@@ -2,6 +2,9 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
 import '../../features/ranking/domain/points_scale.dart';
+// Lo usa el código generado (app_database.g.dart): los ids por defecto
+// de las tablas llaman a newId(), definido aquí.
+import '../utils/ids.dart';
 import 'daos/decks_dao.dart';
 import 'daos/players_dao.dart';
 import 'daos/ranking_dao.dart';
