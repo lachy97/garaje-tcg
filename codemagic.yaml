@@ -1,0 +1,37 @@
+# Alternativa a GitHub Actions: Codemagic (500 min/mes gratis en macOS M2,
+# cuenta personal). Usa el mismo repositorio de GitHub.
+# Secretos: en Codemagic → Teams/Personal → Environment variables, grupo
+# "firma" con KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD.
+workflows:
+  android-apk:
+    name: APK Android
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      java: 17
+      groups:
+        - firma
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+    scripts:
+      - name: Dependencias y código generado
+        script: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+      - name: Tests
+        script: flutter test
+      - name: Clave de firma
+        script: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=app/upload-keystore.jks\n" \
+              "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+          fi
+      - name: Compilar APK
+        script: flutter build apk --release --split-per-abi --build-number=$BUILD_NUMBER
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk

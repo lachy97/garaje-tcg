@@ -1,0 +1,73 @@
+name: garaje_tcg
+description: Gestión offline de torneos TCG para la comunidad Garaje TCG.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.8.0
+  flutter: ">=3.32.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Estado
+  flutter_riverpod: ^3.0.0
+  # Base de datos local (SQLite)
+  drift: ^2.26.0
+  drift_flutter: ^0.2.4
+  path_provider: ^2.1.5
+  # Navegación
+  go_router: ^16.0.0
+  # Utilidades
+  uuid: ^4.5.1
+  intl: ^0.20.2
+  shared_preferences: ^2.5.3
+  package_info_plus: ^8.3.0
+  # Imágenes, exportación y compartir
+  image_picker: ^1.1.2
+  flutter_image_compress: ^2.4.0
+  screenshot: ^3.0.0
+  share_plus: ^11.0.0
+  url_launcher: ^6.3.1
+  file_picker: ^10.1.0
+  # Gráficos
+  fl_chart: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.26.0
+  build_runner: ^2.4.15
+  # Icono y pantalla de carga (se generan una vez con `dart run ...`)
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.6
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo/logo.png
+    - assets/logo/logo_dark.png
+
+# dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/logo/app_icon.png
+  remove_alpha_ios: true
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: assets/logo/app_icon_foreground.png
+  min_sdk_android: 21
+
+# dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#000000"
+  image: assets/logo/logo_dark.png
+  android_12:
+    color: "#000000"
+    image: assets/logo/app_icon_foreground.png
+    icon_background_color: "#000000"
+  fullscreen: false

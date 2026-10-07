@@ -1,0 +1,103 @@
+# Compila la APK de Android en los servidores de GitHub (gratis).
+# Se ejecuta en cada push a "main" y también a mano desde la pestaña Actions
+# ("Run workflow"). La APK queda en la sección "Artifacts" de cada ejecución.
+# Si se sube una etiqueta tipo v0.1.0, además se publica como Release
+# (descarga directa desde el navegador del teléfono).
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # necesario para publicar Releases
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Código generado (Drift)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Tests
+        run: flutter test
+
+      # Firma con la clave de release guardada en los secretos del repositorio.
+      # Sin secretos se firma con la clave de debug (solo para pruebas).
+      - name: Clave de firma
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=app/upload-keystore.jks
+          EOF
+            echo "Firmando con la clave de release"
+          else
+            echo "::warning::Sin secretos de firma: la APK usa la clave de debug"
+          fi
+
+      # Una APK por arquitectura: la arm64 (casi todos los teléfonos actuales)
+      # pesa mucho menos que la APK universal; mejor para la conexión.
+      # El número de compilación sube solo en cada ejecución, así cada APK
+      # nueva se instala encima de la anterior sin borrar los datos.
+      - name: Compilar APK
+        run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
+
+      - name: Renombrar
+        run: |
+          NAME=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
+          VERSION="$NAME-b${{ github.run_number }}"
+          cd build/app/outputs/flutter-apk
+          mv app-arm64-v8a-release.apk "garaje-tcg-$VERSION-arm64.apk"
+          mv app-armeabi-v7a-release.apk "garaje-tcg-$VERSION-arm32.apk"
+          ls -lh *.apk
+
+      - name: APK arm64 (la mayoría de teléfonos)
+        uses: actions/upload-artifact@v4
+        with:
+          name: garaje-tcg-arm64
+          path: build/app/outputs/flutter-apk/*-arm64.apk
+          retention-days: 30
+
+      - name: APK arm32 (teléfonos antiguos)
+        uses: actions/upload-artifact@v4
+        with:
+          name: garaje-tcg-arm32
+          path: build/app/outputs/flutter-apk/*-arm32.apk
+          retention-days: 30
+
+      - name: Publicar Release (solo con etiquetas v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/*.apk
