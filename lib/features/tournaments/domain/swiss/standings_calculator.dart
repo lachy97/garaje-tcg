@@ -6,6 +6,7 @@ import '../tournament_rules.dart';
 ///
 /// Orden: Puntos → OMW% → OOMW% → GW% (juegos ganados) → id (determinista).
 /// - Victoria 3 · Empate 1 · Derrota 0. El BYE cuenta como victoria.
+/// - Doble derrota: los dos suman una derrota (0 puntos) y cuentan como rivales.
 /// - El BYE NO cuenta como rival para OMW% (no hay rival).
 /// - MWP con piso de 33 %. Los matches pendientes se ignoran.
 class StandingsCalculator {
@@ -54,6 +55,9 @@ class StandingsCalculator {
         case MatchResult.draw:
           a.draws++;
           b.draws++;
+        case MatchResult.doubleLoss:
+          a.losses++;
+          b.losses++;
         case MatchResult.pending:
           break;
       }

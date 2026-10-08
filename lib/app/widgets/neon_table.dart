@@ -39,12 +39,21 @@ class NeonTable extends StatelessWidget {
     required this.rows,
     this.fixedWidth,
     this.horizontalPadding = 12,
+    this.fontSize = 14,
+    this.rowPadding = 8,
+    this.headerColor = AppColors.textSecondary,
   });
 
   final List<NeonColumn> columns;
   final List<NeonTableRow> rows;
   final double? fixedWidth;
   final double horizontalPadding;
+
+  /// Tamaño base del texto de las filas (la cabecera usa el 80 %).
+  /// En las imágenes exportadas se usa más grande para que se lea bien.
+  final double fontSize;
+  final double rowPadding;
+  final Color headerColor;
 
   double get _minWidth =>
       columns.fold<double>(0, (s, c) => s + c.width) + horizontalPadding * 2;
@@ -74,11 +83,11 @@ class NeonTable extends StatelessWidget {
           _ => Alignment.center,
         };
 
-    const headStyle = TextStyle(
-      fontSize: 11,
+    final headStyle = TextStyle(
+      fontSize: fontSize * 0.8,
       fontWeight: FontWeight.w800,
       letterSpacing: 0.6,
-      color: AppColors.textSecondary,
+      color: headerColor,
     );
 
     return SizedBox(
@@ -88,7 +97,7 @@ class NeonTable extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: rowPadding),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.moss, width: 1)),
             ),
@@ -102,7 +111,7 @@ class NeonTable extends StatelessWidget {
           ),
           for (final r in rows) ...[
             Container(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: rowPadding),
               decoration: BoxDecoration(
                 color: r.highlight ? AppColors.forest.withValues(alpha: 0.35) : null,
                 border: const Border(
@@ -110,7 +119,7 @@ class NeonTable extends StatelessWidget {
               ),
               child: DefaultTextStyle.merge(
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: fontSize,
                   color: r.dim ? AppColors.textDisabled : AppColors.textPrimary,
                 ),
                 child: Row(children: [

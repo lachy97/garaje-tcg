@@ -1,4 +1,4 @@
-# Garaje TCG
+# Garage TCG
 
 App Flutter **100 % offline** para organizar torneos de Yu-Gi-Oh! (Swiss + Top Cut), ranking trimestral y meta de mazos.
 
@@ -49,9 +49,11 @@ lib/
     (juegos de J1, empates, juegos de J2); se guarda sola al formar un marcador válido
     (2-0-0, 2-0-1, 1-1-1, 1-0-2, 0-0-2). Botón flotante ">" para avanzar:
     generar ronda → iniciar Top → siguiente ronda → finalizar (siempre con confirmación).
+    Casilla **Doble derrota** (Swiss) para cuando se acaba el tiempo: 0-0-0, pierden los dos.
+    **Reloj de ronda** (45 min por defecto, editable antes de empezar): se inicia a mano y avisa al llegar a 0.
   - *Clasificación*: tabla Swiss en vivo (Pts, OMW%, OOMW%, GW%) con línea de corte y resultado final con puntos.
-- **Ranking**: tabla del trimestre (puntos, mazo, PJ/V/D/E, WR%, torneos, mejor puesto) y exportación a imagen PNG para compartir.
-- **Mazos**: lista, crear, renombrar y fusionar duplicados.
+- **Ranking**: tabla del trimestre (selector de temporada; puntos, mazo, PJ/V/D/E, WR%, torneos, mejor puesto) y exportación a imágenes PNG nítidas (12 jugadores por imagen) para compartir.
+- **Mazos**: tier list S/A/B/C y tabla de la temporada con la puntuación ponderada (Score), exportable como imágenes. *Gestionar mazos* (crear, renombrar, fusionar duplicados) en el botón de la barra.
 - **Jugadores**: contador, lista con búsqueda, alta y borrado. Al tocar un jugador se abre su **perfil**: datos personales (nombre, Konami ID, teléfono, notas), resumen (torneos, partidas, V-D-E, winrate, títulos, mejor puesto), mazos usados (veces, PJ, V/D/E, WR%, última vez) e historial de todas sus partidas agrupado por torneo (fase, rival y su mazo, marcador y resultado).
 
 ## Diseño visual

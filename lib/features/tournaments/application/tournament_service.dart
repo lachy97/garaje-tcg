@@ -72,6 +72,24 @@ class TournamentService {
     await _dao.reportScore(matchId, score);
   }
 
+  /// Doble derrota: se acabó el tiempo y los dos pierden (0-0-0). Solo en Swiss.
+  Future<void> reportDoubleLoss(String matchId) async {
+    final m = await _dao.matchById(matchId);
+    if (m == null) throw const TournamentException('Match no encontrado.');
+    if (m.isBye) throw const TournamentException('El BYE no se reporta.');
+    final ctx = await _load(m.tournamentId);
+    final round = ctx.roundById[m.roundId]!;
+    if (round.id != ctx.currentRound?.id) {
+      throw const TournamentException(
+          'Solo se pueden reportar o corregir resultados de la ronda actual.');
+    }
+    if (round.phase == RoundPhase.topCut) {
+      throw const TournamentException(
+          'En el Top Cut no puede haber doble derrota: debe haber un ganador.');
+    }
+    await _dao.reportDoubleLoss(matchId);
+  }
+
   Future<void> clearResult(String matchId) async {
     final m = await _dao.matchById(matchId);
     if (m == null || m.isBye) return;
@@ -105,6 +123,25 @@ class TournamentService {
     }
     await _dao.updateSettings(tournamentId, topCutSize: size);
   }
+
+  /// Cambia el tiempo por ronda. Solo durante la inscripción.
+  Future<void> setRoundMinutes(String tournamentId, int minutes) async {
+    final ctx = await _load(tournamentId);
+    _ensureNotStarted(ctx.tournament);
+    if (minutes < TournamentRules.minRoundMinutes ||
+        minutes > TournamentRules.maxRoundMinutes) {
+      throw const TournamentException('El tiempo por ronda debe estar entre '
+          '${TournamentRules.minRoundMinutes} y ${TournamentRules.maxRoundMinutes} min.');
+    }
+    await _dao.updateSettings(tournamentId, roundMinutes: minutes);
+  }
+
+  /// Inicia (o reinicia) el reloj de la ronda actual. El tiempo solo avisa:
+  /// los resultados los pone siempre el organizador.
+  Future<void> startRoundTimer(String roundId) => _dao.setRoundTimer(roundId, DateTime.now());
+
+  /// Detiene el reloj (vuelve a "sin iniciar").
+  Future<void> stopRoundTimer(String roundId) => _dao.setRoundTimer(roundId, null);
 
   void _ensureNotStarted(Tournament t) {
     if (t.status != TournamentStatus.draft) {

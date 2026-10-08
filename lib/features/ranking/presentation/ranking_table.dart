@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/neon_table.dart';
+import '../../../app/widgets/table_export.dart';
 import '../domain/ranking_row.dart';
 
-/// Tabla del ranking trimestral. La usan la pantalla y la imagen exportada.
+/// Tabla del ranking trimestral. La usan la pantalla y las imágenes exportadas.
 class RankingTable extends StatelessWidget {
-  const RankingTable({super.key, required this.rows, this.fixedWidth});
+  const RankingTable({super.key, required this.rows, this.fixedWidth, this.forExport = false});
 
   final List<RankingRow> rows;
 
   /// Ancho fijo (exportación). En pantalla es null y la tabla se adapta/desplaza.
   final double? fixedWidth;
+
+  /// Letra más grande y colores más claros para la imagen.
+  final bool forExport;
 
   static const columns = [
     NeonColumn('#', width: 36, align: TextAlign.start),
@@ -27,11 +31,30 @@ class RankingTable extends StatelessWidget {
     NeonColumn('Mejor', width: 50),
   ];
 
+  /// Columnas de la imagen: más anchas para letra grande (suman 724 + 24 ≤ 750).
+  static const exportColumns = [
+    NeonColumn('#', width: 40, align: TextAlign.start),
+    NeonColumn('Jugador', width: 140, align: TextAlign.start, flex: true),
+    NeonColumn('Pts', width: 62),
+    NeonColumn('Mazo', width: 150, align: TextAlign.start),
+    NeonColumn('PJ', width: 42),
+    NeonColumn('V', width: 38),
+    NeonColumn('D', width: 38),
+    NeonColumn('E', width: 38),
+    NeonColumn('WR%', width: 62),
+    NeonColumn('Torn', width: 52),
+    NeonColumn('Mejor', width: 62),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final secondary = forExport ? AppColors.textPrimary : AppColors.textSecondary;
     return NeonTable(
       fixedWidth: fixedWidth,
-      columns: columns,
+      columns: forExport ? exportColumns : columns,
+      fontSize: forExport ? kExportFontSize : 14,
+      rowPadding: forExport ? kExportRowPadding : 8,
+      headerColor: forExport ? AppColors.neon : AppColors.textSecondary,
       rows: [
         for (final r in rows)
           NeonTableRow(
@@ -41,7 +64,7 @@ class RankingTable extends StatelessWidget {
                 '${r.rank}',
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
-                  color: r.rank <= 3 ? AppColors.neon : AppColors.textSecondary,
+                  color: r.rank <= 3 ? AppColors.neon : secondary,
                   shadows: r.rank == 1 ? AppColors.textGlow(blur: 8) : null,
                 ),
               ),
@@ -55,7 +78,8 @@ class RankingTable extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
               Text(r.lastDeck ?? '—',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  style: TextStyle(
+                      fontSize: forExport ? kExportFontSize - 2 : 13, color: secondary)),
               Text('${r.played}'),
               Text('${r.wins}', style: const TextStyle(color: AppColors.win)),
               Text('${r.losses}', style: const TextStyle(color: AppColors.loss)),

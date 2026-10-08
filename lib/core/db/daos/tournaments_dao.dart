@@ -50,6 +50,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     required int swissRounds,
     int topCutSize = 0,
     bool hasThirdPlaceMatch = true,
+    int roundMinutes = TournamentRules.defaultRoundMinutes,
     String game = kDefaultGame,
     String? notes,
   }) {
@@ -68,6 +69,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
         swissRounds: swissRounds,
         topCutSize: Value(topCutSize),
         hasThirdPlaceMatch: Value(hasThirdPlaceMatch),
+        roundMinutes: Value(roundMinutes),
         notes: Value(notes),
       ));
     });
@@ -92,6 +94,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     int? swissRounds,
     int? topCutSize,
     bool? hasThirdPlaceMatch,
+    int? roundMinutes,
   }) {
     return (update(tournaments)..where((t) => t.id.equals(id))).write(
       TournamentsCompanion(
@@ -99,6 +102,17 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
         swissRounds: Value.absentIfNull(swissRounds),
         topCutSize: Value.absentIfNull(topCutSize),
         hasThirdPlaceMatch: Value.absentIfNull(hasThirdPlaceMatch),
+        roundMinutes: Value.absentIfNull(roundMinutes),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Pone en marcha (o reinicia) el reloj de una ronda. null = lo detiene.
+  Future<void> setRoundTimer(String roundId, DateTime? startedAt) {
+    return (update(rounds)..where((r) => r.id.equals(roundId))).write(
+      RoundsCompanion(
+        timerStartedAt: Value(startedAt),
         updatedAt: Value(DateTime.now()),
       ),
     );
@@ -315,6 +329,21 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
         games1: Value(score.p1),
         gamesDraw: Value(score.draws),
         games2: Value(score.p2),
+        reportedAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
+  /// Doble derrota (se acabó el tiempo): 0-0-0 y pierden los dos.
+  Future<void> reportDoubleLoss(String matchId) {
+    final now = DateTime.now();
+    return (update(matches)..where((m) => m.id.equals(matchId))).write(
+      MatchesCompanion(
+        result: const Value(MatchResult.doubleLoss),
+        games1: const Value(0),
+        gamesDraw: const Value(0),
+        games2: const Value(0),
         reportedAt: Value(now),
         updatedAt: Value(now),
       ),

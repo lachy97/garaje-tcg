@@ -11,6 +11,7 @@ import '../../application/tournament_service.dart';
 import '../../domain/tournament_rules.dart';
 import '../providers.dart';
 import 'match_score_card.dart';
+import 'round_timer.dart';
 
 /// Rondas: configuración (rondas Swiss / Top Cut), pairings, reporte de
 /// resultados y botón para avanzar el torneo.
@@ -96,6 +97,7 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                             t.status != TournamentStatus.finished,
                         names: names,
                         deckNames: deckNames,
+                        roundMinutes: t.roundMinutes,
                       ),
                     // espacio para que el botón flotante no tape la última tarjeta
                     const SliverToBoxAdapter(child: SizedBox(height: 104)),
@@ -159,7 +161,7 @@ class _ConfigCard extends ConsumerWidget {
             const Icon(Icons.lock_outline, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 10),
             Expanded(
-              child: Text('${t.swissRounds} rondas Swiss · $topLabel',
+              child: Text('${t.swissRounds} rondas Swiss · $topLabel · ${t.roundMinutes} min/ronda',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
             const Text('Fijado',
@@ -194,6 +196,24 @@ class _ConfigCard extends ConsumerWidget {
                 max: TournamentRules.maxSwissRounds,
                 onChanged: (v) =>
                     runGuarded(context, () => service.setSwissRounds(t.id, v)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Tiempo por ronda',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+              NumberStepper(
+                value: t.roundMinutes,
+                min: TournamentRules.minRoundMinutes,
+                max: TournamentRules.maxRoundMinutes,
+                step: 5,
+                suffix: 'min',
+                onChanged: (v) =>
+                    runGuarded(context, () => service.setRoundMinutes(t.id, v)),
               ),
             ],
           ),
@@ -256,12 +276,14 @@ class _MatchesSliver extends ConsumerWidget {
     required this.isCurrent,
     required this.names,
     required this.deckNames,
+    required this.roundMinutes,
   });
 
   final Round round;
   final bool isCurrent;
   final Map<String, String> names;
   final Map<String, String> deckNames;
+  final int roundMinutes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -298,6 +320,7 @@ class _MatchesSliver extends ConsumerWidget {
               color: pending == 0 ? AppColors.leaf : AppColors.textSecondary,
             ),
           ),
+          if (isCurrent) RoundTimer(round: round, minutes: roundMinutes),
           const SizedBox(height: 8),
           for (final m in list)
             MatchScoreCard(

@@ -1,4 +1,6 @@
-# Decisiones de diseño — Garaje TCG
+# Decisiones de diseño — Garage TCG
+
+- Nombre de la app: **Garage TCG**; en el lanzador de Android/iOS aparece **GARAGE TCG**. El identificador interno del paquete sigue siendo `garaje_tcg` para que las actualizaciones se instalen encima de la versión anterior.
 
 ## Plataforma y datos
 - Flutter + Riverpod + **Drift (SQLite)**. Isar/Hive descartados por estar casi abandonados; los datos son relacionales y las estadísticas son agregaciones SQL.
@@ -26,6 +28,8 @@
 - Top Cut según asistencia: **menos de 15 jugadores → Top 4** (mínimo 6 jugadores); 15+ → Top 8; 24+ → Top 16; 48+ → Top 32. Se siembra 1 vs N según el Swiss (el 1 y el 2 solo se cruzan en la final). Los jugadores retirados no entran al Top.
 - Pairings: ronda 1 aleatoria; después por puntos, con orden aleatorio dentro de cada grupo de puntos. Backtracking sin repetir rivales; solo se repite rival si es imposible evitarlo. El BYE va al jugador con menos puntos que aún no haya tenido BYE.
 - En el Top Cut no hay empates: cada match necesita un ganador.
+- **Doble derrota** (solo Swiss): si se acaba el tiempo y el match no terminó, el organizador marca la casilla "Doble derrota" y queda 0-0-0 con derrota para los dos (0 puntos, cuenta como partida jugada y como rival enfrentado). No es automática. Se guarda como `result = doubleLoss`.
+- **Tiempo por ronda**: 45 min por defecto, configurable de 5 a 120 (de 5 en 5) al crear el torneo o durante la inscripción; al generar la ronda 1 queda fijo (BD v4: `tournaments.round_minutes`). En la ronda actual se inicia el reloj a mano ("Iniciar tiempo"), se puede reiniciar o detener; se guarda la hora de inicio (`rounds.timer_started_at`), así sigue bien aunque se cierre la app. Al llegar a 0 avisa (vibración, sonido y mensaje) y muestra el tiempo extra; nunca pone resultados.
 - **3º/4º se decide con una partida por el 3er puesto.**
 - Posiciones 5-8, 9-16, … se ordenan por standing Swiss dentro de su tramo.
 
@@ -39,14 +43,17 @@
 - **Fuera del Top Cut: 0 puntos.**
 - Desempates: puntos, mejor posición, winrate, menos torneos.
 - Tabla con: #, jugador, puntos, último mazo, PJ, V, D, E, WR%, torneos y mejor posición. Solo cuentan torneos terminados; PJ excluye BYE.
-- Exportación a PNG de la tabla completa (cualquier número de filas), 1600 px de ancho, y menú de compartir de Android.
+- Se puede consultar cualquier temporada (selector en el título), no solo la actual.
+- **Exportación**: imágenes PNG de 1920 px de ancho con **12 filas por imagen** (letra grande y colores claros), compartidas todas juntas. Una sola imagen larga se reducía mucho al enviarla por WhatsApp y el texto se volvía ilegible. Recomendado enviar en calidad HD.
 
 ## Puntuación de mazos
 - PP = 3·V_swiss + 1·E_swiss + 6·V_top + 3·Entradas_top + 5·Títulos
 - WRp = (V_swiss + 2·V_top + 0.5·E + 5) / (Partidas_swiss + 2·Partidas_top + 10)
 - Score = PP × (0.5 + WRp)
 - Desempates: títulos, victorias en Top, WRp, mejor resultado.
-- "Mejor rendimiento" exige un mínimo de 8 partidas.
+- Pestaña **Mazos** = tabla de la temporada para la tier list de fin de trimestre: #, tier, mazo, Score, uso (inscripciones), jugadores distintos, PJ, V, D, E, WR%, entradas al Top, V en Top, títulos y mejor posición. Solo torneos terminados; la doble derrota cuenta como derrota para ambos mazos.
+- **Tiers** relativos al mejor Score de la temporada: S ≥ 70 %, A ≥ 45 %, B ≥ 20 %, C el resto. Se muestra la tier list (filas S/A/B/C) y la tabla; se exporta como imágenes (la tier list primero, luego la tabla de 12 en 12).
+- Crear, renombrar y fusionar mazos pasa a "Gestionar mazos" (botón en la barra de Mazos).
 
 ## Pendiente de confirmar
 - Torneos de menos de 6 jugadores: no tienen Top Cut, así que no dan puntos de ranking.

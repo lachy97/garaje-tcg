@@ -99,12 +99,18 @@ class NumberStepper extends StatelessWidget {
     required this.min,
     required this.max,
     required this.onChanged,
+    this.step = 1,
+    this.suffix,
   });
 
   final int value;
   final int min;
   final int max;
   final ValueChanged<int> onChanged;
+  final int step;
+
+  /// Texto pequeño bajo el número (p. ej. "min").
+  final String? suffix;
 
   @override
   Widget build(BuildContext context) {
@@ -112,18 +118,26 @@ class NumberStepper extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton.outlined(
-          onPressed: value > min ? () => onChanged(value - 1) : null,
+          onPressed: value > min ? () => onChanged((value - step).clamp(min, max)) : null,
           icon: const Icon(Icons.remove),
         ),
         SizedBox(
-          width: 44,
-          child: Text('$value',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.neon)),
+          width: suffix == null ? 44 : 64,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$value',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.neon)),
+              if (suffix != null)
+                Text(suffix!,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            ],
+          ),
         ),
         IconButton.outlined(
-          onPressed: value < max ? () => onChanged(value + 1) : null,
+          onPressed: value < max ? () => onChanged((value + step).clamp(min, max)) : null,
           icon: const Icon(Icons.add),
         ),
       ],

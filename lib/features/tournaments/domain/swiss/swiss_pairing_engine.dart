@@ -64,6 +64,7 @@ class SwissPairingEngine {
           _add(points, m.player1Id, TournamentRules.drawPoints);
           _add(points, m.player2Id!, TournamentRules.drawPoints);
         case MatchResult.pending:
+        case MatchResult.doubleLoss:
           break;
       }
     }

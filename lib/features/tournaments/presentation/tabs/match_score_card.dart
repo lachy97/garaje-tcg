@@ -43,6 +43,9 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
   late int _draws;
   late int _p2;
 
+  /// Doble derrota marcada (se acabó el tiempo y pierden los dos).
+  late bool _doubleLoss;
+
   Match get m => widget.match;
   bool get _isTopCut => widget.phase == RoundPhase.topCut;
 
@@ -62,13 +65,15 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
     final saved = old.match != m &&
         m.games1 != null &&
         (m.games1 != _p1 || (m.gamesDraw ?? 0) != _draws || (m.games2 ?? 0) != _p2);
-    if (changedMatch || saved) _loadFromMatch();
+    final dl = old.match != m && (m.result == MatchResult.doubleLoss) != _doubleLoss;
+    if (changedMatch || saved || dl) _loadFromMatch();
   }
 
   void _loadFromMatch() {
     _p1 = m.games1 ?? 0;
     _draws = m.gamesDraw ?? 0;
     _p2 = m.games2 ?? 0;
+    _doubleLoss = m.result == MatchResult.doubleLoss;
   }
 
   GameScore get _local => GameScore(_p1, _draws, _p2);
@@ -105,6 +110,30 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
     }
   }
 
+  Future<void> _toggleDoubleLoss(bool? value) async {
+    if (value == true) {
+      if (m.result.isReported && !_doubleLoss) {
+        final ok = await confirmDialog(
+          context,
+          title: 'Doble derrota',
+          message: 'Se reemplazará el resultado ${_savedLabel()} por 0-0-0 '
+              '(pierden los dos).',
+          confirm: 'Aplicar',
+          danger: true,
+        );
+        if (!ok || !mounted) return;
+      }
+      setState(() {
+        _p1 = _draws = _p2 = 0;
+        _doubleLoss = true;
+      });
+      await runGuarded(
+          context, () => ref.read(tournamentServiceProvider).reportDoubleLoss(m.id));
+    } else {
+      await _clear();
+    }
+  }
+
   Future<void> _clear() async {
     final ok = await confirmDialog(
       context,
@@ -115,10 +144,17 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
     );
     if (!ok || !mounted) return;
     await runGuarded(context, () => ref.read(tournamentServiceProvider).clearResult(m.id));
-    if (mounted) setState(() => _p1 = _draws = _p2 = 0);
+    if (mounted) {
+      setState(() {
+        _p1 = _draws = _p2 = 0;
+        _doubleLoss = false;
+      });
+    }
   }
 
-  String _savedLabel() => m.games1 == null
+  String _savedLabel() => m.result == MatchResult.doubleLoss
+      ? '0-0-0 (doble derrota)'
+      : m.games1 == null
       ? ''
       : '${m.games1}-${m.gamesDraw ?? 0}-${m.games2 ?? 0}';
 
@@ -130,9 +166,11 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
     if (m.isBye) return _ByeCard(name: p1, deck: widget.deckNames[m.deck1Id]);
 
     final score = _local;
-    final valid = _isValid(score);
+    final valid = _isValid(score) || _doubleLoss;
     final untouched = _p1 == 0 && _draws == 0 && _p2 == 0;
-    final status = _statusFor(score, valid, untouched, p1, p2!);
+    final status = _doubleLoss
+        ? ('Doble derrota · 0-0-0 (pierden los dos)', AppColors.loss)
+        : _statusFor(score, valid, untouched, p1, p2!);
     final title = m.isThirdPlace
         ? '3ER PUESTO'
         : _isTopCut
@@ -146,10 +184,14 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: valid ? AppColors.neon : AppColors.outline,
+          color: _doubleLoss
+              ? AppColors.loss
+              : valid
+                  ? AppColors.neon
+                  : AppColors.outline,
           width: valid ? 1.2 : 0.8,
         ),
-        boxShadow: valid ? AppColors.glow(strength: 0.5) : null,
+        boxShadow: valid && !_doubleLoss ? AppColors.glow(strength: 0.5) : null,
       ),
       child: Column(
         children: [
@@ -168,7 +210,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                 child: _PlayerHeader(
                   name: p1,
                   deck: widget.deckNames[m.deck1Id],
-                  highlight: valid && score.p1 > score.p2,
+                  highlight: !_doubleLoss && valid && score.p1 > score.p2,
                 ),
               ),
               const SizedBox(
@@ -186,9 +228,9 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
               ),
               Expanded(
                 child: _PlayerHeader(
-                  name: p2,
+                  name: p2!,
                   deck: widget.deckNames[m.deck2Id],
-                  highlight: valid && score.p2 > score.p1,
+                  highlight: !_doubleLoss && valid && score.p2 > score.p1,
                   alignEnd: true,
                 ),
               ),
@@ -216,11 +258,39 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                             1 => _draws == value,
                             _ => _p2 == value,
                           },
-                          enabled: widget.editable && _optionPossible(column, value),
+                          enabled: widget.editable &&
+                              !_doubleLoss &&
+                              _optionPossible(column, value),
                           onTap: () => _select(column, value),
                         ),
                       ),
                     ),
+                ],
+              ),
+            ),
+          if (!_isTopCut && (widget.editable || _doubleLoss))
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: widget.editable ? () => _toggleDoubleLoss(!_doubleLoss) : null,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Checkbox(
+                    value: _doubleLoss,
+                    onChanged: widget.editable ? _toggleDoubleLoss : null,
+                    activeColor: AppColors.loss,
+                    side: const BorderSide(color: AppColors.textSecondary, width: 1.5),
+                  ),
+                  Flexible(
+                    child: Text(
+                      'Doble derrota (se acabó el tiempo)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _doubleLoss ? AppColors.loss : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -230,7 +300,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.w700, color: status.$2),
           ),
-          if (!valid && m.result.isReported)
+          if (!valid && !_doubleLoss && m.result.isReported)
             Text('Guardado: ${_savedLabel()}',
                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           if (widget.editable && m.result.isReported)

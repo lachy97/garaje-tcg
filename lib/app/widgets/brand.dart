@@ -82,7 +82,7 @@ class NeonCard extends StatelessWidget {
   }
 }
 
-/// Título "GARAJE TCG" con brillo.
+/// Título "GARAGE TCG" con brillo.
 class BrandTitle extends StatelessWidget {
   const BrandTitle({super.key, this.fontSize = 28});
 
@@ -91,7 +91,7 @@ class BrandTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      'GARAJE TCG',
+      'GARAGE TCG',
       style: TextStyle(
         fontSize: fontSize,
         fontWeight: FontWeight.w900,

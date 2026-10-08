@@ -216,6 +216,7 @@ String phaseLabel({
   final outcome = switch (result) {
     MatchResult.pending => Outcome.pending,
     MatchResult.draw => Outcome.draw,
+    MatchResult.doubleLoss => Outcome.loss,
     MatchResult.p1Win => isPlayer1 ? Outcome.win : Outcome.loss,
     MatchResult.p2Win => isPlayer1 ? Outcome.loss : Outcome.win,
   };

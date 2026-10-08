@@ -112,6 +112,10 @@ class Tournaments extends Table with SyncColumns {
       boolean().withDefault(const Constant(true))();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get finishedAt => dateTime().nullable()();
+
+  /// Duración de cada ronda en minutos (v4). Solo informativo: el tiempo
+  /// no decide resultados, avisa al organizador.
+  IntColumn get roundMinutes => integer().withDefault(const Constant(45))();
 }
 
 @DataClassName('TournamentPlayer')
@@ -153,6 +157,9 @@ class Rounds extends Table with SyncColumns {
   IntColumn get bracketSize => integer().nullable()();
   TextColumn get status =>
       textEnum<RoundStatus>().withDefault(const Constant('open'))();
+
+  /// Cuándo se puso en marcha el reloj de la ronda (v4). null = sin iniciar.
+  DateTimeColumn get timerStartedAt => dateTime().nullable()();
 
   @override
   List<Set<Column<Object>>> get uniqueKeys => [

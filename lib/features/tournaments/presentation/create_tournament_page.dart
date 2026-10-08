@@ -24,6 +24,7 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
   DateTime _date = DateTime.now();
   int _rounds = 3;
   int _topCut = 0;
+  int _minutes = TournamentRules.defaultRoundMinutes;
   bool _saving = false;
 
   @override
@@ -51,6 +52,7 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
             date: _date,
             swissRounds: _rounds,
             topCutSize: _topCut,
+            roundMinutes: _minutes,
           );
       if (mounted) context.pushReplacement('/torneos/${t.id}');
     } finally {
@@ -109,12 +111,26 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
                 onChanged: (v) => setState(() => _topCut = v),
               ),
             ),
+            const SectionLabel('Tiempo por ronda'),
+            NeonCard(
+              child: Center(
+                child: NumberStepper(
+                  value: _minutes,
+                  min: TournamentRules.minRoundMinutes,
+                  max: TournamentRules.maxRoundMinutes,
+                  step: 5,
+                  suffix: 'min',
+                  onChanged: (v) => setState(() => _minutes = v),
+                ),
+              ),
+            ),
             const SectionLabel('Sugerencia (solo orientativa)'),
             const NeonCard(child: _SuggestionTable()),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
-                'Se usa exactamente lo que elijas. Puedes cambiarlo mientras inscribes '
+                'Se usa exactamente lo que elijas (rondas, Top Cut y tiempo). '
+                'Puedes cambiarlo mientras inscribes '
                 'jugadores; al generar la ronda 1 queda fijo.',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),

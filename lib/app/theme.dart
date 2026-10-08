@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Paleta sacada del logo de Garaje TCG: negro de fondo + verdes neón.
+/// Paleta sacada del logo de Garage TCG: negro de fondo + verdes neón.
 class AppColors {
   const AppColors._();
 

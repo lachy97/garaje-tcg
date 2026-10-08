@@ -20,7 +20,7 @@ class GarajeTcgApp extends ConsumerWidget {
     ));
 
     return MaterialApp.router(
-      title: 'Garaje TCG',
+      title: 'Garage TCG',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark, // la app es siempre oscura
       darkTheme: AppTheme.dark,

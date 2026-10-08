@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/decks/presentation/deck_manage_page.dart';
 import '../features/decks/presentation/decks_page.dart';
 import '../features/players/presentation/player_profile_page.dart';
 import '../features/players/presentation/players_page.dart';
@@ -45,7 +46,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(path: '/ranking', builder: (_, _) => const RankingPage()),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: '/mazos', builder: (_, _) => const DecksPage()),
+            GoRoute(
+              path: '/mazos',
+              builder: (_, _) => const DecksPage(),
+              routes: [
+                GoRoute(
+                  path: 'gestionar',
+                  parentNavigatorKey: _rootKey,
+                  builder: (_, _) => const DeckManagePage(),
+                ),
+              ],
+            ),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(

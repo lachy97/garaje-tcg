@@ -10,6 +10,11 @@ class TournamentRules {
   static const int minSwissRounds = 1;
   static const int maxSwissRounds = 15;
 
+  /// Tiempo por ronda (minutos). Editable antes de empezar el torneo.
+  static const int defaultRoundMinutes = 45;
+  static const int minRoundMinutes = 5;
+  static const int maxRoundMinutes = 120;
+
   /// Piso de MWP/OMW% (estándar: 33 %), evita que rivales muy malos hundan a alguien.
   static const double minMatchWinPct = 1 / 3;
 

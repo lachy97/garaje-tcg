@@ -42,7 +42,7 @@ class AppDatabase extends _$AppDatabase {
   static QueryExecutor _open() => driftDatabase(name: kDatabaseName);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -58,6 +58,11 @@ class AppDatabase extends _$AppDatabase {
             // v3: datos personales del jugador
             await m.addColumn(players, players.konamiId);
             await m.addColumn(players, players.phone);
+          }
+          if (from < 4) {
+            // v4: tiempo por ronda
+            await m.addColumn(tournaments, tournaments.roundMinutes);
+            await m.addColumn(rounds, rounds.timerStartedAt);
           }
         },
         beforeOpen: (details) async {

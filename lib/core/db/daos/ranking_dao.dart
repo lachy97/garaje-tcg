@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../features/decks/domain/deck_stats.dart';
 import '../../../features/ranking/domain/points_scale.dart';
 import '../../../features/ranking/domain/ranking_row.dart';
 import '../app_database.dart';
@@ -129,6 +130,9 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
         case 'draw':
           add(d, p1);
           add(d, p2);
+        case 'doubleLoss':
+          add(l, p1);
+          add(l, p2);
       }
     }
     final lastDeck = <String, String?>{
@@ -157,5 +161,64 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
           ..where((r) => r.tournamentId.equals(tournamentId))
           ..orderBy([(r) => OrderingTerm.asc(r.position)]))
         .watch();
+  }
+
+  // ───────────────────────── Mazos (tier list) ─────────────────────────
+
+  /// Tabla de mazos de la temporada. Se recalcula al terminar torneos o al
+  /// renombrar/fusionar mazos.
+  Stream<List<DeckSeasonStats>> watchSeasonDecks(String seasonId) {
+    final db = attachedDatabase;
+    return customSelect(
+      'SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?',
+      variables: [Variable.withString(seasonId)],
+      readsFrom: {db.tournaments, db.tournamentPlayers, db.decks, db.matches},
+    ).watch().asyncMap((_) => seasonDecks(seasonId));
+  }
+
+  Future<List<DeckSeasonStats>> seasonDecks(String seasonId) async {
+    final sid = Variable.withString(seasonId);
+    const finished = "t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished'";
+
+    final entries = await customSelect(
+      'SELECT tp.deck_id AS deck, d.name AS name, tp.player_id AS pid, '
+      't.top_cut_size AS top, tp.final_position AS pos '
+      'FROM tournament_players tp '
+      'JOIN tournaments t ON t.id = tp.tournament_id '
+      'JOIN decks d ON d.id = tp.deck_id '
+      'WHERE $finished AND tp.deleted_at IS NULL AND tp.deck_id IS NOT NULL',
+      variables: [sid],
+    ).get();
+
+    final matches = await customSelect(
+      'SELECT m.deck1_id AS d1, m.deck2_id AS d2, m.result AS r, rd.phase AS phase '
+      'FROM matches m '
+      'JOIN tournaments t ON t.id = m.tournament_id '
+      'JOIN rounds rd ON rd.id = m.round_id '
+      "WHERE $finished AND m.deleted_at IS NULL AND m.is_bye = 0 AND m.result != 'pending'",
+      variables: [sid],
+    ).get();
+
+    return DeckStats.compute(
+      entries: [
+        for (final e in entries)
+          DeckEntryRow(
+            deckId: e.read<String>('deck'),
+            deckName: e.read<String>('name'),
+            playerId: e.read<String>('pid'),
+            topCutSize: e.read<int>('top'),
+            finalPosition: e.read<int?>('pos'),
+          ),
+      ],
+      matches: [
+        for (final m in matches)
+          DeckMatchRow(
+            deck1Id: m.read<String?>('d1'),
+            deck2Id: m.read<String?>('d2'),
+            result: MatchResult.values.byName(m.read<String>('r')),
+            isTopCut: m.read<String>('phase') == RoundPhase.topCut.name,
+          ),
+      ],
+    );
   }
 }

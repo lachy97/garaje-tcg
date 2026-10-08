@@ -16,7 +16,11 @@ enum MatchResult {
   pending,
   p1Win,
   p2Win,
-  draw;
+  draw,
+
+  /// Se acabó el tiempo sin terminar el match: pierden los dos (0-0-0).
+  /// Solo en Swiss; el organizador lo marca a mano.
+  doubleLoss;
 
   bool get isReported => this != MatchResult.pending;
 }

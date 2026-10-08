@@ -5,21 +5,17 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
-import '../../../core/utils/season_utils.dart';
 import '../domain/ranking_row.dart';
 import 'ranking_export.dart';
 import 'ranking_table.dart';
-
-final currentSeasonProvider = FutureProvider.autoDispose<Season>((ref) {
-  return ref.watch(seasonsDaoProvider).current();
-});
+import 'season_picker.dart';
 
 final seasonRankingProvider =
     StreamProvider.autoDispose.family<List<RankingRow>, String>((ref, seasonId) {
   return ref.watch(rankingDaoProvider).watchSeasonRanking(seasonId);
 });
 
-/// Ranking trimestral en tabla, con exportación a imagen.
+/// Ranking trimestral en tabla, con exportación a imágenes.
 class RankingPage extends ConsumerStatefulWidget {
   const RankingPage({super.key});
 
@@ -29,6 +25,7 @@ class RankingPage extends ConsumerStatefulWidget {
 
 class _RankingPageState extends ConsumerState<RankingPage> {
   bool _exporting = false;
+  String? _seasonId; // null = trimestre actual
 
   Future<void> _export(Season season, List<RankingRow> rows) async {
     setState(() => _exporting = true);
@@ -43,8 +40,9 @@ class _RankingPageState extends ConsumerState<RankingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final season = ref.watch(currentSeasonProvider);
-    final s = season.value;
+    final seasons = ref.watch(seasonListProvider);
+    final list = seasons.value;
+    final s = list == null || list.isEmpty ? null : pickSeason(list, _seasonId);
     final rows = s == null ? null : ref.watch(seasonRankingProvider(s.id)).value;
 
     return Scaffold(
@@ -53,7 +51,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
         actions: [
           if (s != null && rows != null && rows.isNotEmpty)
             IconButton(
-              tooltip: 'Exportar imagen',
+              tooltip: 'Exportar imágenes',
               onPressed: _exporting ? null : () => _export(s, rows),
               icon: _exporting
                   ? const SizedBox(
@@ -65,23 +63,19 @@ class _RankingPageState extends ConsumerState<RankingPage> {
         ],
       ),
       body: AsyncView(
-        value: season,
-        builder: (s) {
-          final ranking = ref.watch(seasonRankingProvider(s.id));
+        value: seasons,
+        builder: (all) {
+          final season = pickSeason(all, _seasonId);
+          final ranking = ref.watch(seasonRankingProvider(season.id));
           return AsyncView(
             value: ranking,
             builder: (list) => ListView(
               padding: const EdgeInsets.only(bottom: 32),
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    'Temporada ${seasonLabel(s.year, s.quarter)}',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          shadows: AppColors.textGlow(blur: 8),
-                        ),
-                  ),
+                SeasonPicker(
+                  seasons: all,
+                  selected: season,
+                  onChanged: (v) => setState(() => _seasonId = v.id),
                 ),
                 if (list.isEmpty)
                   const Padding(
@@ -106,9 +100,18 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                     child: OutlinedButton.icon(
-                      onPressed: _exporting ? null : () => _export(s, list),
+                      onPressed: _exporting ? null : () => _export(season, list),
                       icon: const Icon(Icons.image_outlined),
                       label: const Text('EXPORTAR RANKING COMO IMAGEN'),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Text(
+                      'Se genera una imagen por cada 12 jugadores para que se lea bien. '
+                      'En WhatsApp, envíalas en calidad HD.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ),
                 ],

@@ -22,7 +22,7 @@ void main() {
       ),
     );
 
-    expect(find.text('GARAJE TCG'), findsOneWidget);
+    expect(find.text('GARAGE TCG'), findsOneWidget);
     expect(find.text('Mesa 1'), findsOneWidget);
 
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
