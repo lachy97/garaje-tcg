@@ -23,11 +23,12 @@ Future<bool> runExport<T>(BuildContext context, ExportSpec<T> spec) async {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           ),
           _option(ctx, ExportFormat.singleImage, Icons.photo_size_select_large,
-              'Imagen única (alta calidad)',
-              'Toda la tabla en una sola imagen. Se envía como documento para que '
-                  'WhatsApp no la comprima: al abrirla se hace zoom y se lee nítida.'),
+              'Imagen única (como documento)',
+              'Toda la tabla en una sola imagen de alta resolución, dentro de un '
+                  'archivo PDF para que WhatsApp la envíe como documento sin '
+                  'comprimirla: al abrirla se hace zoom y se lee nítida.'),
           _option(ctx, ExportFormat.pdf, Icons.picture_as_pdf_outlined, 'Documento PDF',
-              'Texto nítido a cualquier zoom, varias páginas si hace falta. '
+              'Tabla en hojas A4 con texto nítido a cualquier zoom. '
                   'Ideal para guardar o imprimir.'),
           _option(ctx, ExportFormat.pagedImages, Icons.collections_outlined,
               'Imágenes para el chat',

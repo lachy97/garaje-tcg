@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart' show PdfPageFormat;
+import 'package:pdf/widgets.dart' as pw;
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -69,9 +72,13 @@ Future<void> exportPagedImages<T>(BuildContext context, ExportSpec<T> spec,
   await SharePlus.instance.share(ShareParams(files: files, text: spec.shareText));
 }
 
-/// Exporta TODO en una sola imagen PNG de alta resolución y la comparte como
-/// documento (tipo genérico) para que WhatsApp no la comprima: al abrirla se
-/// puede hacer zoom y los datos se leen nítidos.
+/// Exporta TODO en una sola imagen de alta resolución.
+///
+/// WhatsApp decide por la extensión del archivo: un .png SIEMPRE lo manda como
+/// foto y lo comprime, aunque se comparta como tipo genérico. Por eso la
+/// imagen se entrega dentro de un PDF de una sola página del tamaño exacto de
+/// la imagen: WhatsApp lo envía como documento, sin tocarlo, y al abrirlo se
+/// ve la imagen completa y nítida al hacer zoom.
 Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) async {
   await precacheImage(const AssetImage(BrandAssets.logo), context);
   if (!context.mounted) return;
@@ -96,12 +103,35 @@ Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) asyn
   );
   final bytes = await _capture(context, spec, content,
       page: 1, pageCount: 1, pixelRatio: ratio, framed: false);
-  final file = await _saveTemp(
-      bytes, '${spec.fileBase}_HD.png', 'application/octet-stream');
+  final pdf = await _imageAsPdf(bytes, ratio, spec.heading);
+  final file = await _saveTemp(pdf, '${spec.fileBase}_HD.pdf', 'application/pdf');
   await SharePlus.instance.share(ShareParams(
     files: [file],
     text: '${spec.shareText}\n(Imagen en alta calidad: ábrela y haz zoom)',
   ));
+}
+
+/// PDF de una página con la imagen a tamaño completo, sin márgenes.
+/// El PNG se decodifica con el decodificador nativo del teléfono (rápido) y se
+/// guarda sin pérdida en el PDF.
+Future<Uint8List> _imageAsPdf(Uint8List png, double pixelRatio, String title) async {
+  final codec = await ui.instantiateImageCodec(png);
+  final frame = await codec.getNextFrame();
+  final image = frame.image;
+  final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  final w = image.width, h = image.height;
+  image.dispose();
+  codec.dispose();
+  final doc = pw.Document(title: title, author: 'Garage TCG', creator: 'Garage TCG')
+    ..addPage(pw.Page(
+      pageFormat: PdfPageFormat(w / pixelRatio, h / pixelRatio),
+      margin: pw.EdgeInsets.zero,
+      build: (_) => pw.Image(
+        pw.RawImage(bytes: rgba!.buffer.asUint8List(), width: w, height: h),
+        fit: pw.BoxFit.fill,
+      ),
+    ));
+  return doc.save();
 }
 
 Future<Uint8List> _capture<T>(

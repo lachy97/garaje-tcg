@@ -49,3 +49,7 @@ app.*.map.json
 *.keystore
 key.properties
 keystore-base64.txt
+
+# Salidas de compilación de Android
+android/build/
+android/app/build/
