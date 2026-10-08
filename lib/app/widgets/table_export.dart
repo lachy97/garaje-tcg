@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -6,11 +7,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../export/export_models.dart';
 import '../theme.dart';
 import 'brand.dart';
 
 /// Ancho lógico de las imágenes exportadas.
 const kExportWidth = 800.0;
+
+/// Ancho útil de la tabla dentro de la imagen (márgenes de 24 y borde de 2).
+const kExportContentWidth = kExportWidth - 48 - 2;
 
 /// Densidad de la captura: 800 × 2.4 = 1920 px de ancho.
 const kExportPixelRatio = 2.4;
@@ -24,78 +29,131 @@ const kExportRowsPerPage = 12;
 const kExportFontSize = 17.0;
 const kExportRowPadding = 10.0;
 
-/// Exporta una tabla como una o varias imágenes PNG (paginadas) y abre el menú
-/// de compartir (WhatsApp, Galería…).
-///
-/// [tableBuilder] recibe las filas de cada página y el ancho disponible.
-/// [summary], si se da, sale como primera imagen (p. ej. la tier list).
-Future<void> exportPagedTable<T>(
-  BuildContext context, {
-  required String heading,
-  required List<T> items,
-  required Widget Function(List<T> pageItems, double width) tableBuilder,
-  required String legend,
-  required String fileBase,
-  required String shareText,
-  int rowsPerPage = kExportRowsPerPage,
-  Widget? summary,
-}) async {
-  // El logo debe estar decodificado antes de "fotografiar" el widget.
+/// Máximo de píxeles de alto de la imagen única. Muchos móviles no pueden
+/// crear imágenes más altas (límite de la GPU); si la tabla es muy larga se
+/// baja la densidad en vez de cortar.
+const _kMaxSinglePixels = 8000.0;
+
+/// Exporta en varias imágenes PNG (12 filas cada una) y abre el menú de
+/// compartir. Se ven directamente en el chat de WhatsApp.
+Future<void> exportPagedImages<T>(BuildContext context, ExportSpec<T> spec,
+    {int rowsPerPage = kExportRowsPerPage}) async {
   await precacheImage(const AssetImage(BrandAssets.logo), context);
   if (!context.mounted) return;
 
+  final items = spec.items;
   final pages = <List<T>>[
     for (var i = 0; i < items.length; i += rowsPerPage)
       items.sublist(i, (i + rowsPerPage).clamp(0, items.length)),
   ];
   if (pages.isEmpty) pages.add(<T>[]);
   final contents = <Widget>[
-    if (summary != null) summary,
-    for (final p in pages) tableBuilder(p, kExportWidth - 48 - 2),
+    if (spec.summary != null) spec.summary!,
+    for (final p in pages) spec.tableBuilder(p, kExportContentWidth),
   ];
 
-  final date = DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now());
-  final dir = await getTemporaryDirectory();
-  final stamp = DateTime.now().millisecondsSinceEpoch;
   final files = <XFile>[];
-  final controller = ScreenshotController();
-
   for (var i = 0; i < contents.length; i++) {
     if (!context.mounted) return;
-    final bytes = await controller.captureFromLongWidget(
-      Theme(
-        data: AppTheme.dark,
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          // Sin escalado de texto del sistema: la imagen sale igual en todos los móviles.
-          child: MediaQuery(
-            data: const MediaQueryData(textScaler: TextScaler.noScaling),
-            child: Material(
-              color: AppColors.background,
-              child: _ExportPage(
-                heading: heading,
-                page: i + 1,
-                pageCount: contents.length,
-                legend: legend,
-                date: date,
-                table: contents[i],
-              ),
+    final bytes = await _capture(
+      context,
+      spec,
+      contents[i],
+      page: i + 1,
+      pageCount: contents.length,
+      pixelRatio: kExportPixelRatio,
+    );
+    final suffix = contents.length == 1 ? '' : '_${i + 1}de${contents.length}';
+    files.add(await _saveTemp(bytes, '${spec.fileBase}$suffix.png', 'image/png'));
+  }
+  await SharePlus.instance.share(ShareParams(files: files, text: spec.shareText));
+}
+
+/// Exporta TODO en una sola imagen PNG de alta resolución y la comparte como
+/// documento (tipo genérico) para que WhatsApp no la comprima: al abrirla se
+/// puede hacer zoom y los datos se leen nítidos.
+Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) async {
+  await precacheImage(const AssetImage(BrandAssets.logo), context);
+  if (!context.mounted) return;
+
+  // Densidad según el alto estimado: hasta 3× (2400 px de ancho) en tablas
+  // normales, menos en las muy largas para no pasar el límite del móvil.
+  final estimated = 220 +
+      spec.summaryHeightEstimate +
+      (spec.items.length + 1) * spec.rowHeightEstimate;
+  final ratio = (_kMaxSinglePixels / estimated).clamp(1.2, 3.0);
+
+  final content = Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (spec.summary != null) ...[
+        spec.summary!,
+        const SizedBox(height: 16),
+      ],
+      _TableFrame(child: spec.tableBuilder(spec.items, kExportContentWidth)),
+    ],
+  );
+  final bytes = await _capture(context, spec, content,
+      page: 1, pageCount: 1, pixelRatio: ratio, framed: false);
+  final file = await _saveTemp(
+      bytes, '${spec.fileBase}_HD.png', 'application/octet-stream');
+  await SharePlus.instance.share(ShareParams(
+    files: [file],
+    text: '${spec.shareText}\n(Imagen en alta calidad: ábrela y haz zoom)',
+  ));
+}
+
+Future<Uint8List> _capture<T>(
+  BuildContext context,
+  ExportSpec<T> spec,
+  Widget content, {
+  required int page,
+  required int pageCount,
+  required double pixelRatio,
+  bool framed = true,
+}) {
+  final date = DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now());
+  return ScreenshotController().captureFromLongWidget(
+    Theme(
+      data: AppTheme.dark,
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        // Sin escalado de texto del sistema: la imagen sale igual en todos los móviles.
+        child: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.noScaling),
+          child: Material(
+            color: AppColors.background,
+            child: _ExportPage(
+              heading: spec.heading,
+              page: page,
+              pageCount: pageCount,
+              legend: spec.legend,
+              date: date,
+              table: content,
+              framed: framed,
             ),
           ),
         ),
       ),
-      context: context,
-      pixelRatio: kExportPixelRatio,
-      delay: const Duration(milliseconds: 120),
-      constraints: const BoxConstraints(minWidth: kExportWidth, maxWidth: kExportWidth),
-    );
-    final suffix = contents.length == 1 ? '' : '_${i + 1}de${contents.length}';
-    final file = File('${dir.path}/${fileBase}_$stamp$suffix.png');
-    await file.writeAsBytes(bytes, flush: true);
-    files.add(XFile(file.path, mimeType: 'image/png'));
-  }
+    ),
+    context: context,
+    pixelRatio: pixelRatio,
+    delay: const Duration(milliseconds: 120),
+    constraints: const BoxConstraints(minWidth: kExportWidth, maxWidth: kExportWidth),
+  );
+}
 
-  await SharePlus.instance.share(ShareParams(files: files, text: shareText));
+/// Guarda en la carpeta temporal con un nombre único y devuelve el archivo
+/// listo para compartir.
+Future<XFile> _saveTemp(Uint8List bytes, String name, String mime) async {
+  final dir = await getTemporaryDirectory();
+  final stamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+  final dot = name.lastIndexOf('.');
+  final fileName = '${name.substring(0, dot)}_$stamp${name.substring(dot)}';
+  final file = File('${dir.path}/$fileName');
+  await file.writeAsBytes(bytes, flush: true);
+  return XFile(file.path, mimeType: mime, name: fileName);
 }
 
 class _ExportPage extends StatelessWidget {
@@ -106,8 +164,12 @@ class _ExportPage extends StatelessWidget {
     required this.legend,
     required this.date,
     required this.table,
+    this.framed = true,
   });
 
+  /// Tabla dentro de un recuadro. En la imagen única con tier list el
+  /// contenido ya trae sus propios recuadros.
+  final bool framed;
   final String heading;
   final int page;
   final int pageCount;
@@ -167,15 +229,7 @@ class _ExportPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.outline),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: table,
-          ),
+          if (framed) _TableFrame(child: table) else table,
           const SizedBox(height: 12),
           Text(legend, style: small),
           const SizedBox(height: 4),
@@ -184,6 +238,25 @@ class _ExportPage extends StatelessWidget {
               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         ],
       ),
+    );
+  }
+}
+
+class _TableFrame extends StatelessWidget {
+  const _TableFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
     );
   }
 }

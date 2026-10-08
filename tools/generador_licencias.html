@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generador de licencias · Garage TCG</title>
+<style>
+  :root { --bg:#000; --card:#070D09; --input:#0E1A12; --neon:#8CF04C; --text:#C9F7B4; --muted:#7FA886; --line:#2A4A33; --red:#FF5C5C; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { color:var(--neon); letter-spacing:.12em; font-size:24px; margin:8px 0 2px; text-shadow:0 0 12px rgba(140,240,76,.5); }
+  h2 { font-size:17px; margin:0 0 10px; color:var(--neon); }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin:14px 0; }
+  label { display:block; font-weight:600; margin:12px 0 4px; }
+  input, select, textarea { width:100%; background:var(--input); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font:inherit; }
+  textarea { font-family:ui-monospace,Consolas,monospace; font-size:13px; word-break:break-all; min-height:84px; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--neon); border-color:transparent; }
+  button { background:var(--neon); color:#000; border:0; border-radius:10px; padding:11px 16px; font-weight:800; font-size:15px; cursor:pointer; margin-top:12px; }
+  button.secondary { background:transparent; color:var(--neon); border:1px solid var(--neon); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1 1 160px; }
+  .hint { color:var(--muted); font-size:13px; margin-top:4px; }
+  .error { color:var(--red); font-weight:600; margin-top:8px; white-space:pre-line; }
+  .ok { color:var(--neon); font-weight:600; margin-top:8px; }
+  .warn { border-color:var(--red); }
+  code { color:var(--neon); word-break:break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>GARAGE TCG</h1>
+  <p class="sub">Generador de licencias (funciona sin internet). La clave privada no sale de este navegador.</p>
+
+  <section>
+    <h2>1 · Tu clave privada</h2>
+    <label for="priv">Clave privada (empieza por GTCG-PRIV-)</label>
+    <textarea id="priv" placeholder="GTCG-PRIV-..." autocomplete="off" spellcheck="false"></textarea>
+    <div id="pubOut" class="hint"></div>
+    <button class="secondary" id="newKey" type="button">Crear claves nuevas</button>
+    <div class="hint">Solo la primera vez. Si ya creaste las claves en el móvil (Modo administrador), pega aquí la misma clave privada.</div>
+  </section>
+
+  <section>
+    <h2>2 · Datos de la licencia</h2>
+    <label for="code">Código del dispositivo del cliente</label>
+    <input id="code" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+    <div class="hint">El cliente lo ve en la app: Ajustes → Licencia (o en la pantalla de bloqueo).</div>
+    <label for="holder">Cliente (nombre que verá en la app)</label>
+    <input id="holder" maxlength="40" placeholder="Club Garage TCG">
+    <div class="row">
+      <div>
+        <label for="months">Duración</label>
+        <select id="months">
+          <option value="1">1 mes</option><option value="2">2 meses</option><option value="3" selected>3 meses</option>
+          <option value="6">6 meses</option><option value="12">12 meses</option><option value="24">24 meses</option>
+          <option value="other">Otro…</option>
+        </select>
+      </div>
+      <div>
+        <label for="otherMonths">Meses (si eliges «Otro»)</label>
+        <input id="otherMonths" type="number" min="1" max="240" value="18" disabled>
+      </div>
+      <div>
+        <label for="issued">Fecha de inicio</label>
+        <input id="issued" type="date">
+      </div>
+    </div>
+    <button id="make" type="button">GENERAR LICENCIA</button>
+    <div id="err" class="error"></div>
+  </section>
+
+  <section id="result" hidden>
+    <h2>3 · Licencia</h2>
+    <div id="summary" class="ok"></div>
+    <textarea id="license" readonly></textarea>
+    <button id="copy" type="button">Copiar licencia</button>
+    <div class="hint">Envíasela al cliente. En la app: Ajustes → Licencia → «Introducir licencia» y pegar.</div>
+  </section>
+</main>
+<script>
+/* CORE-START */
+const GTCG = (() => {
+  // ───────── SHA-512 ─────────
+  const K512 = [
+    '428a2f98d728ae22','7137449123ef65cd','b5c0fbcfec4d3b2f','e9b5dba58189dbbc','3956c25bf348b538',
+    '59f111f1b605d019','923f82a4af194f9b','ab1c5ed5da6d8118','d807aa98a3030242','12835b0145706fbe',
+    '243185be4ee4b28c','550c7dc3d5ffb4e2','72be5d74f27b896f','80deb1fe3b1696b1','9bdc06a725c71235',
+    'c19bf174cf692694','e49b69c19ef14ad2','efbe4786384f25e3','0fc19dc68b8cd5b5','240ca1cc77ac9c65',
+    '2de92c6f592b0275','4a7484aa6ea6e483','5cb0a9dcbd41fbd4','76f988da831153b5','983e5152ee66dfab',
+    'a831c66d2db43210','b00327c898fb213f','bf597fc7beef0ee4','c6e00bf33da88fc2','d5a79147930aa725',
+    '06ca6351e003826f','142929670a0e6e70','27b70a8546d22ffc','2e1b21385c26c926','4d2c6dfc5ac42aed',
+    '53380d139d95b3df','650a73548baf63de','766a0abb3c77b2a8','81c2c92e47edaee6','92722c851482353b',
+    'a2bfe8a14cf10364','a81a664bbc423001','c24b8b70d0f89791','c76c51a30654be30','d192e819d6ef5218',
+    'd69906245565a910','f40e35855771202a','106aa07032bbd1b8','19a4c116b8d2d0c8','1e376c085141ab53',
+    '2748774cdf8eeb99','34b0bcb5e19b48a8','391c0cb3c5c95a63','4ed8aa4ae3418acb','5b9cca4f7763e373',
+    '682e6ff3d6b2b8a3','748f82ee5defb2fc','78a5636f43172f60','84c87814a1f0ab72','8cc702081a6439ec',
+    '90befffa23631e28','a4506cebde82bde9','bef9a3f7b2c67915','c67178f2e372532b','ca273eceea26619c',
+    'd186b8c721c0c207','eada7dd6cde0eb1e','f57d4f7fee6ed178','06f067aa72176fba','0a637dc5a2c898a6',
+    '113f9804bef90dae','1b710b35131c471b','28db77f523047d84','32caab7b40c72493','3c9ebe0a15c9bebc',
+    '431d67c49c100d4c','4cc5d4becb3e42b6','597f299cfc657e2a','5fcb6fab3ad6faec','6c44198c4a475817',
+  ].map((h) => BigInt('0x' + h));
+  const M64 = (1n << 64n) - 1n;
+  const rotr = (x, n) => ((x >> n) | (x << (64n - n))) & M64;
+
+  function sha512(bytes) {
+    const H = ['6a09e667f3bcc908','bb67ae8584caa73b','3c6ef372fe94f82b','a54ff53a5f1d36f1',
+      '510e527fade682d1','9b05688c2b3e6c1f','1f83d9abfb41bd6b','5be0cd19137e2179'].map((h) => BigInt('0x' + h));
+    const len = bytes.length;
+    const padLen = ((len + 17 + 127) >> 7) << 7;
+    const m = new Uint8Array(padLen);
+    m.set(bytes);
+    m[len] = 0x80;
+    const bitLen = BigInt(len) * 8n;
+    for (let i = 0; i < 16; i++) m[padLen - 1 - i] = Number((bitLen >> BigInt(8 * i)) & 0xffn);
+    const W = new Array(80);
+    for (let off = 0; off < padLen; off += 128) {
+      for (let t = 0; t < 16; t++) {
+        let v = 0n;
+        for (let j = 0; j < 8; j++) v = (v << 8n) | BigInt(m[off + t * 8 + j]);
+        W[t] = v;
+      }
+      for (let t = 16; t < 80; t++) {
+        const s0 = rotr(W[t - 15], 1n) ^ rotr(W[t - 15], 8n) ^ (W[t - 15] >> 7n);
+        const s1 = rotr(W[t - 2], 19n) ^ rotr(W[t - 2], 61n) ^ (W[t - 2] >> 6n);
+        W[t] = (W[t - 16] + s0 + W[t - 7] + s1) & M64;
+      }
+      let [a, b, c, d, e, f, g, h] = H;
+      for (let t = 0; t < 80; t++) {
+        const S1 = rotr(e, 14n) ^ rotr(e, 18n) ^ rotr(e, 41n);
+        const ch = (e & f) ^ (~e & M64 & g);
+        const t1 = (h + S1 + ch + K512[t] + W[t]) & M64;
+        const S0 = rotr(a, 28n) ^ rotr(a, 34n) ^ rotr(a, 39n);
+        const maj = (a & b) ^ (a & c) ^ (b & c);
+        const t2 = (S0 + maj) & M64;
+        h = g; g = f; f = e; e = (d + t1) & M64; d = c; c = b; b = a; a = (t1 + t2) & M64;
+      }
+      H[0] = (H[0] + a) & M64; H[1] = (H[1] + b) & M64; H[2] = (H[2] + c) & M64; H[3] = (H[3] + d) & M64;
+      H[4] = (H[4] + e) & M64; H[5] = (H[5] + f) & M64; H[6] = (H[6] + g) & M64; H[7] = (H[7] + h) & M64;
+    }
+    const out = new Uint8Array(64);
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) out[i * 8 + j] = Number((H[i] >> BigInt(56 - 8 * j)) & 0xffn);
+    return out;
+  }
+
+  // ───────── SHA-256 (para el código de dispositivo) ─────────
+  function sha256(bytes) {
+    const K = new Uint32Array([
+      0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+      0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+      0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+      0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+    const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+    const len = bytes.length;
+    const padLen = ((len + 9 + 63) >> 6) << 6;
+    const m = new Uint8Array(padLen);
+    m.set(bytes); m[len] = 0x80;
+    const bitLen = len * 8;
+    m[padLen - 4] = (bitLen >>> 24) & 0xff; m[padLen - 3] = (bitLen >>> 16) & 0xff;
+    m[padLen - 2] = (bitLen >>> 8) & 0xff; m[padLen - 1] = bitLen & 0xff;
+    const W = new Uint32Array(64);
+    const r = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let off = 0; off < padLen; off += 64) {
+      for (let t = 0; t < 16; t++) W[t] = (m[off+t*4]<<24)|(m[off+t*4+1]<<16)|(m[off+t*4+2]<<8)|m[off+t*4+3];
+      for (let t = 16; t < 64; t++) {
+        const s0 = r(W[t-15],7) ^ r(W[t-15],18) ^ (W[t-15] >>> 3);
+        const s1 = r(W[t-2],17) ^ r(W[t-2],19) ^ (W[t-2] >>> 10);
+        W[t] = (W[t-16] + s0 + W[t-7] + s1) >>> 0;
+      }
+      let [a,b,c,d,e,f,g,h] = H;
+      for (let t = 0; t < 64; t++) {
+        const t1 = (h + (r(e,6)^r(e,11)^r(e,25)) + ((e&f)^(~e&g)) + K[t] + W[t]) >>> 0;
+        const t2 = ((r(a,2)^r(a,13)^r(a,22)) + ((a&b)^(a&c)^(b&c))) >>> 0;
+        h=g; g=f; f=e; e=(d+t1)>>>0; d=c; c=b; b=a; a=(t1+t2)>>>0;
+      }
+      H[0]+=a; H[1]+=b; H[2]+=c; H[3]+=d; H[4]+=e; H[5]+=f; H[6]+=g; H[7]+=h;
+    }
+    const out = new Uint8Array(32);
+    for (let i = 0; i < 8; i++) { out[i*4]=H[i]>>>24; out[i*4+1]=(H[i]>>>16)&0xff; out[i*4+2]=(H[i]>>>8)&0xff; out[i*4+3]=H[i]&0xff; }
+    return out;
+  }
+
+  // ───────── Ed25519 ─────────
+  const P = (1n << 255n) - 19n;
+  const L = (1n << 252n) + 27742317777372353535851937790883648493n;
+  const mod = (a, m = P) => { const r = a % m; return r >= 0n ? r : r + m; };
+  const pow = (b, e, m = P) => { let r = 1n; b = mod(b, m); while (e > 0n) { if (e & 1n) r = r * b % m; b = b * b % m; e >>= 1n; } return r; };
+  const inv = (a) => pow(a, P - 2n);
+  const D = mod(-121665n * inv(121666n));
+  const Gx = 15112221349535400772501151409588531511454012693041857206046113283949847762202n;
+  const Gy = 46316835694926478169428394003475163141307993866256225615783033603165251855960n;
+  const G = [Gx, Gy, 1n, mod(Gx * Gy)];
+
+  function add(p, q) {
+    const [X1, Y1, Z1, T1] = p, [X2, Y2, Z2, T2] = q;
+    const A = mod((Y1 - X1) * (Y2 - X2)), B = mod((Y1 + X1) * (Y2 + X2));
+    const C = mod(2n * D * T1 * T2), DD = mod(2n * Z1 * Z2);
+    const E = B - A, F = DD - C, Gg = DD + C, H = B + A;
+    return [mod(E * F), mod(Gg * H), mod(F * Gg), mod(E * H)];
+  }
+  function mul(p, n) {
+    let r = [0n, 1n, 1n, 0n], q = p;
+    while (n > 0n) { if (n & 1n) r = add(r, q); q = add(q, q); n >>= 1n; }
+    return r;
+  }
+  function encodePoint(p) {
+    const zi = inv(p[2]);
+    const x = mod(p[0] * zi), y = mod(p[1] * zi);
+    const out = numToLE(y, 32);
+    if (x & 1n) out[31] |= 0x80;
+    return out;
+  }
+  function numToLE(n, len) { const out = new Uint8Array(len); for (let i = 0; i < len; i++) { out[i] = Number(n & 0xffn); n >>= 8n; } return out; }
+  function leToNum(b) { let n = 0n; for (let i = b.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(b[i]); return n; }
+  const concat = (...arrs) => { const out = new Uint8Array(arrs.reduce((s, a) => s + a.length, 0)); let o = 0; for (const a of arrs) { out.set(a, o); o += a.length; } return out; };
+
+  function expand(seed) {
+    const h = sha512(seed);
+    const a = h.slice(0, 32);
+    a[0] &= 248; a[31] &= 127; a[31] |= 64;
+    return { a: leToNum(a), prefix: h.slice(32) };
+  }
+  function publicKey(seed) { return encodePoint(mul(G, expand(seed).a)); }
+  function sign(msg, seed) {
+    const { a, prefix } = expand(seed);
+    const A = encodePoint(mul(G, a));
+    const r = mod(leToNum(sha512(concat(prefix, msg))), L);
+    const R = encodePoint(mul(G, r));
+    const k = mod(leToNum(sha512(concat(R, A, msg))), L);
+    const S = mod(r + k * a, L);
+    return concat(R, numToLE(S, 32));
+  }
+
+  // ───────── Formato de la licencia ─────────
+  const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  function b32decode(text) {
+    const clean = text.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+    const out = []; let buf = 0, bits = 0;
+    for (const ch of clean) {
+      const v = ALPHA.indexOf(ch); if (v < 0) return null;
+      buf = ((buf << 5) | v) & 0xffff; bits += 5;
+      if (bits >= 8) { out.push((buf >> (bits - 8)) & 0xff); bits -= 8; }
+    }
+    return new Uint8Array(out);
+  }
+  function b32encode(bytes) {
+    let out = '', buf = 0, bits = 0;
+    for (const b of bytes) { buf = ((buf << 8) | b) & 0xffff; bits += 8; while (bits >= 5) { out += ALPHA[(buf >> (bits - 5)) & 31]; bits -= 5; } }
+    if (bits > 0) out += ALPHA[(buf << (5 - bits)) & 31];
+    return out;
+  }
+  function b64url(bytes) { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function unb64url(text) { let s = text.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const bin = atob(s); return Uint8Array.from(bin, (c) => c.charCodeAt(0)); }
+
+  const EPOCH = Date.UTC(2024, 0, 1);
+  const dayOf = (y, m, d) => Math.round((Date.UTC(y, m - 1, d) - EPOCH) / 86400000);
+  function addMonths(y, m, d, months) {
+    const t = new Date(Date.UTC(y, m - 1 + months, 1));
+    const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+    return [t.getUTCFullYear(), t.getUTCMonth() + 1, Math.min(d, last)];
+  }
+
+  function parsePrivateKey(text) {
+    const clean = text.replace(/\s/g, '');
+    if (!clean.startsWith('GTCG-PRIV-')) return null;
+    try { const b = unb64url(clean.slice(10)); return b.length === 32 ? b : null; } catch (e) { return null; }
+  }
+  function deviceCodeFromId(rawId) {
+    const fp = sha256(new TextEncoder().encode('garage-tcg-device:' + rawId)).slice(0, 10);
+    return b32encode(fp).match(/.{4}/g).join('-');
+  }
+
+  /** Crea la licencia. issued = [año, mes, día]. */
+  function makeLicense({ seed, deviceCode, holder, issued, months }) {
+    const fp = b32decode(deviceCode);
+    if (!fp || fp.length !== 10) throw new Error('Código de dispositivo no válido (deben ser 16 caracteres).');
+    let name = new TextEncoder().encode(holder.trim());
+    if (name.length > 40) { let cut = 40; while (cut > 0 && (name[cut] & 0xc0) === 0x80) cut--; name = name.slice(0, cut); }
+    const issuedDay = dayOf(...issued);
+    const exp = addMonths(...issued, months);
+    const expiresDay = dayOf(...exp);
+    const payload = concat(new Uint8Array([1]), fp,
+      new Uint8Array([(issuedDay >> 8) & 255, issuedDay & 255, (expiresDay >> 8) & 255, expiresDay & 255, name.length]), name);
+    return { license: 'GTCG1.' + b64url(concat(payload, sign(payload, seed))), expires: exp };
+  }
+
+  function newPrivateKey() {
+    const seed = new Uint8Array(32);
+    crypto.getRandomValues(seed);
+    return seed;
+  }
+
+  return { sha512, sha256, publicKey, sign, makeLicense, parsePrivateKey, newPrivateKey,
+    encodePrivateKey: (seed) => 'GTCG-PRIV-' + b64url(seed), encodePublicKey: (pk) => b64url(pk),
+    deviceCodeFromId, addMonths, dayOf, b32encode, b32decode };
+})();
+/* CORE-END */
+
+const $ = (id) => document.getElementById(id);
+const today = new Date();
+$('issued').value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+function showPublic() {
+  const seed = GTCG.parsePrivateKey($('priv').value);
+  if (!$('priv').value.trim()) { $('pubOut').textContent = ''; return null; }
+  if (!seed) { $('pubOut').innerHTML = '<span style="color:var(--red)">Clave privada no válida.</span>'; return null; }
+  $('pubOut').innerHTML = 'Clave pública (la que va en la app): <code>' + GTCG.encodePublicKey(GTCG.publicKey(seed)) + '</code>';
+  return seed;
+}
+$('priv').addEventListener('input', showPublic);
+$('months').addEventListener('change', () => { $('otherMonths').disabled = $('months').value !== 'other'; });
+
+$('newKey').addEventListener('click', () => {
+  if ($('priv').value.trim() && !confirm('Ya hay una clave escrita. ¿Crear otra? Las licencias firmadas con claves distintas NO sirven en la misma app.')) return;
+  $('priv').value = GTCG.encodePrivateKey(GTCG.newPrivateKey());
+  showPublic();
+  alert('Claves creadas.\n\n1) Guarda la CLAVE PRIVADA en un lugar seguro (si la pierdes no podrás crear más licencias para esta app).\n2) Copia la CLAVE PÚBLICA en lib/core/license/license_config.dart.');
+});
+
+$('make').addEventListener('click', () => {
+  $('err').textContent = '';
+  $('result').hidden = true;
+  try {
+    const seed = showPublic();
+    if (!seed) throw new Error('Pega tu clave privada (GTCG-PRIV-...).');
+    const months = $('months').value === 'other' ? parseInt($('otherMonths').value, 10) : parseInt($('months').value, 10);
+    if (!(months >= 1 && months <= 240)) throw new Error('La duración debe estar entre 1 y 240 meses.');
+    const holder = $('holder').value.trim();
+    if (!holder) throw new Error('Escribe el nombre del cliente.');
+    const [y, m, d] = $('issued').value.split('-').map((n) => parseInt(n, 10));
+    if (!y) throw new Error('Elige la fecha de inicio.');
+    const r = GTCG.makeLicense({ seed, deviceCode: $('code').value, holder, issued: [y, m, d], months });
+    const [ey, em, ed] = r.expires;
+    $('license').value = r.license;
+    $('summary').textContent = holder + ' · ' + months + (months === 1 ? ' mes' : ' meses') + ' · válida hasta el ' +
+      String(ed).padStart(2, '0') + '/' + String(em).padStart(2, '0') + '/' + ey;
+    $('result').hidden = false;
+  } catch (e) {
+    $('err').textContent = e.message || String(e);
+  }
+});
+
+$('copy').addEventListener('click', async () => {
+  const text = 'Licencia Garage TCG (' + $('summary').textContent + '):\n' + $('license').value;
+  try { await navigator.clipboard.writeText(text); $('copy').textContent = 'Copiada ✓'; }
+  catch (e) { $('license').select(); document.execCommand('copy'); $('copy').textContent = 'Copiada ✓'; }
+  setTimeout(() => { $('copy').textContent = 'Copiar licencia'; }, 2000);
+});
+</script>
+</body>
+</html>

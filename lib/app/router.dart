@@ -6,19 +6,31 @@ import '../features/decks/presentation/deck_manage_page.dart';
 import '../features/decks/presentation/decks_page.dart';
 import '../features/players/presentation/player_profile_page.dart';
 import '../features/players/presentation/players_page.dart';
+import '../features/license/admin_page.dart';
 import '../features/ranking/presentation/ranking_page.dart';
+import '../features/settings/settings_page.dart';
 import '../features/tournaments/presentation/create_tournament_page.dart';
 import '../features/tournaments/presentation/tournament_detail_page.dart';
 import '../features/tournaments/presentation/tournaments_page.dart';
 import 'theme.dart';
 
-final _rootKey = GlobalKey<NavigatorState>();
+/// Navigator raíz (también lo usa el aviso de licencia por vencer).
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+final _rootKey = rootNavigatorKey;
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/torneos',
     routes: [
+      // Fuera del shell: pantallas completas sin barra inferior.
+      GoRoute(
+        path: '/ajustes',
+        builder: (_, _) => const SettingsPage(),
+        routes: [
+          GoRoute(path: 'admin', builder: (_, _) => const AdminPage()),
+        ],
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => HomeShell(shell: shell),
         branches: [

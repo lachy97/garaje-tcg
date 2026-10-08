@@ -14,7 +14,17 @@ class NeonColumn {
 }
 
 class NeonTableRow {
-  const NeonTableRow({required this.cells, this.highlight = false, this.dim = false, this.footer});
+  const NeonTableRow({
+    required this.cells,
+    this.highlight = false,
+    this.dim = false,
+    this.footer,
+    this.accent,
+  });
+
+  /// Color propio de la fila (p. ej. puestos del ranking): fondo suave de ese
+  /// color y una franja a la izquierda. Tiene prioridad sobre [highlight].
+  final Color? accent;
 
   final List<Widget> cells;
 
@@ -113,9 +123,17 @@ class NeonTable extends StatelessWidget {
             Container(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: rowPadding),
               decoration: BoxDecoration(
-                color: r.highlight ? AppColors.forest.withValues(alpha: 0.35) : null,
-                border: const Border(
-                    bottom: BorderSide(color: AppColors.outlineVariant, width: 0.6)),
+                color: r.accent != null
+                    ? r.accent!.withValues(alpha: 0.13)
+                    : r.highlight
+                        ? AppColors.forest.withValues(alpha: 0.35)
+                        : null,
+                border: Border(
+                  left: r.accent == null
+                      ? BorderSide.none
+                      : BorderSide(color: r.accent!, width: 4),
+                  bottom: const BorderSide(color: AppColors.outlineVariant, width: 0.6),
+                ),
               ),
               child: DefaultTextStyle.merge(
                 style: TextStyle(

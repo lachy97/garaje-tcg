@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/license/license_gate.dart';
 import 'router.dart';
 import 'theme.dart';
 
@@ -29,6 +30,8 @@ class GarajeTcgApp extends ConsumerWidget {
       supportedLocales: const [Locale('es')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       routerConfig: ref.watch(routerProvider),
+      // Licencia: si no es válida se muestra la pantalla de bloqueo.
+      builder: (context, child) => LicenseGate(child: child ?? const SizedBox()),
     );
   }
 }

@@ -41,6 +41,24 @@ class AppDatabase extends _$AppDatabase {
 
   static QueryExecutor _open() => driftDatabase(name: kDatabaseName);
 
+  bool _closed = false;
+
+  /// Cierra la BD una sola vez (al importar una copia se cierra a mano y
+  /// luego Riverpod vuelve a intentar cerrarla al descartarla).
+  Future<void> closeOnce() async {
+    if (_closed) return;
+    _closed = true;
+    await close();
+  }
+
+  /// Ruta del archivo SQLite en el teléfono.
+  Future<String> filePath() async {
+    final row = await customSelect(
+            "SELECT file FROM pragma_database_list WHERE name = 'main'")
+        .getSingle();
+    return row.read<String>('file');
+  }
+
   @override
   int get schemaVersion => 4;
 

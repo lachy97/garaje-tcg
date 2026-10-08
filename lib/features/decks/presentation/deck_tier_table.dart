@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/neon_table.dart';
+import '../../../app/export/export_models.dart';
+import '../../../app/export/export_sheet.dart';
 import '../../../app/widgets/table_export.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/utils/season_utils.dart';
@@ -227,22 +229,88 @@ const deckLegend = 'Uso = veces inscrito · Jug = jugadores distintos · PJ/V/D/
     '(Swiss + Top) · Top = entradas al Top Cut · VTop = victorias en el Top · '
     'Tít = torneos ganados · Score = PP × (0.5 + WRp)';
 
-/// Exporta la tier list (primera imagen) y la tabla en imágenes de 12 mazos.
+/// Exporta la tier list y la tabla de mazos. Pregunta el formato: imagen única
+/// en alta calidad (como documento), PDF o imágenes de 12 mazos para el chat.
 Future<void> exportDeckTierImages(
   BuildContext context, {
   required Season season,
   required List<DeckSeasonStats> decks,
 }) {
   final label = seasonLabel(season.year, season.quarter);
-  return exportPagedTable<DeckSeasonStats>(
+  return runExport<DeckSeasonStats>(
     context,
-    heading: 'TIER LIST DE MAZOS · $label',
-    items: decks,
-    summary: TierSummary(decks: decks, forExport: true),
-    tableBuilder: (page, width) =>
-        DeckTierTable(decks: page, fixedWidth: width, forExport: true),
-    legend: '${decks.length} mazos · $deckLegend',
-    fileBase: 'tierlist_garage_tcg_${season.year}_T${season.quarter}',
-    shareText: 'Tier list de mazos Garage TCG · Temporada $label',
+    ExportSpec(
+      heading: 'TIER LIST DE MAZOS · $label',
+      items: decks,
+      summary: TierSummary(decks: decks, forExport: true),
+      tableBuilder: (page, width) =>
+          DeckTierTable(decks: page, fixedWidth: width, forExport: true),
+      pdfGroups: [
+        for (final tier in DeckTier.values)
+          ExportGroupData(
+            label: tier.label,
+            color: tierColor(tier).toARGB32(),
+            items: [
+              for (final d in decks)
+                if (d.tier == tier) '${d.rank}. ${d.name}',
+            ],
+          ),
+      ],
+      pdfTable: () => deckPdfTable(decks),
+      legend: '${decks.length} mazos · $deckLegend',
+      fileBase: 'tierlist_garage_tcg_${season.year}_T${season.quarter}',
+      shareText: 'Tier list de mazos Garage TCG · Temporada $label',
+      rowHeightEstimate: 50,
+      // 4 filas de tier + chips de mazos (unos 5 por línea)
+      summaryHeightEstimate: 4 * 70 + decks.length / 5 * 44,
+    ),
+  );
+}
+
+ExportTableData deckPdfTable(List<DeckSeasonStats> decks) {
+  final neon = AppColors.neon.toARGB32();
+  final black = Colors.black.toARGB32();
+  return ExportTableData(
+    columns: const [
+      ExportColumnData('#', 2.6, align: ExportAlign.start),
+      ExportColumnData('Tier', 3.2),
+      ExportColumnData('Mazo', 13, align: ExportAlign.start),
+      ExportColumnData('Score', 4.6),
+      ExportColumnData('Uso', 3.4),
+      ExportColumnData('Jug', 3.4),
+      ExportColumnData('PJ', 3.2),
+      ExportColumnData('V', 3),
+      ExportColumnData('D', 3),
+      ExportColumnData('E', 3),
+      ExportColumnData('WR%', 4.2),
+      ExportColumnData('Top', 3.4),
+      ExportColumnData('VTop', 3.8),
+      ExportColumnData('Tít', 3),
+      ExportColumnData('Mejor', 4.2),
+    ],
+    rows: [
+      for (final d in decks)
+        ExportRowData(
+          highlight: d.tier == DeckTier.s,
+          [
+            ExportCellData('${d.rank}', bold: true),
+            ExportCellData(d.tier.label,
+                bold: true, color: black, background: tierColor(d.tier).toARGB32()),
+            ExportCellData(d.name, bold: true, color: d.tier == DeckTier.s ? neon : null),
+            ExportCellData(d.score.toStringAsFixed(1), bold: true, color: neon),
+            ExportCellData('${d.entries}'),
+            ExportCellData('${d.pilots.length}'),
+            ExportCellData('${d.played}'),
+            ExportCellData('${d.wins}', color: AppColors.win.toARGB32()),
+            ExportCellData('${d.losses}', color: AppColors.loss.toARGB32()),
+            ExportCellData('${d.swissDraws}', color: AppColors.draw.toARGB32()),
+            ExportCellData(d.played == 0 ? '-' : '${(d.winrate * 100).toStringAsFixed(0)}%'),
+            ExportCellData('${d.topEntries}'),
+            ExportCellData('${d.topWins}'),
+            ExportCellData('${d.titles}', bold: d.titles > 0, color: d.titles > 0 ? neon : null),
+            ExportCellData(d.bestPosition == null ? '-' : '${d.bestPosition}º'),
+          ],
+        ),
+    ],
   );
 }

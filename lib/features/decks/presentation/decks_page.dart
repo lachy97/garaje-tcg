@@ -113,7 +113,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.image_outlined),
-                      label: const Text('EXPORTAR TIER LIST COMO IMAGEN'),
+                      label: const Text('EXPORTAR TIER LIST'),
                     ),
                   ),
                 ],

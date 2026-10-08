@@ -51,7 +51,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
         actions: [
           if (s != null && rows != null && rows.isNotEmpty)
             IconButton(
-              tooltip: 'Exportar imágenes',
+              tooltip: 'Exportar',
               onPressed: _exporting ? null : () => _export(s, rows),
               icon: _exporting
                   ? const SizedBox(
@@ -102,14 +102,14 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                     child: OutlinedButton.icon(
                       onPressed: _exporting ? null : () => _export(season, list),
                       icon: const Icon(Icons.image_outlined),
-                      label: const Text('EXPORTAR RANKING COMO IMAGEN'),
+                      label: const Text('EXPORTAR RANKING'),
                     ),
                   ),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Text(
-                      'Se genera una imagen por cada 12 jugadores para que se lea bien. '
-                      'En WhatsApp, envíalas en calidad HD.',
+                      'Elige imagen única en alta calidad (se envía como documento), '
+                      'PDF o imágenes de 12 jugadores para ver en el chat.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),

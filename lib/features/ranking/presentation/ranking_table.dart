@@ -5,6 +5,17 @@ import '../../../app/widgets/neon_table.dart';
 import '../../../app/widgets/table_export.dart';
 import '../domain/ranking_row.dart';
 
+/// Colores por puesto: 1º oro, 2º plata, 3º bronce, 4º turquesa y del 5º al
+/// 8º un mismo verde. Del 9º en adelante, sin color propio.
+Color? rankingColor(int rank) => switch (rank) {
+      1 => const Color(0xFFFFD54A),
+      2 => const Color(0xFFD3DCE6),
+      3 => const Color(0xFFE39A5C),
+      4 => const Color(0xFF4FD8C4),
+      >= 5 && <= 8 => AppColors.leaf,
+      _ => null,
+    };
+
 /// Tabla del ranking trimestral. La usan la pantalla y las imágenes exportadas.
 class RankingTable extends StatelessWidget {
   const RankingTable({super.key, required this.rows, this.fixedWidth, this.forExport = false});
@@ -58,21 +69,23 @@ class RankingTable extends StatelessWidget {
       rows: [
         for (final r in rows)
           NeonTableRow(
-            highlight: r.rank <= 3,
+            accent: rankingColor(r.rank),
             cells: [
               Text(
                 '${r.rank}',
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
-                  color: r.rank <= 3 ? AppColors.neon : secondary,
-                  shadows: r.rank == 1 ? AppColors.textGlow(blur: 8) : null,
+                  color: rankingColor(r.rank) ?? secondary,
+                  shadows: r.rank == 1
+                      ? AppColors.textGlow(color: rankingColor(1)!, blur: 8)
+                      : null,
                 ),
               ),
               Text(r.nickname,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: r.rank <= 3 ? AppColors.neon : null,
+                    fontWeight: r.rank <= 4 ? FontWeight.w800 : FontWeight.w700,
+                    color: rankingColor(r.rank),
                   )),
               Text('${r.points}',
                   style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),

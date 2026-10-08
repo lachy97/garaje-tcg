@@ -44,7 +44,10 @@
 - Desempates: puntos, mejor posición, winrate, menos torneos.
 - Tabla con: #, jugador, puntos, último mazo, PJ, V, D, E, WR%, torneos y mejor posición. Solo cuentan torneos terminados; PJ excluye BYE.
 - Se puede consultar cualquier temporada (selector en el título), no solo la actual.
-- **Exportación**: imágenes PNG de 1920 px de ancho con **12 filas por imagen** (letra grande y colores claros), compartidas todas juntas. Una sola imagen larga se reducía mucho al enviarla por WhatsApp y el texto se volvía ilegible. Recomendado enviar en calidad HD.
+- **Exportación** (ranking y tier list): al exportar se elige el formato:
+  - *Imagen única (alta calidad)*: toda la tabla en un PNG de hasta 2400 px de ancho (la densidad baja en tablas muy largas para no pasar ~8000 px de alto, límite de muchos móviles). Se comparte con tipo genérico para que WhatsApp la envíe como **documento** y no la comprima.
+  - *Documento PDF*: A4 con los colores de la app, texto vectorial (Inter en TTF, `assets/fonts/pdf/`), varias páginas repitiendo la cabecera de la tabla.
+  - *Imágenes para el chat*: PNG de 1920 px con 12 filas cada uno.
 
 ## Puntuación de mazos
 - PP = 3·V_swiss + 1·E_swiss + 6·V_top + 3·Entradas_top + 5·Títulos
@@ -54,6 +57,18 @@
 - Pestaña **Mazos** = tabla de la temporada para la tier list de fin de trimestre: #, tier, mazo, Score, uso (inscripciones), jugadores distintos, PJ, V, D, E, WR%, entradas al Top, V en Top, títulos y mejor posición. Solo torneos terminados; la doble derrota cuenta como derrota para ambos mazos.
 - **Tiers** relativos al mejor Score de la temporada: S ≥ 70 %, A ≥ 45 %, B ≥ 20 %, C el resto. Se muestra la tier list (filas S/A/B/C) y la tabla; se exporta como imágenes (la tier list primero, luego la tabla de 12 en 12).
 - Crear, renombrar y fusionar mazos pasa a "Gestionar mazos" (botón en la barra de Mazos).
+
+## Licencias (offline)
+- Ver `docs/LICENCIAS.md`. Firma Ed25519: la app lleva la clave pública (`lib/core/license/license_config.dart`); el administrador firma con la privada desde el **Modo administrador** del móvil (7 toques en la versión, en Ajustes) o con `tools/generador_licencias.html` en el PC.
+- Licencia ligada al código del teléfono (hash de ANDROID_ID) con vencimiento por meses (1 mes en adelante). Aviso diario 7 días antes. Al vencer, pantalla de bloqueo con el código, introducir licencia y exportar datos.
+- Protección contra atrasar la fecha (última fecha vista, tolerancia 36 h).
+- Sin clave pública configurada la app no pide licencia (modo desarrollo).
+- Sin servidor no hay desactivación remota: el control es la duración de la licencia.
+
+## Copias de seguridad
+- Exportar/importar toda la BD en un archivo `.gtcg`: cabecera + SQLite (VACUUM INTO) comprimido + sello HMAC-SHA256 con clave interna. Solo se aceptan archivos exportados por la app (de cualquier teléfono); se detectan archivos dañados.
+- Importar reemplaza todos los datos, previa confirmación. Antes se guarda una copia automática (las 5 últimas) para poder deshacer. Una copia de una versión anterior de la BD se actualiza sola; una de una versión más nueva se rechaza.
+- La licencia NO va en la copia (está fuera de la BD).
 
 ## Pendiente de confirmar
 - Torneos de menos de 6 jugadores: no tienen Top Cut, así que no dan puntos de ranking.

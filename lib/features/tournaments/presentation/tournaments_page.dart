@@ -20,16 +20,32 @@ class TournamentsPage extends ConsumerWidget {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(top: 24, bottom: 8),
-                child: Column(
-                  children: [
-                    GlowLogo(size: 96),
-                    SizedBox(height: 10),
-                    BrandTitle(fontSize: 24),
-                  ],
-                ),
+            SliverToBoxAdapter(
+              child: Stack(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 24, bottom: 8),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          GlowLogo(size: 96),
+                          SizedBox(height: 10),
+                          BrandTitle(fontSize: 24),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton(
+                      tooltip: 'Ajustes',
+                      onPressed: () => context.push('/ajustes'),
+                      icon: const Icon(Icons.settings_outlined,
+                          color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SliverToBoxAdapter(child: SectionLabel('Torneos')),

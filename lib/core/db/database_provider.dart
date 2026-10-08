@@ -5,7 +5,7 @@ import 'app_database.dart';
 /// Única instancia de la BD para toda la app.
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
-  ref.onDispose(db.close);
+  ref.onDispose(db.closeOnce);
   return db;
 });
 
