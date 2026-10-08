@@ -14,6 +14,10 @@
 - Fuente única **Inter** (OFL) empaquetada en `assets/fonts`, recortada a caracteres latinos (~70 KB por peso): se ve igual en cualquier teléfono.
 - Toda eliminación pide confirmación (jugador, torneo, inscripción, fusión de mazos, resultado de un match, drop).
 
+## Perfil de jugador
+- Datos personales: nickname, nombre, Konami/COSSY ID, teléfono, notas (BD v3 añade `konami_id` y `phone`).
+- Todo lo demás se calcula desde los matches: historial (torneo, fase, rival, mazos, marcador visto desde el jugador, V/D/E), mazos usados (torneos con ese mazo, PJ, V/D/E, WR%, última vez) y totales (títulos = 1º en torneos terminados). El BYE aparece en el historial pero no cuenta como partida.
+
 ## Torneo
 - **Matches al mejor de 3** (gana quien llega a 2 juegos). Marcador `J1 - Empates - J2`, solo se aceptan: 2-0-0, 2-0-1, 0-0-2, 1-0-2 y 1-1-1 (empate del match). En Top Cut no se acepta 1-1-1. El BYE se registra 2-0-0. Se guardan los juegos (columnas `games1`, `gamesDraw`, `games2`) y el resultado del match se deriva del marcador.
 - Rondas Swiss (1-15) y Top Cut (Sin Top / 4 / 8 / 16 / 32) se eligen al crear el torneo y se pueden ajustar solo durante la inscripción. **Al generar la ronda 1 quedan fijos.** La app solo muestra una sugerencia orientativa; nunca cambia la configuración por su cuenta. Al empezar se comprueba que haya jugadores suficientes para el Top elegido.

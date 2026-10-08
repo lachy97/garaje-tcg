@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
@@ -100,7 +101,7 @@ class _PlayerTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return NeonCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      onTap: () => showPlayerForm(context, ref, player: player),
+      onTap: () => context.push('/jugadores/${player.id}'),
       child: Row(
         children: [
           CircleAvatar(
@@ -163,12 +164,16 @@ class _PlayerFormDialogState extends ConsumerState<_PlayerFormDialog> {
   late final _nick = TextEditingController(text: widget.player?.nickname ?? '');
   late final _name = TextEditingController(text: widget.player?.fullName ?? '');
   late final _notes = TextEditingController(text: widget.player?.notes ?? '');
+  late final _konami = TextEditingController(text: widget.player?.konamiId ?? '');
+  late final _phone = TextEditingController(text: widget.player?.phone ?? '');
 
   @override
   void dispose() {
     _nick.dispose();
     _name.dispose();
     _notes.dispose();
+    _konami.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
@@ -181,6 +186,8 @@ class _PlayerFormDialogState extends ConsumerState<_PlayerFormDialog> {
         nickname: _nick.text,
         fullName: _name.text,
         notes: _notes.text,
+        konamiId: _konami.text,
+        phone: _phone.text,
       );
       if (mounted) Navigator.pop(context, created);
     } else {
@@ -190,6 +197,8 @@ class _PlayerFormDialogState extends ConsumerState<_PlayerFormDialog> {
         nickname: _nick.text,
         fullName: Value(clean(_name.text)),
         notes: Value(clean(_notes.text)),
+        konamiId: Value(clean(_konami.text)),
+        phone: Value(clean(_phone.text)),
       );
       if (mounted) Navigator.pop(context);
     }
@@ -219,6 +228,24 @@ class _PlayerFormDialogState extends ConsumerState<_PlayerFormDialog> {
                 controller: _name,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(labelText: 'Nombre (opcional)'),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _konami,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Konami ID / COSSY ID (opcional)',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Teléfono / WhatsApp (opcional)',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
               ),
               const SizedBox(height: 12),
               TextFormField(

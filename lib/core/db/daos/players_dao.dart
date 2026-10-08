@@ -31,12 +31,16 @@ class PlayersDao extends DatabaseAccessor<AppDatabase> with _$PlayersDaoMixin {
     String? fullName,
     String? photoPath,
     String? notes,
+    String? konamiId,
+    String? phone,
   }) {
     return into(players).insertReturning(PlayersCompanion.insert(
       nickname: nickname.trim(),
       fullName: Value(_blankToNull(fullName)),
       photoPath: Value(photoPath),
       notes: Value(_blankToNull(notes)),
+      konamiId: Value(_blankToNull(konamiId)),
+      phone: Value(_blankToNull(phone)),
     ));
   }
 
@@ -46,6 +50,8 @@ class PlayersDao extends DatabaseAccessor<AppDatabase> with _$PlayersDaoMixin {
     Value<String?> fullName = const Value.absent(),
     Value<String?> photoPath = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    Value<String?> konamiId = const Value.absent(),
+    Value<String?> phone = const Value.absent(),
   }) {
     return (update(players)..where((p) => p.id.equals(id))).write(
       PlayersCompanion(
@@ -53,6 +59,8 @@ class PlayersDao extends DatabaseAccessor<AppDatabase> with _$PlayersDaoMixin {
         fullName: fullName,
         photoPath: photoPath,
         notes: notes,
+        konamiId: konamiId,
+        phone: phone,
         updatedAt: Value(DateTime.now()),
       ),
     );

@@ -26,6 +26,10 @@ class Players extends Table with SyncColumns {
   TextColumn get fullName => text().nullable()();
   TextColumn get photoPath => text().nullable()();
   TextColumn get notes => text().nullable()();
+
+  /// v3: datos personales del perfil.
+  TextColumn get konamiId => text().nullable()(); // Konami / COSSY ID
+  TextColumn get phone => text().nullable()();
 }
 
 /// El mazo es una entidad propia: sus estadísticas se calculan a partir de
