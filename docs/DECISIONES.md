@@ -45,7 +45,7 @@
 - Tabla con: #, jugador, puntos, último mazo, PJ, V, D, E, WR%, torneos y mejor posición. Solo cuentan torneos terminados; PJ excluye BYE.
 - Se puede consultar cualquier temporada (selector en el título), no solo la actual.
 - **Exportación** (ranking y tier list): al exportar se elige el formato:
-  - *Imagen única (alta calidad)*: toda la tabla en un PNG de hasta 2400 px de ancho (la densidad baja en tablas muy largas para no pasar ~8000 px de alto, límite de muchos móviles). Se comparte con tipo genérico para que WhatsApp la envíe como **documento** y no la comprima.
+  - *Imagen única (alta calidad)*: toda la tabla en un PNG de hasta 2400 px de ancho (la densidad baja en tablas muy largas para no pasar ~8000 px de alto, límite de muchos móviles). Se entrega **dentro de un PDF de una sola página** del tamaño exacto de la imagen: WhatsApp decide por la extensión y un .png siempre lo comprime como foto, mientras que un PDF va como documento intacto.
   - *Documento PDF*: A4 con los colores de la app, texto vectorial (Inter en TTF, `assets/fonts/pdf/`), varias páginas repitiendo la cabecera de la tabla.
   - *Imágenes para el chat*: PNG de 1920 px con 12 filas cada uno.
 

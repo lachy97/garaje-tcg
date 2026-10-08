@@ -5,14 +5,15 @@ import '../../../app/widgets/neon_table.dart';
 import '../../../app/widgets/table_export.dart';
 import '../domain/ranking_row.dart';
 
-/// Colores por puesto: 1º oro, 2º plata, 3º bronce, 4º turquesa y del 5º al
-/// 8º un mismo verde. Del 9º en adelante, sin color propio.
+/// Colores por puesto: degradado de verdes de la marca, del más brillante
+/// (1º) al más oscuro; del 5º al 8º un mismo verde. Del 9º en adelante, sin
+/// color propio.
 Color? rankingColor(int rank) => switch (rank) {
-      1 => const Color(0xFFFFD54A),
-      2 => const Color(0xFFD3DCE6),
-      3 => const Color(0xFFE39A5C),
-      4 => const Color(0xFF4FD8C4),
-      >= 5 && <= 8 => AppColors.leaf,
+      1 => const Color(0xFFD1FFAD),
+      2 => const Color(0xFFA8F56E),
+      3 => const Color(0xFF7FD957),
+      4 => const Color(0xFF4FC08D),
+      >= 5 && <= 8 => const Color(0xFF3E9A63),
       _ => null,
     };
 
