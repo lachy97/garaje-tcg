@@ -60,6 +60,8 @@ flutter:
     - assets/fonts/pdf/
     # Imágenes de los mazos de Edison Format (edisonformat.net/decks)
     - assets/decks/
+    # Fondo con textura del póster de la tier list exportada
+    - assets/export/
   # Fuente única de toda la app (Inter, licencia OFL, recortada a caracteres latinos)
   fonts:
     - family: Inter

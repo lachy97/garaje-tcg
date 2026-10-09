@@ -180,6 +180,8 @@ const kDeckCatalog = <DeckCatalogEntry>[
   DeckCatalogEntry('Calculator', DeckCategory.more, 'calculator'),
   DeckCatalogEntry('Chaos Zombie', DeckCategory.more, 'chaos_zombie'),
   DeckCatalogEntry('Exodia', DeckCategory.more, 'exodia'),
+  // Añadido a mano (imagen: Jinzo).
+  DeckCatalogEntry('Jinzo OTK', DeckCategory.more, 'jinzo_otk'),
 ];
 
 /// Entrada del catálogo por nombre normalizado (minúsculas, espacios simples).

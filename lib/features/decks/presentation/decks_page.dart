@@ -10,7 +10,9 @@ import '../../../core/db/database_provider.dart';
 import '../../ranking/presentation/season_picker.dart';
 import '../domain/deck_stats.dart';
 import 'deck_picker.dart' show sortDecks;
+import '../domain/tier_style.dart';
 import 'deck_tier_table.dart';
+import 'tier_board.dart';
 
 /// Todos los mazos registrados (inscripción, rondas, gestión).
 /// Ordenados como en edisonformat.net (competitivos, rogue, casual) y luego
@@ -40,7 +42,8 @@ class _DecksPageState extends ConsumerState<DecksPage> {
   Future<void> _export(Season season, List<DeckSeasonStats> decks) async {
     setState(() => _exporting = true);
     try {
-      await exportDeckTierImages(context, season: season, decks: decks);
+      await exportDeckTierImages(context,
+          season: season, decks: decks, styles: ref.read(tierStylesProvider));
     } catch (e) {
       if (mounted) showMessage(context, 'No se pudo exportar: $e', error: true);
     } finally {
@@ -88,9 +91,16 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                   )
                 else ...[
                   const SectionLabel('Tier list'),
-                  NeonCard(
-                    padding: EdgeInsets.zero,
-                    child: TierSummary(decks: decks),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: TierBoardView(decks: decks),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Text(
+                      'Toca el cuadro de color de un tier para cambiar su texto o su color.',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
                   ),
                   const SectionLabel('Tabla de mazos'),
                   DeckTierTable(decks: decks),
@@ -122,8 +132,8 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Text(
-                      'Se exporta la tier list como imagen (filas de tiers con las imágenes de '
-                      'los mazos). En WhatsApp toca "HD" antes de enviarla para que se vea nítida.',
+                      'Se exporta la tier list como imagen, con las etiquetas que hayas puesto. '
+                      'En WhatsApp toca "HD" antes de enviarla para que se vea nítida.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),

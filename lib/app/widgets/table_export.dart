@@ -62,24 +62,38 @@ Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) asyn
   }
   if (!context.mounted) return;
 
-  final contentWidth = spec.contentWidth ?? kExportContentWidth;
-  final width = contentWidth + 48 + 4;
-  final table = spec.tableBuilder;
-  final height = _kChromeHeight +
-      spec.summaryHeightEstimate +
-      (table == null ? 0 : (spec.items.length + 1) * spec.rowHeightEstimate);
+  final Widget page;
+  final double width;
+  final double height;
+  if (spec.page != null) {
+    page = spec.page!;
+    width = spec.contentWidth!;
+    height = spec.summaryHeightEstimate;
+  } else {
+    final contentWidth = spec.contentWidth ?? kExportContentWidth;
+    width = contentWidth + 48 + 4;
+    final table = spec.tableBuilder;
+    height = _kChromeHeight +
+        spec.summaryHeightEstimate +
+        (table == null ? 0 : (spec.items.length + 1) * spec.rowHeightEstimate);
+    page = _ExportPage(
+      width: width,
+      heading: spec.heading,
+      legend: spec.legend,
+      date: DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now()),
+      table: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (spec.summary != null) spec.summary!,
+          if (spec.summary != null && table != null) const SizedBox(height: 16),
+          if (table != null) _TableFrame(child: table(spec.items, contentWidth)),
+        ],
+      ),
+    );
+  }
 
-  final content = Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (spec.summary != null) spec.summary!,
-      if (spec.summary != null && table != null) const SizedBox(height: 16),
-      if (table != null) _TableFrame(child: table(spec.items, contentWidth)),
-    ],
-  );
-
-  final bytes = await _capture(context, spec, content,
+  final bytes = await _capture(context, page,
       width: width, pixelRatio: _pixelRatioFor(width, height));
   final stamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
   final name = '${spec.fileBase}_$stamp.png';
@@ -92,14 +106,12 @@ Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) asyn
   ));
 }
 
-Future<Uint8List> _capture<T>(
+Future<Uint8List> _capture(
   BuildContext context,
-  ExportSpec<T> spec,
-  Widget content, {
+  Widget page, {
   required double width,
   required double pixelRatio,
 }) {
-  final date = DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now());
   return ScreenshotController().captureFromLongWidget(
     Theme(
       data: AppTheme.dark,
@@ -108,16 +120,7 @@ Future<Uint8List> _capture<T>(
         // Sin escalado de texto del sistema: la imagen sale igual en todos los móviles.
         child: MediaQuery(
           data: const MediaQueryData(textScaler: TextScaler.noScaling),
-          child: Material(
-            color: AppColors.background,
-            child: _ExportPage(
-              width: width,
-              heading: spec.heading,
-              legend: spec.legend,
-              date: date,
-              table: content,
-            ),
-          ),
+          child: Material(color: AppColors.background, child: page),
         ),
       ),
     ),

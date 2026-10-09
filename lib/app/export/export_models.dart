@@ -77,7 +77,13 @@ class ExportSpec<T> {
     this.summaryHeightEstimate = 0,
     this.preload = const [],
     this.contentWidth,
+    this.page,
   });
+
+  /// Página completa ya diseñada (p. ej. el póster de la tier list). Si no es
+  /// null se exporta tal cual, sin la cabecera estándar ni la tabla; su ancho
+  /// es [contentWidth] y su alto aproximado [summaryHeightEstimate].
+  final Widget? page;
 
   /// Ancho útil (px lógicos) del contenido; null = ancho de tabla estándar.
   final double? contentWidth;
