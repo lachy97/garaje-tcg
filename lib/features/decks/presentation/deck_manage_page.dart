@@ -6,6 +6,7 @@ import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
+import '../domain/deck_catalog.dart';
 import 'deck_image.dart';
 import 'deck_picker.dart';
 import 'decks_page.dart' show decksProvider;
