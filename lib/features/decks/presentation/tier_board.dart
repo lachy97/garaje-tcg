@@ -296,7 +296,9 @@ Future<void> showTierStyleDialog(BuildContext context, WidgetRef ref, DeckTier t
       builder: (ctx, setState) {
         final preview = TierStyle(text.text.trim().isEmpty ? tier.label : text.text.trim(), color);
         return AlertDialog(
-          title: Text('Etiqueta del tier ${tier.label}'),
+          title: Text(tier == DeckTier.rogue
+              ? 'Etiqueta de Rogue/Local'
+              : 'Etiqueta del tier ${tier.label}'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -476,8 +478,8 @@ class TierListPoster extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${decks.length} mazos · Tier según el Score de la temporada respecto '
-                  'al mejor mazo · En cada fila, ordenados por puesto.',
+                  '${decks.length} mazos · Tier según el Power (puntos por resultados en el '
+                  'Top) respecto al mejor mazo · En cada fila, ordenados por puesto.',
                   style: const TextStyle(fontSize: 14, color: muted),
                 ),
               ),

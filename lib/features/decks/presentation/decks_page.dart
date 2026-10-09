@@ -108,10 +108,10 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Text(
                       '$deckLegend.\n\n'
-                      'PP = 3·V Swiss + 1·E + 6·V Top + 3·Entradas Top + 5·Títulos\n'
-                      'WRp = (V Swiss + 2·V Top + 0.5·E + 5) / (PJ Swiss + 2·PJ Top + 10)\n'
-                      'Tier según el Score del mejor mazo: S ≥ 70 % · A ≥ 45 % · B ≥ 20 % · C resto.\n'
-                      'Desempates: títulos → V Top → WRp → mejor resultado. '
+                      'En torneos sin Top Cut cuentan como Top los 4 primeros.\n'
+                      'Tier según el Power del mejor mazo: S ≥ 70 % · A ≥ 40 % · B ≥ 15 % · C el resto · '
+                      'Rogue/Local = sin Top.\n'
+                      'Desempates: Conversión → Presencia. '
                       'Solo cuentan torneos terminados. Desliza la tabla para ver todas las columnas.',
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),

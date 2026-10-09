@@ -35,10 +35,26 @@ class DeckEntryRow {
   final int topCutSize;
   final int? finalPosition;
 
-  bool get madeTop => topCutSize > 0 && finalPosition != null && finalPosition! <= topCutSize;
+  /// Hasta qué puesto se considera "Top" en ese torneo: el Top Cut o, si el
+  /// torneo no tuvo Top Cut, los 4 primeros.
+  int get topLimit => topCutSize > 0 ? topCutSize : 4;
+
+  bool get madeTop => finalPosition != null && finalPosition! <= topLimit;
+
+  /// Puntos de Power por el resultado en el Top (fuera del Top: 0).
+  int get placementPoints {
+    final pos = finalPosition;
+    if (!madeTop || pos == null) return 0;
+    if (pos == 1) return 8;
+    if (pos == 2) return 6;
+    if (pos <= 4) return 4;
+    if (pos <= 8) return 2;
+    return 1; // Top 16 / Top 32
+  }
 }
 
-enum DeckTier { s, a, b, c }
+/// [rogue] = mazos que no entraron a ningún Top en la temporada (Power 0).
+enum DeckTier { s, a, b, c, rogue }
 
 extension DeckTierLabel on DeckTier {
   String get label => switch (this) {
@@ -46,19 +62,20 @@ extension DeckTierLabel on DeckTier {
         DeckTier.a => 'A',
         DeckTier.b => 'B',
         DeckTier.c => 'C',
+        DeckTier.rogue => 'R',
       };
 }
 
 /// Estadísticas de un mazo en la temporada + puntuación para la tier list.
 ///
-/// Fórmula (ver docs/DECISIONES.md):
-///   PP    = 3·V_swiss + 1·E_swiss + 6·V_top + 3·Entradas_top + 5·Títulos
-///   WRp   = (V_swiss + 2·V_top + 0.5·E + 5) / (PJ_swiss + 2·PJ_top + 10)
-///   Score = PP × (0.5 + WRp)
-///
-/// PP premia rendimiento acumulado (uso + resultados); WRp es un winrate
-/// "suavizado" (5 de 10 ficticios) para que un mazo con 1 partida ganada no
-/// aparezca arriba, y donde una victoria en el Top vale doble.
+/// Fórmula (estilo Konami / comunidad, ver docs/DECISIONES.md):
+///   Power      = Σ puntos de cada piloto que entró al Top
+///                (Campeón 8 · Finalista 6 · 3º-4º 4 · Top 8 2 · Top 16+ 1)
+///   Presencia  = inscripciones con el mazo ÷ inscripciones de la temporada
+///   Conversión = entradas al Top ÷ inscripciones con el mazo
+///   Tier relativo al mejor Power: S ≥ 70 % · A ≥ 40 % · B ≥ 15 % · C > 0 ·
+///   Rogue/Local = sin Top.
+///   Orden: Power → Conversión → Presencia → nombre.
 class DeckSeasonStats {
   DeckSeasonStats(this.deckId, this.name, {this.imagePath});
 
@@ -77,9 +94,22 @@ class DeckSeasonStats {
   int titles = 0;
   int? bestPosition;
 
+  /// Suma de puntos por resultados en el Top.
+  int power = 0;
+
+  /// Fracción del total de inscripciones de la temporada (0-1). Se asigna en
+  /// [DeckStats.compute].
+  double presence = 0;
+
   /// Puesto en la tabla (1 = mejor) y tier. Se asignan en [DeckStats.rank].
   int rank = 0;
-  DeckTier tier = DeckTier.c;
+  DeckTier tier = DeckTier.rogue;
+
+  /// Fracción de pilotos que entraron al Top (0-1).
+  double get conversion => entries == 0 ? 0 : topEntries / entries;
+
+  /// Valor que ordena la tier list (= Power).
+  double get score => power.toDouble();
 
   int get swissPlayed => swissWins + swissLosses + swissDraws;
   int get topPlayed => topWins + topLosses;
@@ -89,22 +119,14 @@ class DeckSeasonStats {
 
   /// Winrate real (todas las partidas, sin ponderar).
   double get winrate => played == 0 ? 0 : wins / played;
-
-  int get performancePoints =>
-      3 * swissWins + swissDraws + 6 * topWins + 3 * topEntries + 5 * titles;
-
-  double get weightedWinrate =>
-      (swissWins + 2 * topWins + 0.5 * swissDraws + 5) / (swissPlayed + 2 * topPlayed + 10);
-
-  double get score => performancePoints * (0.5 + weightedWinrate);
 }
 
 class DeckStats {
   const DeckStats._();
 
-  /// Umbrales de tier respecto al mejor Score de la temporada.
-  /// S ≥ 70 % · A ≥ 45 % · B ≥ 20 % · C resto.
-  static const tierThresholds = {DeckTier.s: 0.70, DeckTier.a: 0.45, DeckTier.b: 0.20};
+  /// Umbrales de tier respecto al mejor Power de la temporada.
+  /// S ≥ 70 % · A ≥ 40 % · B ≥ 15 % · C > 0 · Rogue/Local = 0.
+  static const tierThresholds = {DeckTier.s: 0.70, DeckTier.a: 0.40, DeckTier.b: 0.15};
 
   static List<DeckSeasonStats> compute({
     required List<DeckEntryRow> entries,
@@ -116,6 +138,7 @@ class DeckStats {
       s.entries++;
       s.pilots.add(e.playerId);
       if (e.madeTop) s.topEntries++;
+      s.power += e.placementPoints;
       final pos = e.finalPosition;
       if (pos != null) {
         if (pos == 1) s.titles++;
@@ -158,22 +181,22 @@ class DeckStats {
           break;
       }
     }
+    final total = entries.length;
+    for (final s in byId.values) {
+      s.presence = total == 0 ? 0 : s.entries / total;
+    }
     return rank(byId.values.toList());
   }
 
-  /// Ordena por Score y desempata: títulos → V top → WRp → mejor resultado → nombre.
+  /// Ordena por Power y desempata: Conversión → Presencia → nombre.
   /// Asigna puesto y tier.
   static List<DeckSeasonStats> rank(List<DeckSeasonStats> list) {
     list.sort((a, b) {
-      var c = b.score.compareTo(a.score);
+      var c = b.power.compareTo(a.power);
       if (c != 0) return c;
-      c = b.titles.compareTo(a.titles);
+      c = b.conversion.compareTo(a.conversion);
       if (c != 0) return c;
-      c = b.topWins.compareTo(a.topWins);
-      if (c != 0) return c;
-      c = b.weightedWinrate.compareTo(a.weightedWinrate);
-      if (c != 0) return c;
-      c = (a.bestPosition ?? 1 << 30).compareTo(b.bestPosition ?? 1 << 30);
+      c = b.presence.compareTo(a.presence);
       if (c != 0) return c;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
@@ -186,9 +209,9 @@ class DeckStats {
     return list;
   }
 
-  static DeckTier tierFor(double score, double best) {
-    if (best <= 0) return DeckTier.c;
-    final r = score / best;
+  static DeckTier tierFor(double power, double best) {
+    if (power <= 0 || best <= 0) return DeckTier.rogue;
+    final r = power / best;
     for (final MapEntry(key: tier, value: min) in tierThresholds.entries) {
       if (r >= min) return tier;
     }

@@ -35,6 +35,7 @@ const kDefaultTierStyles = <DeckTier, TierStyle>{
   DeckTier.a: TierStyle('A', Color(0xFFD6A06A)),
   DeckTier.b: TierStyle('B', Color(0xFFD4BD6A)),
   DeckTier.c: TierStyle('C', Color(0xFF8CC06A)),
+  DeckTier.rogue: TierStyle('Rogue/Local', Color(0xFF8A86D6)),
 };
 
 /// Paleta para elegir el color de un tier.

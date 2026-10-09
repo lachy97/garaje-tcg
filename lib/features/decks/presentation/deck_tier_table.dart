@@ -14,6 +14,7 @@ Color tierColor(DeckTier t) => switch (t) {
       DeckTier.a => AppColors.leaf,
       DeckTier.b => AppColors.draw,
       DeckTier.c => AppColors.textSecondary,
+      DeckTier.rogue => AppColors.textDisabled,
     };
 
 /// Cuadrado con la etiqueta del tier (texto y color editables; si el texto
@@ -69,7 +70,9 @@ class DeckTierTable extends StatelessWidget {
     NeonColumn('#', width: 32, align: TextAlign.start),
     NeonColumn('Tier', width: 44),
     NeonColumn('Mazo', width: 140, align: TextAlign.start, flex: true),
-    NeonColumn('Score', width: 60),
+    NeonColumn('Power', width: 58),
+    NeonColumn('Pres.', width: 52),
+    NeonColumn('Conv.', width: 54),
     NeonColumn('Uso', width: 42),
     NeonColumn('Jug.', width: 42),
     NeonColumn('PJ', width: 38),
@@ -83,12 +86,15 @@ class DeckTierTable extends StatelessWidget {
     NeonColumn('Mejor', width: 50),
   ];
 
-  /// Suman 722 + 24 ≤ 750 (ancho útil de la imagen).
+  /// Columnas para imagen (la tier list ya no exporta la tabla, se mantiene
+  /// por si se vuelve a usar).
   static const exportColumns = [
     NeonColumn('#', width: 30, align: TextAlign.start),
     NeonColumn('Tier', width: 44),
     NeonColumn('Mazo', width: 130, align: TextAlign.start, flex: true),
-    NeonColumn('Score', width: 58),
+    NeonColumn('Power', width: 56),
+    NeonColumn('Pres', width: 50),
+    NeonColumn('Conv', width: 52),
     NeonColumn('Uso', width: 42),
     NeonColumn('Jug', width: 40),
     NeonColumn('PJ', width: 40),
@@ -133,8 +139,10 @@ class DeckTierTable extends StatelessWidget {
                   ),
                 ],
               ),
-              Text(d.score.toStringAsFixed(1),
+              Text('${d.power}',
                   style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
+              Text(_pct(d.presence)),
+              Text(_pct(d.conversion)),
               Text('${d.entries}'),
               Text('${d.pilots.length}'),
               Text('${d.played}'),
@@ -156,9 +164,13 @@ class DeckTierTable extends StatelessWidget {
   }
 }
 
-const deckLegend = 'Uso = veces inscrito · Jug = jugadores distintos · PJ/V/D/E partidas '
-    '(Swiss + Top) · Top = entradas al Top Cut · VTop = victorias en el Top · '
-    'Tít = torneos ganados · Score = PP × (0.5 + WRp)';
+String _pct(double v) => '${(v * 100).round()}%';
+
+const deckLegend = 'Power = puntos por resultados en el Top (Campeón 8 · Finalista 6 · '
+    '3º-4º 4 · Top 8 2 · Top 16 1) · Pres = % de inscripciones con el mazo · '
+    'Conv = % de sus pilotos que entraron al Top · Uso = veces inscrito · '
+    'Jug = jugadores distintos · PJ/V/D/E partidas (Swiss + Top) · '
+    'Top = entradas al Top · VTop = victorias en el Top · Tít = torneos ganados';
 
 ExportTableData deckPdfTable(List<DeckSeasonStats> decks) {
   final neon = AppColors.neon.toARGB32();
@@ -168,7 +180,9 @@ ExportTableData deckPdfTable(List<DeckSeasonStats> decks) {
       ExportColumnData('#', 2.6, align: ExportAlign.start),
       ExportColumnData('Tier', 3.2),
       ExportColumnData('Mazo', 13, align: ExportAlign.start),
-      ExportColumnData('Score', 4.6),
+      ExportColumnData('Power', 4.2),
+      ExportColumnData('Pres', 3.8),
+      ExportColumnData('Conv', 3.8),
       ExportColumnData('Uso', 3.4),
       ExportColumnData('Jug', 3.4),
       ExportColumnData('PJ', 3.2),
@@ -190,7 +204,9 @@ ExportTableData deckPdfTable(List<DeckSeasonStats> decks) {
             ExportCellData(d.tier.label,
                 bold: true, color: black, background: tierColor(d.tier).toARGB32()),
             ExportCellData(d.name, bold: true, color: d.tier == DeckTier.s ? neon : null),
-            ExportCellData(d.score.toStringAsFixed(1), bold: true, color: neon),
+            ExportCellData('${d.power}', bold: true, color: neon),
+            ExportCellData(_pct(d.presence)),
+            ExportCellData(_pct(d.conversion)),
             ExportCellData('${d.entries}'),
             ExportCellData('${d.pilots.length}'),
             ExportCellData('${d.played}'),
