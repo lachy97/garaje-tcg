@@ -79,6 +79,23 @@ class DecksDao extends DatabaseAccessor<AppDatabase> with _$DecksDaoMixin {
         }
       }
     });
+    await _mergeAliases(game);
+  }
+
+  /// Fusiona los mazos con un nombre viejo ([kDeckAliases]) en su mazo actual.
+  Future<void> _mergeAliases(String game) async {
+    for (final MapEntry(key: alias, value: targetName) in kDeckAliases.entries) {
+      Future<Deck?> find(String norm) => (select(decks)
+            ..where((d) =>
+                d.game.equals(game) & d.normalizedName.equals(norm) & d.deletedAt.isNull()))
+          .getSingleOrNull();
+      final from = await find(alias);
+      if (from == null) continue;
+      final into = await find(normalizeDeckName(targetName));
+      if (into == null || into.id == from.id) continue;
+      // Sin transacción propia: se llama al abrir la BD (beforeOpen).
+      await _moveDeck(from.id, into.id);
+    }
   }
 
   /// Cambia (o quita, con null) la imagen de un mazo.
@@ -114,19 +131,20 @@ class DecksDao extends DatabaseAccessor<AppDatabase> with _$DecksDaoMixin {
 
   /// Fusiona [fromId] dentro de [intoId] (corrige mazos duplicados o mal escritos):
   /// reasigna matches e inscripciones y borra lógicamente el origen.
-  Future<void> merge({required String fromId, required String intoId}) {
+  Future<void> merge({required String fromId, required String intoId}) =>
+      transaction(() => _moveDeck(fromId, intoId));
+
+  /// Pasa partidas e inscripciones de [fromId] a [intoId] y borra [fromId].
+  Future<void> _moveDeck(String fromId, String intoId) async {
     final db = attachedDatabase;
     final now = DateTime.now();
-    return transaction(() async {
-      await (update(db.matches)..where((m) => m.deck1Id.equals(fromId)))
-          .write(MatchesCompanion(deck1Id: Value(intoId), updatedAt: Value(now)));
-      await (update(db.matches)..where((m) => m.deck2Id.equals(fromId)))
-          .write(MatchesCompanion(deck2Id: Value(intoId), updatedAt: Value(now)));
-      await (update(db.tournamentPlayers)..where((t) => t.deckId.equals(fromId)))
-          .write(TournamentPlayersCompanion(
-              deckId: Value(intoId), updatedAt: Value(now)));
-      await (update(decks)..where((d) => d.id.equals(fromId)))
-          .write(DecksCompanion(deletedAt: Value(now), updatedAt: Value(now)));
-    });
+    await (update(db.matches)..where((m) => m.deck1Id.equals(fromId)))
+        .write(MatchesCompanion(deck1Id: Value(intoId), updatedAt: Value(now)));
+    await (update(db.matches)..where((m) => m.deck2Id.equals(fromId)))
+        .write(MatchesCompanion(deck2Id: Value(intoId), updatedAt: Value(now)));
+    await (update(db.tournamentPlayers)..where((t) => t.deckId.equals(fromId)))
+        .write(TournamentPlayersCompanion(deckId: Value(intoId), updatedAt: Value(now)));
+    await (update(decks)..where((d) => d.id.equals(fromId)))
+        .write(DecksCompanion(deletedAt: Value(now), updatedAt: Value(now)));
   }
 }

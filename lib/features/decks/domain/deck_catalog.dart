@@ -31,7 +31,7 @@ class DeckCatalogEntry {
 const kDeckCatalog = <DeckCatalogEntry>[
   DeckCatalogEntry('Blackwing', DeckCategory.competitive, 'blackwing'),
   DeckCatalogEntry('Vayu Turbo', DeckCategory.competitive, 'vayu_turbo'),
-  DeckCatalogEntry('Hybrid', DeckCategory.competitive, 'hybrid'),
+  DeckCatalogEntry('Hybrid Blackwing', DeckCategory.competitive, 'hybrid_blackwing'),
   DeckCatalogEntry('Hero Frog', DeckCategory.competitive, 'hero_frog'),
   DeckCatalogEntry('Junk Frog', DeckCategory.competitive, 'junk_frog'),
   DeckCatalogEntry('Diva Zombie', DeckCategory.competitive, 'diva_zombie'),
@@ -183,17 +183,22 @@ const kDeckCatalog = <DeckCatalogEntry>[
   // Añadido a mano (imagen: Jinzo).
   DeckCatalogEntry('Jinzo OTK', DeckCategory.more, 'jinzo_otk'),
   // Mazos del Torneo #1 · T4 2026 (imágenes enviadas por el organizador).
-  DeckCatalogEntry('Dark Jinzo OTK', DeckCategory.more, 'dark_jinzo_otk'),
   DeckCatalogEntry('Dream Frogs', DeckCategory.more, 'dream_frogs'),
   DeckCatalogEntry('Hero Stun', DeckCategory.more, 'hero_stun'),
   DeckCatalogEntry('Dark Hero Frog', DeckCategory.more, 'dark_hero_frog'),
   DeckCatalogEntry('Simochi Burn', DeckCategory.more, 'simochi_burn'),
-  DeckCatalogEntry('Hybrid Blackwing', DeckCategory.more, 'hybrid_blackwing'),
   DeckCatalogEntry('Valhalla Fairies', DeckCategory.more, 'valhalla_fairies'),
   DeckCatalogEntry('Instant Zombie', DeckCategory.more, 'instant_zombie'),
   DeckCatalogEntry('GB Turbo', DeckCategory.more, 'gb_turbo'),
   DeckCatalogEntry('X-Insects', DeckCategory.more, 'x_insects'),
 ];
+
+/// Nombres viejos que son el mismo mazo que otro del catálogo. Al abrir la app
+/// se fusionan solos (partidas, inscripciones y estadísticas pasan al nuevo).
+const Map<String, String> kDeckAliases = {
+  'hybrid': 'Hybrid Blackwing',
+  'dark jinzo otk': 'Jinzo OTK',
+};
 
 /// Entrada del catálogo por nombre normalizado (minúsculas, espacios simples).
 final Map<String, DeckCatalogEntry> kDeckCatalogByName = {
