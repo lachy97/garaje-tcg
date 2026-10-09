@@ -66,7 +66,7 @@ class ExportSpec<T> {
   const ExportSpec({
     required this.heading,
     required this.items,
-    required this.tableBuilder,
+    this.tableBuilder,
     required this.pdfTable,
     required this.legend,
     required this.fileBase,
@@ -76,7 +76,11 @@ class ExportSpec<T> {
     this.rowHeightEstimate = 50,
     this.summaryHeightEstimate = 0,
     this.preload = const [],
+    this.contentWidth,
   });
+
+  /// Ancho útil (px lógicos) del contenido; null = ancho de tabla estándar.
+  final double? contentWidth;
 
   /// Imágenes que deben estar cargadas antes de "fotografiar" la tabla
   /// (p. ej. las de los mazos).
@@ -86,8 +90,9 @@ class ExportSpec<T> {
   final String heading;
   final List<T> items;
 
-  /// Tabla (widget) de las filas dadas, para las imágenes.
-  final Widget Function(List<T> items, double width) tableBuilder;
+  /// Tabla (widget) de las filas dadas, para las imágenes. null = sin tabla
+  /// (p. ej. la tier list, que solo exporta [summary]).
+  final Widget Function(List<T> items, double width)? tableBuilder;
 
   /// Bloque previo opcional en las imágenes (p. ej. la tier list).
   final Widget? summary;

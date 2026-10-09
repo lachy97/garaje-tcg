@@ -123,7 +123,7 @@ class _DeckPickerState extends ConsumerState<_DeckPicker> {
                     maxCrossAxisExtent: 120,
                     mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
-                    childAspectRatio: 0.52,
+                    childAspectRatio: 0.72,
                   ),
                   itemCount: list.length,
                   itemBuilder: (_, i) {
@@ -212,13 +212,9 @@ Future<String?> showNewDeckDialog(BuildContext context, WidgetRef ref,
             const SizedBox(height: 14),
             Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: photo == null
-                      ? DeckImage(path: null, name: name.text, width: 56)
-                      : Image.file(File(photo!.path),
-                          width: 56, height: 56 / kDeckImageAspect, fit: BoxFit.cover),
-                ),
+                photo == null
+                    ? DeckImage(path: null, name: name.text, width: 56)
+                    : DeckImage(path: photo!.path, name: name.text, width: 56),
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(

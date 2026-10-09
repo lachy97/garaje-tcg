@@ -57,7 +57,7 @@ class _DeckTile extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          DeckImage(path: deck.imagePath, name: deck.name, width: 40, radius: 4),
+          DeckImage(path: deck.imagePath, name: deck.name, width: 44),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

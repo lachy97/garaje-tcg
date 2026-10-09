@@ -108,8 +108,8 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Text(
-                      'Imagen como archivo (máxima calidad, se envía como documento) '
-                      'o imagen HD para ver en el chat.',
+                      'Se genera una sola imagen con la tabla completa, en la máxima calidad. '
+                      'En WhatsApp toca "HD" antes de enviarla para que se vea nítida al hacer zoom.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),

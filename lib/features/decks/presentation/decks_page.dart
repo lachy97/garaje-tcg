@@ -119,6 +119,15 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                       label: const Text('EXPORTAR TIER LIST'),
                     ),
                   ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Text(
+                      'Se exporta la tier list como imagen (filas de tiers con las imágenes de '
+                      'los mazos). En WhatsApp toca "HD" antes de enviarla para que se vea nítida.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
                 ],
               ],
             ),

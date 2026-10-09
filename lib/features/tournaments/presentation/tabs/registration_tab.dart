@@ -109,7 +109,7 @@ class _RegisteredTile extends ConsumerWidget {
             Opacity(
               opacity: dropped ? 0.4 : 1,
               child: DeckImage(
-                  path: item.deck!.imagePath, name: item.deck!.name, width: 34, radius: 4),
+                  path: item.deck!.imagePath, name: item.deck!.name, width: 40),
             )
           else
             CircleAvatar(
