@@ -14,27 +14,103 @@ import 'decks_page.dart' show decksProvider;
 /// Gestión de mazos (pantalla secundaria de "Mazos"): la lista de Edison
 /// Format viene cargada con sus imágenes; aquí se añaden mazos nuevos (con foto
 /// opcional), se cambian imágenes, se corrigen nombres y se fusionan duplicados.
-class DeckManagePage extends ConsumerWidget {
+class DeckManagePage extends ConsumerStatefulWidget {
   const DeckManagePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DeckManagePage> createState() => _DeckManagePageState();
+}
+
+class _DeckManagePageState extends ConsumerState<DeckManagePage> {
+  final _search = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// Busca sin distinguir mayúsculas, espacios, guiones ni signos
+  /// ("xinsects" encuentra "X-Insects", "koaki" encuentra "Koa'ki Meiru").
+  static String _key(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9ñáéíóúü]'), '');
+
+  @override
+  Widget build(BuildContext context) {
     final decks = ref.watch(decksProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('GESTIONAR MAZOS')),
       body: AsyncView(
         value: decks,
-        builder: (raw) => raw.isEmpty
-            ? const EmptyState(
-                icon: Icons.style_outlined,
-                title: 'Aún no hay mazos',
-                subtitle: 'Se crean al inscribir jugadores en un torneo, o con el botón +.',
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.only(top: 8, bottom: 96),
-                itemCount: raw.length,
-                itemBuilder: (_, i) => _DeckTile(deck: raw[i], all: raw),
+        builder: (raw) {
+          if (raw.isEmpty) {
+            return const EmptyState(
+              icon: Icons.style_outlined,
+              title: 'Aún no hay mazos',
+              subtitle: 'Se crean al inscribir jugadores en un torneo, o con el botón +.',
+            );
+          }
+          final q = _key(_query);
+          final list = q.isEmpty ? raw : raw.where((d) => _key(d.name).contains(q)).toList();
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: TextField(
+                  controller: _search,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: 'Buscar mazo (${raw.length})',
+                    isDense: true,
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Borrar búsqueda',
+                            icon: const Icon(Icons.close),
+                            onPressed: () => setState(() {
+                              _search.clear();
+                              _query = '';
+                            }),
+                          ),
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
               ),
+              Expanded(
+                child: list.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Text('No hay ningún mazo llamado "${_query.trim()}".',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: AppColors.textSecondary)),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                final n = await showNewDeckDialog(context, ref,
+                                    initialName: _query.trim());
+                                if (n != null && context.mounted) {
+                                  showMessage(context, 'Mazo "$n" guardado');
+                                }
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Añadirlo'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(top: 4, bottom: 96),
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                        itemCount: list.length,
+                        itemBuilder: (_, i) => _DeckTile(deck: list[i], all: raw),
+                      ),
+              ),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),

@@ -182,6 +182,17 @@ const kDeckCatalog = <DeckCatalogEntry>[
   DeckCatalogEntry('Exodia', DeckCategory.more, 'exodia'),
   // Añadido a mano (imagen: Jinzo).
   DeckCatalogEntry('Jinzo OTK', DeckCategory.more, 'jinzo_otk'),
+  // Mazos del Torneo #1 · T4 2026 (imágenes enviadas por el organizador).
+  DeckCatalogEntry('Dark Jinzo OTK', DeckCategory.more, 'dark_jinzo_otk'),
+  DeckCatalogEntry('Dream Frogs', DeckCategory.more, 'dream_frogs'),
+  DeckCatalogEntry('Hero Stun', DeckCategory.more, 'hero_stun'),
+  DeckCatalogEntry('Dark Hero Frog', DeckCategory.more, 'dark_hero_frog'),
+  DeckCatalogEntry('Simochi Burn', DeckCategory.more, 'simochi_burn'),
+  DeckCatalogEntry('Hybrid Blackwing', DeckCategory.more, 'hybrid_blackwing'),
+  DeckCatalogEntry('Valhalla Fairies', DeckCategory.more, 'valhalla_fairies'),
+  DeckCatalogEntry('Instant Zombie', DeckCategory.more, 'instant_zombie'),
+  DeckCatalogEntry('GB Turbo', DeckCategory.more, 'gb_turbo'),
+  DeckCatalogEntry('X-Insects', DeckCategory.more, 'x_insects'),
 ];
 
 /// Entrada del catálogo por nombre normalizado (minúsculas, espacios simples).
