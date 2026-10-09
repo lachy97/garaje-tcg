@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../app/restartable_app.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
@@ -145,10 +147,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       danger: true,
     );
     if (!ok || !mounted) return;
-    await ref.read(backupServiceProvider).restore(preview);
+    final applied = await ref.read(backupServiceProvider).restore(preview);
     if (!mounted) return;
-    showMessage(context, 'Datos importados');
-    context.go('/torneos');
+    if (applied) {
+      // Se vuelven a crear la BD y todas las pantallas con los datos nuevos.
+      RestartableApp.restart();
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Falta un paso'),
+        content: const Text(
+            'La copia está lista. Cierra la app por completo y vuelve a abrirla '
+            'para terminar la importación.'),
+        actions: [
+          FilledButton(
+            onPressed: () => SystemNavigator.pop(),
+            child: const Text('Cerrar la app'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ───────────────────── Acerca de ─────────────────────

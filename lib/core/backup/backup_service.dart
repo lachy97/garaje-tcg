@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../db/app_database.dart';
 import '../db/database_provider.dart';
 import 'backup_codec.dart';
+import 'pending_import.dart';
 
 /// Copia lista para importar (ya validada).
 class BackupPreview {
@@ -128,33 +129,24 @@ class BackupService {
 
   /// Reemplaza TODOS los datos por los de la copia. Antes guarda una copia
   /// automática de los datos actuales dentro de la app.
-  Future<void> restore(BackupPreview preview) async {
+  ///
+  /// La copia se deja como importación pendiente y se coloca en su sitio con
+  /// la BD cerrada. Devuelve true si ya quedó aplicada (hay que reiniciar la
+  /// app); false si la BD no se pudo cerrar a
+  /// tiempo: se aplicará al volver a abrir la app.
+  Future<bool> restore(BackupPreview preview) async {
     final current = await createBackup();
     await _saveAuto(current);
-    final previousSqlite = BackupCodec.decode(current).$2;
 
     final db = _db;
     final path = await db.filePath();
-    await db.closeOnce();
+    await PendingImport.save(preview.sqlite, path);
     try {
-      await _replaceFile(path, preview.sqlite);
-    } catch (_) {
-      // Si algo falla, se dejan los datos como estaban.
-      await _replaceFile(path, previousSqlite);
-      rethrow;
-    } finally {
-      // Riverpod crea una conexión nueva sobre el archivo restaurado; si la
-      // copia es de una versión anterior, Drift la actualiza al abrirla.
-      _ref.invalidate(databaseProvider);
+      await db.closeOnce().timeout(const Duration(seconds: 8));
+    } on Object {
+      return false;
     }
-  }
-
-  static Future<void> _replaceFile(String path, Uint8List sqlite) async {
-    for (final suffix in ['-wal', '-shm', '-journal']) {
-      final f = File('$path$suffix');
-      if (await f.exists()) await f.delete();
-    }
-    await File(path).writeAsBytes(sqlite, flush: true);
+    return PendingImport.applyIfAny();
   }
 
   // ───────────────────── Copias automáticas ─────────────────────
