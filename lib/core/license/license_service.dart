@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'admin_vault.dart';
 import 'device_id.dart';
 import 'license_codec.dart';
 import 'license_config.dart';
@@ -61,6 +62,11 @@ class LicenseService {
   static const _keyLastWarn = 'license.lastWarnDay';
   static const _keyAdminSeed = 'admin.seed';
   static const _keyAdminUnlocked = 'admin.unlocked';
+  static const _keyAdminSealed = 'admin.sealedSeed';
+  static const _keyPinFails = 'admin.pinFails';
+  static const _keyPinLockedUntil = 'admin.pinLockedUntil';
+  static const maxPinFails = 5;
+  static const pinLockMinutes = 15;
 
   /// Margen para cambios de hora/zona horaria antes de considerar que se
   /// atrasó la fecha.
@@ -180,15 +186,63 @@ class LicenseService {
 
   Future<void> setAdminUnlocked(bool v) => _prefs.setBool(_keyAdminUnlocked, v);
 
-  Uint8List? get adminSeed {
+  /// Clave privada guardada SIN cifrar por una versión anterior (antes del
+  /// PIN). Se migra a cifrada en cuanto se abre el Modo administrador.
+  Uint8List? get legacyAdminSeed {
     final s = _prefs.getString(_keyAdminSeed);
     return s == null ? null : LicenseCodec.decodePrivateKey(s);
   }
 
-  Future<void> saveAdminSeed(Uint8List seed) =>
-      _prefs.setString(_keyAdminSeed, LicenseCodec.encodePrivateKey(seed));
+  bool get hasAdminKey =>
+      _prefs.getString(_keyAdminSealed) != null || legacyAdminSeed != null;
 
-  Future<void> deleteAdminSeed() => _prefs.remove(_keyAdminSeed);
+  /// Guarda la clave privada cifrada con el PIN (y borra cualquier copia sin cifrar).
+  Future<void> saveAdminSeed(Uint8List seed, String pin) async {
+    await _prefs.setString(_keyAdminSealed, await AdminVault.seal(seed, pin));
+    await _prefs.remove(_keyAdminSeed);
+    await _prefs.remove(_keyPinFails);
+    await _prefs.remove(_keyPinLockedUntil);
+  }
+
+  /// Descifra la clave con el PIN. Lanza [AdminPinException] si el PIN es
+  /// incorrecto o hay demasiados intentos fallidos.
+  Future<Uint8List> openAdminSeed(String pin) async {
+    final lockedUntil = _prefs.getInt(_keyPinLockedUntil) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now < lockedUntil) {
+      final min = ((lockedUntil - now) / 60000).ceil();
+      throw AdminPinException('Demasiados intentos. Espera $min min.');
+    }
+    final sealed = _prefs.getString(_keyAdminSealed);
+    final seed = sealed == null ? null : await AdminVault.open(sealed, pin);
+    if (seed == null) {
+      final fails = (_prefs.getInt(_keyPinFails) ?? 0) + 1;
+      if (fails >= maxPinFails) {
+        await _prefs.setInt(_keyPinLockedUntil, now + pinLockMinutes * 60000);
+        await _prefs.setInt(_keyPinFails, 0);
+        throw AdminPinException(
+            'PIN incorrecto. Bloqueado $pinLockMinutes min por demasiados intentos.');
+      }
+      await _prefs.setInt(_keyPinFails, fails);
+      throw AdminPinException('PIN incorrecto (${maxPinFails - fails} intento(s) más).');
+    }
+    await _prefs.remove(_keyPinFails);
+    return seed;
+  }
+
+  Future<void> deleteAdminSeed() async {
+    await _prefs.remove(_keyAdminSeed);
+    await _prefs.remove(_keyAdminSealed);
+  }
+}
+
+class AdminPinException implements Exception {
+  const AdminPinException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 final licenseServiceProvider = FutureProvider<LicenseService>((ref) => LicenseService.create());

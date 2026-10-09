@@ -21,7 +21,10 @@ En TU teléfono, con la versión actual de la app (todavía sin licencias):
 
 1. Ajustes (engranaje arriba a la derecha en Torneos) → toca **7 veces** la
    tarjeta "Garage TCG · Versión" → aparece **Modo administrador**.
-2. Modo administrador → **Crear claves nuevas**.
+2. Modo administrador → **Crear claves nuevas** → elige un **PIN** (4 a 8 números).
+   La clave privada queda cifrada con ese PIN: sin él nadie puede generar
+   licencias desde tu teléfono. Tras 5 PIN incorrectos se bloquea 15 minutos.
+   Si olvidas el PIN: "Importar clave privada" con tu respaldo y eliges otro PIN.
 3. **Copiar privada (respaldo)** y guárdala en 2 lugares seguros (una nota
    privada, un papel, una memoria USB). **Si la pierdes no podrás crear más
    licencias** para esta app. No se la envíes a nadie.
@@ -83,6 +86,14 @@ del vencimiento la app avisa una vez al día.
   la barrera alta para el uso normal. Con un servidor (más adelante) se podrá
   añadir verificación online y desactivación remota.
 - Mientras `kLicensePublicKey` esté vacía, la app funciona sin licencia (modo desarrollo).
+
+## Protección extra
+
+- **PIN del Modo administrador**: la clave privada se guarda cifrada (AES-256-GCM
+  con clave derivada del PIN por PBKDF2). Si la creaste en una versión anterior
+  sin PIN, al entrar al Modo administrador te pedirá crear uno.
+- **Ofuscación**: el build de GitHub compila con `--obfuscate`, así es mucho más
+  difícil descompilar la app para saltarse las licencias.
 
 ## Detalles técnicos
 

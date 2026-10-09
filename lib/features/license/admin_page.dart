@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
+import '../../core/license/admin_vault.dart';
 import '../../core/license/license_codec.dart';
 import '../../core/license/license_service.dart';
 import 'license_widgets.dart';
@@ -34,6 +35,10 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   final _code = TextEditingController();
   final _holder = TextEditingController();
   int _months = 3;
+
+  final _pin = TextEditingController();
+  String? _pinError;
+  bool _unlocking = false;
   String? _license;
   DateTime? _licenseExpires;
 
@@ -47,22 +52,136 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   void dispose() {
     _code.dispose();
     _holder.dispose();
+    _pin.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     final service = await ref.read(licenseServiceProvider.future);
-    final seed = service.adminSeed;
-    final kp = seed == null ? null : await LicenseCodec.keyPairFromSeed(seed);
-    final pub = kp == null ? null : await LicenseCodec.publicKeyOf(kp);
     final code = await service.deviceCode();
     if (!mounted) return;
     setState(() {
       _service = service;
-      _keyPair = kp;
-      _publicKey = pub;
       _ownCode = code;
     });
+  }
+
+  /// Deja la clave descifrada en memoria mientras la pantalla está abierta.
+  Future<void> _unlockWith(Uint8List seed) async {
+    final kp = await LicenseCodec.keyPairFromSeed(seed);
+    final pub = await LicenseCodec.publicKeyOf(kp);
+    if (!mounted) return;
+    setState(() {
+      _keyPair = kp;
+      _publicKey = pub;
+    });
+  }
+
+  void _lock() => setState(() {
+        _keyPair = null;
+        _publicKey = null;
+        _license = null;
+        _pin.clear();
+      });
+
+  // ───────────────────── PIN ─────────────────────
+
+  Future<void> _unlock() async {
+    if (_unlocking) return;
+    setState(() {
+      _unlocking = true;
+      _pinError = null;
+    });
+    try {
+      final seed = await _service!.openAdminSeed(_pin.text);
+      await _unlockWith(seed);
+      _pin.clear();
+    } on AdminPinException catch (e) {
+      if (mounted) setState(() => _pinError = e.message);
+    } finally {
+      if (mounted) setState(() => _unlocking = false);
+    }
+  }
+
+  /// Pide un PIN nuevo dos veces. null si se cancela.
+  Future<String?> _askNewPin({String title = 'Crea tu PIN de administrador'}) {
+    final a = TextEditingController();
+    final b = TextEditingController();
+    String? error;
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text(title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('De ${AdminVault.minPinLength} a ${AdminVault.maxPinLength} números. '
+                  'Lo pedirá cada vez que entres al Modo administrador. '
+                  'No se puede recuperar: si lo olvidas tendrás que importar tu '
+                  'clave privada de respaldo.'),
+              const SizedBox(height: 12),
+              _pinField(a, 'PIN'),
+              const SizedBox(height: 8),
+              _pinField(b, 'Repite el PIN', errorText: error),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                if (!AdminVault.isValidPin(a.text)) {
+                  setState(() => error = 'El PIN debe tener de '
+                      '${AdminVault.minPinLength} a ${AdminVault.maxPinLength} números.');
+                } else if (a.text != b.text) {
+                  setState(() => error = 'Los PIN no coinciden.');
+                } else {
+                  Navigator.pop(ctx, a.text);
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _pinField(TextEditingController c, String label,
+      {String? errorText, ValueChanged<String>? onSubmitted}) {
+    return TextField(
+      controller: c,
+      obscureText: true,
+      keyboardType: TextInputType.number,
+      maxLength: AdminVault.maxPinLength,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 22, letterSpacing: 8),
+      onSubmitted: onSubmitted,
+      decoration: InputDecoration(labelText: label, errorText: errorText, counterText: ''),
+    );
+  }
+
+  /// Guarda la clave cifrada con un PIN nuevo y la deja desbloqueada.
+  Future<bool> _protectAndUnlock(Uint8List seed, {String? title}) async {
+    final pin = await _askNewPin(title: title ?? 'Crea tu PIN de administrador');
+    if (pin == null || !mounted) return false;
+    setState(() => _unlocking = true);
+    try {
+      await _service!.saveAdminSeed(seed, pin);
+      await _unlockWith(seed);
+    } finally {
+      if (mounted) setState(() => _unlocking = false);
+    }
+    return true;
+  }
+
+  Future<void> _changePin() async {
+    final seed = await LicenseCodec.seedOf(_keyPair!);
+    if (await _protectAndUnlock(seed, title: 'Nuevo PIN') && mounted) {
+      showMessage(context, 'PIN cambiado');
+    }
   }
 
   bool get _matchesApp {
@@ -91,9 +210,9 @@ class _AdminPageState extends ConsumerState<AdminPage> {
     );
     if (!ok) return;
     final kp = await LicenseCodec.newKeyPair();
-    await _service!.saveAdminSeed(await LicenseCodec.seedOf(kp));
-    await _load();
-    if (mounted) showMessage(context, 'Claves creadas. Haz ya la copia de la clave privada.');
+    if (await _protectAndUnlock(await LicenseCodec.seedOf(kp)) && mounted) {
+      showMessage(context, 'Claves creadas. Haz ya la copia de la clave privada.');
+    }
   }
 
   Future<void> _importKey() async {
@@ -105,9 +224,9 @@ class _AdminPageState extends ConsumerState<AdminPage> {
       if (mounted) showMessage(context, 'Clave privada no válida.', error: true);
       return;
     }
-    await _service!.saveAdminSeed(seed);
-    await _load();
-    if (mounted) showMessage(context, 'Clave privada importada.');
+    if (await _protectAndUnlock(seed) && mounted) {
+      showMessage(context, 'Clave privada importada.');
+    }
   }
 
   Future<void> _copyPrivate() async {
@@ -136,11 +255,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
     );
     if (!ok) return;
     await _service!.deleteAdminSeed();
-    setState(() {
-      _keyPair = null;
-      _publicKey = null;
-      _license = null;
-    });
+    _lock();
   }
 
   // ───────────────────── Generar ─────────────────────
@@ -178,24 +293,94 @@ class _AdminPageState extends ConsumerState<AdminPage> {
 
   @override
   Widget build(BuildContext context) {
+    final service = _service;
     final hasKey = _keyPair != null;
+    final Widget keyCard;
+    if (service == null) {
+      keyCard = const Center(child: CircularProgressIndicator());
+    } else if (hasKey) {
+      keyCard = _keyInfo();
+    } else if (service.legacyAdminSeed != null) {
+      keyCard = _legacyKey(service.legacyAdminSeed!);
+    } else if (service.hasAdminKey) {
+      keyCard = _locked();
+    } else {
+      keyCard = _noKey();
+    }
     return Scaffold(
-      appBar: AppBar(title: const Text('MODO ADMINISTRADOR')),
-      body: _service == null
+      appBar: AppBar(
+        title: const Text('MODO ADMINISTRADOR'),
+        actions: [
+          if (hasKey)
+            IconButton(
+              tooltip: 'Bloquear',
+              onPressed: _lock,
+              icon: const Icon(Icons.lock_outline),
+            ),
+        ],
+      ),
+      body: service == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.only(bottom: 40),
               children: [
                 const SectionLabel('Claves de licencias'),
-                NeonCard(
-                  child: hasKey ? _keyInfo() : _noKey(),
-                ),
+                NeonCard(child: keyCard),
                 if (hasKey) ...[
                   const SectionLabel('Generar licencia'),
                   NeonCard(child: _generator()),
                 ],
               ],
             ),
+    );
+  }
+
+  Widget _locked() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.lock, size: 40, color: AppColors.neon),
+        const SizedBox(height: 8),
+        const Text('Introduce tu PIN de administrador',
+            textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        _pinField(_pin, 'PIN', errorText: _pinError, onSubmitted: (_) => _unlock()),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _unlocking ? null : _unlock,
+          icon: _unlocking
+              ? const SizedBox(
+                  width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.lock_open),
+          label: const Text('Desbloquear'),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _importKey,
+          child: const Text('¿Olvidaste el PIN? Importa tu clave privada de respaldo'),
+        ),
+      ],
+    );
+  }
+
+  Widget _legacyKey(Uint8List seed) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.shield_outlined, size: 40, color: AppColors.draw),
+        const SizedBox(height: 8),
+        const Text(
+          'Tu clave privada está guardada sin protección. Crea un PIN: la clave '
+          'quedará cifrada y nadie podrá generar licencias con tu teléfono sin él.',
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: _unlocking ? null : () => _protectAndUnlock(seed),
+          icon: const Icon(Icons.pin),
+          label: const Text('Crear PIN'),
+        ),
+      ],
     );
   }
 
@@ -262,6 +447,11 @@ class _AdminPageState extends ConsumerState<AdminPage> {
               onPressed: _copyPrivate,
               icon: const Icon(Icons.lock_outline, size: 18),
               label: const Text('Copiar privada (respaldo)'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _changePin,
+              icon: const Icon(Icons.pin, size: 18),
+              label: const Text('Cambiar PIN'),
             ),
             TextButton.icon(
               onPressed: _deleteKey,
