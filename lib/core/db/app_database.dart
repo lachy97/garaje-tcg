@@ -60,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -82,10 +82,15 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(tournaments, tournaments.roundMinutes);
             await m.addColumn(rounds, rounds.timerStartedAt);
           }
+          if (from < 5) {
+            // v5: imagen de cada mazo
+            await m.addColumn(decks, decks.imagePath);
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
           await seedDefaultPointsScales();
+          await decksDao.seedCatalog();
         },
       );
 

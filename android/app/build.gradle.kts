@@ -68,3 +68,9 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // FileProvider propio para compartir la imagen como DOCUMENTO (ver
+    // DocumentShareProvider.kt).
+    implementation("androidx.core:core-ktx:1.13.1")
+}

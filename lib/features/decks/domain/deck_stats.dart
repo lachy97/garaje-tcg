@@ -23,10 +23,12 @@ class DeckEntryRow {
     required this.playerId,
     required this.topCutSize,
     this.finalPosition,
+    this.imagePath,
   });
 
   final String deckId;
   final String deckName;
+  final String? imagePath;
   final String playerId;
 
   /// Top Cut de ese torneo (0 = sin Top).
@@ -58,10 +60,11 @@ extension DeckTierLabel on DeckTier {
 /// "suavizado" (5 de 10 ficticios) para que un mazo con 1 partida ganada no
 /// aparezca arriba, y donde una victoria en el Top vale doble.
 class DeckSeasonStats {
-  DeckSeasonStats(this.deckId, this.name);
+  DeckSeasonStats(this.deckId, this.name, {this.imagePath});
 
   final String deckId;
   final String name;
+  final String? imagePath;
 
   int entries = 0; // inscripciones (veces jugado en un torneo)
   final Set<String> pilots = {};
@@ -109,7 +112,7 @@ class DeckStats {
   }) {
     final byId = <String, DeckSeasonStats>{};
     for (final e in entries) {
-      final s = byId[e.deckId] ??= DeckSeasonStats(e.deckId, e.deckName);
+      final s = byId[e.deckId] ??= DeckSeasonStats(e.deckId, e.deckName, imagePath: e.imagePath);
       s.entries++;
       s.pilots.add(e.playerId);
       if (e.madeTop) s.topEntries++;

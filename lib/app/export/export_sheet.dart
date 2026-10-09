@@ -4,9 +4,8 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/table_export.dart';
 import 'export_models.dart';
-import 'pdf_export.dart';
 
-/// Pregunta cómo exportar (imagen única, PDF o imágenes para el chat) y lo hace.
+/// Pregunta cómo exportar (imagen como archivo o imagen HD para el chat) y lo hace.
 /// Devuelve false si el usuario cancela.
 Future<bool> runExport<T>(BuildContext context, ExportSpec<T> spec) async {
   final format = await showModalBottomSheet<ExportFormat>(
@@ -22,18 +21,13 @@ Future<bool> runExport<T>(BuildContext context, ExportSpec<T> spec) async {
             child: Text('¿Cómo quieres exportar?',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           ),
-          _option(ctx, ExportFormat.singleImage, Icons.photo_size_select_large,
-              'Imagen única (como documento)',
-              'Toda la tabla en una sola imagen de alta resolución, dentro de un '
-                  'archivo PDF para que WhatsApp la envíe como documento sin '
-                  'comprimirla: al abrirla se hace zoom y se lee nítida.'),
-          _option(ctx, ExportFormat.pdf, Icons.picture_as_pdf_outlined, 'Documento PDF',
-              'Tabla en hojas A4 con texto nítido a cualquier zoom. '
-                  'Ideal para guardar o imprimir.'),
-          _option(ctx, ExportFormat.pagedImages, Icons.collections_outlined,
-              'Imágenes para el chat',
-              'Una imagen cada $kExportRowsPerPage filas; se ven directamente en '
-                  'el chat de WhatsApp.'),
+          _option(ctx, ExportFormat.imageFile, Icons.insert_drive_file_outlined,
+              'Imagen como archivo (máxima calidad)',
+              'Toda la tabla en una sola imagen. Se envía como documento: WhatsApp '
+                  'no la comprime y al abrirla se hace zoom y se lee perfecta.'),
+          _option(ctx, ExportFormat.imageHd, Icons.hd_outlined, 'Imagen HD para el chat',
+              'Una sola imagen que se ve directamente en el chat. Al enviarla en '
+                  'WhatsApp toca "HD" para que se vea nítida al hacer zoom.'),
           const SizedBox(height: 8),
         ],
       ),
@@ -42,14 +36,11 @@ Future<bool> runExport<T>(BuildContext context, ExportSpec<T> spec) async {
   if (format == null || !context.mounted) return false;
 
   try {
-    switch (format) {
-      case ExportFormat.singleImage:
-        await exportSingleImage(context, spec);
-      case ExportFormat.pdf:
-        await exportPdf(spec);
-      case ExportFormat.pagedImages:
-        await exportPagedImages(context, spec);
-    }
+    await exportSingleImage(
+      context,
+      spec,
+      format == ExportFormat.imageFile ? ImageExportMode.file : ImageExportMode.hdPhoto,
+    );
   } catch (e) {
     if (context.mounted) showMessage(context, 'No se pudo exportar: $e', error: true);
   }

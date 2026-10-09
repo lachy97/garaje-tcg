@@ -8,6 +8,7 @@ import '../../../app/widgets/table_export.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/utils/season_utils.dart';
 import '../domain/deck_stats.dart';
+import 'deck_image.dart';
 
 Color tierColor(DeckTier t) => switch (t) {
       DeckTier.s => AppColors.neon,
@@ -112,22 +113,40 @@ class TierSummary extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
+        // La imagen de cada mazo con su puesto (en lugar del nombre).
         for (final d in list)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceHigh,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.outline),
-            ),
-            child: Text(
-              '${d.rank}. ${d.name}',
-              style: TextStyle(
-                fontSize: font,
-                fontWeight: FontWeight.w700,
-                color: tier == DeckTier.s ? AppColors.neon : AppColors.textPrimary,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: tier == DeckTier.s ? AppColors.neon : AppColors.outline,
+                    width: tier == DeckTier.s ? 1.5 : 1,
+                  ),
+                  boxShadow: tier == DeckTier.s ? AppColors.glow(strength: 0.4) : null,
+                ),
+                child: DeckImage(
+                    path: d.imagePath, name: d.name, width: forExport ? 72 : 54, radius: 6),
               ),
-            ),
+              Positioned(
+                left: -4,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: tierColor(tier),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text('${d.rank}',
+                      style: TextStyle(
+                          fontSize: forExport ? 14 : 11,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black)),
+                ),
+              ),
+            ],
           ),
       ],
     );
@@ -196,12 +215,21 @@ class DeckTierTable extends StatelessWidget {
               Text('${d.rank}',
                   style: TextStyle(fontWeight: FontWeight.w900, color: secondary)),
               TierBadge(d.tier, size: forExport ? 28 : 24),
-              Text(d.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: d.tier == DeckTier.s ? AppColors.neon : null,
-                  )),
+              Row(
+                children: [
+                  DeckImage(
+                      path: d.imagePath, name: d.name, width: forExport ? 22 : 20, radius: 3),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(d.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: d.tier == DeckTier.s ? AppColors.neon : null,
+                        )),
+                  ),
+                ],
+              ),
               Text(d.score.toStringAsFixed(1),
                   style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
               Text('${d.entries}'),
@@ -260,9 +288,13 @@ Future<void> exportDeckTierImages(
       legend: '${decks.length} mazos · $deckLegend',
       fileBase: 'tierlist_garage_tcg_${season.year}_T${season.quarter}',
       shareText: 'Tier list de mazos Garage TCG · Temporada $label',
-      rowHeightEstimate: 50,
-      // 4 filas de tier + chips de mazos (unos 5 por línea)
-      summaryHeightEstimate: 4 * 70 + decks.length / 5 * 44,
+      rowHeightEstimate: 52,
+      // 4 filas de tier + imágenes de mazos (unas 8 por línea, 110 px de alto)
+      summaryHeightEstimate: 4 * 40 + (decks.length / 8 + 4) * 112,
+      preload: [
+        for (final d in decks)
+          if (deckImageProvider(d.imagePath) case final p?) p,
+      ],
     ),
   );
 }

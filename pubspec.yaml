@@ -58,6 +58,8 @@ flutter:
     - assets/logo/logo_dark.png
     # Inter en TrueType para los PDF (el paquete pdf no lee .otf)
     - assets/fonts/pdf/
+    # Imágenes de los mazos de Edison Format (edisonformat.net/decks)
+    - assets/decks/
   # Fuente única de toda la app (Inter, licencia OFL, recortada a caracteres latinos)
   fonts:
     - family: Inter

@@ -46,6 +46,10 @@ class Decks extends Table with SyncColumns {
   TextColumn get normalizedName => text()();
   TextColumn get archetype => text().nullable()();
 
+  /// Imagen del mazo (v5): 'assets/decks/…' para los del catálogo de Edison
+  /// Format, o la ruta de una foto elegida de la galería para los añadidos.
+  TextColumn get imagePath => text().nullable()();
+
   @override
   List<Set<Column<Object>>> get uniqueKeys => [
         {game, normalizedName},

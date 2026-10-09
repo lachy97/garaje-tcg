@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Carpeta (dentro de la caché de la app) que DocumentShareProvider puede compartir. -->
+<paths>
+    <cache-path name="share_docs" path="share_docs/" />
+</paths>

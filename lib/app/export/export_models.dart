@@ -2,15 +2,13 @@ import 'package:flutter/widgets.dart';
 
 /// Formato elegido al exportar una tabla.
 enum ExportFormat {
-  /// Una sola imagen PNG grande con todo. Se comparte como DOCUMENTO para que
-  /// WhatsApp no la comprima: se puede hacer zoom y se lee nítida.
-  singleImage,
+  /// Una sola imagen PNG a máxima resolución enviada como ARCHIVO (documento):
+  /// WhatsApp no la comprime y al abrirla se hace zoom sin perder nitidez.
+  imageFile,
 
-  /// Documento PDF: texto vectorial, nítido a cualquier zoom; se puede imprimir.
-  pdf,
-
-  /// Varias imágenes (12 filas cada una) que se ven directamente en el chat.
-  pagedImages,
+  /// Una sola imagen enviada como FOTO, ajustada al máximo de WhatsApp HD
+  /// (4096 px) y con la tabla repartida en columnas si es larga.
+  imageHd,
 }
 
 /// Columna de una tabla para el PDF. [width] es relativo (se reparte el ancho).
@@ -77,7 +75,12 @@ class ExportSpec<T> {
     this.pdfGroups,
     this.rowHeightEstimate = 50,
     this.summaryHeightEstimate = 0,
+    this.preload = const [],
   });
+
+  /// Imágenes que deben estar cargadas antes de "fotografiar" la tabla
+  /// (p. ej. las de los mazos).
+  final List<ImageProvider> preload;
 
   /// Título bajo la marca, p. ej. "RANKING · TEMPORADA T4 2026".
   final String heading;

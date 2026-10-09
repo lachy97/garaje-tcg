@@ -181,7 +181,7 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
     const finished = "t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished'";
 
     final entries = await customSelect(
-      'SELECT tp.deck_id AS deck, d.name AS name, tp.player_id AS pid, '
+      'SELECT tp.deck_id AS deck, d.name AS name, d.image_path AS img, tp.player_id AS pid, '
       't.top_cut_size AS top, tp.final_position AS pos '
       'FROM tournament_players tp '
       'JOIN tournaments t ON t.id = tp.tournament_id '
@@ -208,6 +208,7 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
             playerId: e.read<String>('pid'),
             topCutSize: e.read<int>('top'),
             finalPosition: e.read<int?>('pos'),
+            imagePath: e.read<String?>('img'),
           ),
       ],
       matches: [

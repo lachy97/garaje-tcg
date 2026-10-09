@@ -1,12 +1,11 @@
 import 'dart:io';
+import 'dart:math' show sqrt;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart' show PdfPageFormat;
-import 'package:pdf/widgets.dart' as pw;
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -14,81 +13,92 @@ import '../export/export_models.dart';
 import '../theme.dart';
 import 'brand.dart';
 
-/// Ancho lógico de las imágenes exportadas.
+/// Ancho lógico de una columna de tabla en las imágenes exportadas.
 const kExportWidth = 800.0;
 
 /// Ancho útil de la tabla dentro de la imagen (márgenes de 24 y borde de 2).
 const kExportContentWidth = kExportWidth - 48 - 2;
 
-/// Densidad de la captura: 800 × 2.4 = 1920 px de ancho.
-const kExportPixelRatio = 2.4;
-
-/// Filas por imagen. Con 12 filas cada imagen mide ~1920×2000 px: WhatsApp
-/// apenas la reduce y el texto se lee nítido. Una sola imagen larga con
-/// todas las filas se reduce muchísimo al enviarla y se vuelve ilegible.
-const kExportRowsPerPage = 12;
-
 /// Estilo de tabla para exportar: letra más grande y colores más claros.
 const kExportFontSize = 17.0;
 const kExportRowPadding = 10.0;
 
-/// Máximo de píxeles de alto de la imagen única. Muchos móviles no pueden
-/// crear imágenes más altas (límite de la GPU); si la tabla es muy larga se
-/// baja la densidad en vez de cortar.
-const _kMaxSinglePixels = 8000.0;
+/// Separación entre columnas cuando la tabla se reparte en varias.
+const _kColumnGap = 16.0;
 
-/// Exporta en varias imágenes PNG (12 filas cada una) y abre el menú de
-/// compartir. Se ven directamente en el chat de WhatsApp.
-Future<void> exportPagedImages<T>(BuildContext context, ExportSpec<T> spec,
-    {int rowsPerPage = kExportRowsPerPage}) async {
-  await precacheImage(const AssetImage(BrandAssets.logo), context);
-  if (!context.mounted) return;
+/// Alto aproximado de cabecera (logo y título) + leyenda + márgenes.
+const _kChromeHeight = 240.0;
 
-  final items = spec.items;
-  final pages = <List<T>>[
-    for (var i = 0; i < items.length; i += rowsPerPage)
-      items.sublist(i, (i + rowsPerPage).clamp(0, items.length)),
-  ];
-  if (pages.isEmpty) pages.add(<T>[]);
-  final contents = <Widget>[
-    if (spec.summary != null) spec.summary!,
-    for (final p in pages) spec.tableBuilder(p, kExportContentWidth),
-  ];
+/// Cómo se va a compartir la imagen.
+enum ImageExportMode {
+  /// Como ARCHIVO (documento): WhatsApp no la toca. Máxima resolución.
+  file,
 
-  final files = <XFile>[];
-  for (var i = 0; i < contents.length; i++) {
-    if (!context.mounted) return;
-    final bytes = await _capture(
-      context,
-      spec,
-      contents[i],
-      page: i + 1,
-      pageCount: contents.length,
-      pixelRatio: kExportPixelRatio,
-    );
-    final suffix = contents.length == 1 ? '' : '_${i + 1}de${contents.length}';
-    files.add(await _saveTemp(bytes, '${spec.fileBase}$suffix.png', 'image/png'));
-  }
-  await SharePlus.instance.share(ShareParams(files: files, text: spec.shareText));
+  /// Como FOTO: se ve directamente en el chat. Se ajusta a 4096 px por el lado
+  /// largo, el máximo de WhatsApp en calidad HD.
+  hdPhoto,
 }
 
-/// Exporta TODO en una sola imagen de alta resolución.
+/// Distribución elegida para la imagen: columnas de tabla y densidad.
+class _Layout {
+  const _Layout(this.columns, this.width, this.pixelRatio);
+
+  final int columns;
+  final double width;
+  final double pixelRatio;
+}
+
+/// Reparte las filas en 1, 2 o 3 columnas para que la imagen quede lo más
+/// "cuadrada" posible (así se aprovecha mejor el límite de píxeles y el texto
+/// sale más grande) y calcula la densidad.
+_Layout _layoutFor(ExportSpec<Object?> spec, ImageExportMode mode) {
+  final maxLongSide = mode == ImageExportMode.file ? 6000.0 : 4096.0;
+  // Límite de memoria: ~24 millones de píxeles.
+  const maxPixels = 24e6;
+  final n = spec.items.length;
+  _Layout? best;
+  for (var c = 1; c <= 3; c++) {
+    if (c > 1 && n <= 12 * (c - 1)) break; // tablas cortas: una sola columna
+    final rowsPerColumn = (n / c).ceil();
+    final width = c * kExportContentWidth + (c - 1) * _kColumnGap + 48 + 4;
+    final height = _kChromeHeight +
+        spec.summaryHeightEstimate +
+        (rowsPerColumn + 1) * spec.rowHeightEstimate;
+    final longSide = width > height ? width : height;
+    var ratio = maxLongSide / longSide;
+    final byMemory = sqrt(maxPixels / (width * height));
+    if (byMemory < ratio) ratio = byMemory;
+    if (ratio > 3) ratio = 3;
+    if (best == null || ratio > best.pixelRatio + 0.05) {
+      best = _Layout(c, width, ratio);
+    }
+  }
+  return best!;
+}
+
+/// Exporta TODA la tabla en una sola imagen PNG y la comparte.
 ///
-/// WhatsApp decide por la extensión del archivo: un .png SIEMPRE lo manda como
-/// foto y lo comprime, aunque se comparta como tipo genérico. Por eso la
-/// imagen se entrega dentro de un PDF de una sola página del tamaño exacto de
-/// la imagen: WhatsApp lo envía como documento, sin tocarlo, y al abrirlo se
-/// ve la imagen completa y nítida al hacer zoom.
-Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) async {
+/// - [ImageExportMode.file]: se comparte como documento mediante un
+///   FileProvider propio que anuncia el archivo como genérico; WhatsApp no la
+///   comprime y al abrirla se puede hacer zoom.
+/// - [ImageExportMode.hdPhoto]: se comparte como foto, ya ajustada al máximo
+///   de WhatsApp HD (4096 px), con la tabla repartida en columnas si es larga.
+Future<void> exportSingleImage<T>(
+    BuildContext context, ExportSpec<T> spec, ImageExportMode mode) async {
   await precacheImage(const AssetImage(BrandAssets.logo), context);
+  for (final img in spec.preload) {
+    if (!context.mounted) return;
+    await precacheImage(img, context, onError: (_, _) {});
+  }
   if (!context.mounted) return;
 
-  // Densidad según el alto estimado: hasta 3× (2400 px de ancho) en tablas
-  // normales, menos en las muy largas para no pasar el límite del móvil.
-  final estimated = 220 +
-      spec.summaryHeightEstimate +
-      (spec.items.length + 1) * spec.rowHeightEstimate;
-  final ratio = (_kMaxSinglePixels / estimated).clamp(1.2, 3.0);
+  final layout = _layoutFor(spec, mode);
+  final perColumn = (spec.items.length / layout.columns).ceil();
+  final chunks = <List<T>>[
+    for (var i = 0; i < spec.items.length; i += perColumn)
+      spec.items.sublist(i, (i + perColumn).clamp(0, spec.items.length)),
+  ];
+  if (chunks.isEmpty) chunks.add(<T>[]);
 
   final content = Column(
     mainAxisSize: MainAxisSize.min,
@@ -98,50 +108,61 @@ Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) asyn
         spec.summary!,
         const SizedBox(height: 16),
       ],
-      _TableFrame(child: spec.tableBuilder(spec.items, kExportContentWidth)),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < chunks.length; i++) ...[
+            if (i > 0) const SizedBox(width: _kColumnGap),
+            SizedBox(
+              width: kExportContentWidth,
+              child: _TableFrame(child: spec.tableBuilder(chunks[i], kExportContentWidth)),
+            ),
+          ],
+        ],
+      ),
     ],
   );
+
   final bytes = await _capture(context, spec, content,
-      page: 1, pageCount: 1, pixelRatio: ratio, framed: false);
-  final pdf = await _imageAsPdf(bytes, ratio, spec.heading);
-  final file = await _saveTemp(pdf, '${spec.fileBase}_HD.pdf', 'application/pdf');
+      width: layout.width, pixelRatio: layout.pixelRatio);
+  final stamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+  final name = '${spec.fileBase}_$stamp.png';
+
+  if (mode == ImageExportMode.file && Platform.isAndroid) {
+    // Carpeta que comparte DocumentShareProvider (res/xml/document_share_paths.xml).
+    final dir = Directory('${(await getTemporaryDirectory()).path}/share_docs');
+    if (await dir.exists()) await dir.delete(recursive: true); // borra las anteriores
+    await dir.create(recursive: true);
+    final file = File('${dir.path}/$name');
+    await file.writeAsBytes(bytes, flush: true);
+    try {
+      await _channel.invokeMethod<void>('shareAsDocument', {
+        'path': file.path,
+        'text': spec.shareText,
+      });
+      return;
+    } on PlatformException {
+      // Si falla, se comparte de la forma normal.
+    }
+  }
+
+  final dir = await getTemporaryDirectory();
+  final file = File('${dir.path}/$name');
+  await file.writeAsBytes(bytes, flush: true);
   await SharePlus.instance.share(ShareParams(
-    files: [file],
-    text: '${spec.shareText}\n(Imagen en alta calidad: ábrela y haz zoom)',
+    files: [XFile(file.path, mimeType: 'image/png', name: name)],
+    text: spec.shareText,
   ));
 }
 
-/// PDF de una página con la imagen a tamaño completo, sin márgenes.
-/// El PNG se decodifica con el decodificador nativo del teléfono (rápido) y se
-/// guarda sin pérdida en el PDF.
-Future<Uint8List> _imageAsPdf(Uint8List png, double pixelRatio, String title) async {
-  final codec = await ui.instantiateImageCodec(png);
-  final frame = await codec.getNextFrame();
-  final image = frame.image;
-  final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-  final w = image.width, h = image.height;
-  image.dispose();
-  codec.dispose();
-  final doc = pw.Document(title: title, author: 'Garage TCG', creator: 'Garage TCG')
-    ..addPage(pw.Page(
-      pageFormat: PdfPageFormat(w / pixelRatio, h / pixelRatio),
-      margin: pw.EdgeInsets.zero,
-      build: (_) => pw.Image(
-        pw.RawImage(bytes: rgba!.buffer.asUint8List(), width: w, height: h),
-        fit: pw.BoxFit.fill,
-      ),
-    ));
-  return doc.save();
-}
+const _channel = MethodChannel('garage_tcg/share');
 
 Future<Uint8List> _capture<T>(
   BuildContext context,
   ExportSpec<T> spec,
   Widget content, {
-  required int page,
-  required int pageCount,
+  required double width,
   required double pixelRatio,
-  bool framed = true,
 }) {
   final date = DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now());
   return ScreenshotController().captureFromLongWidget(
@@ -155,13 +176,11 @@ Future<Uint8List> _capture<T>(
           child: Material(
             color: AppColors.background,
             child: _ExportPage(
+              width: width,
               heading: spec.heading,
-              page: page,
-              pageCount: pageCount,
               legend: spec.legend,
               date: date,
               table: content,
-              framed: framed,
             ),
           ),
         ),
@@ -170,39 +189,21 @@ Future<Uint8List> _capture<T>(
     context: context,
     pixelRatio: pixelRatio,
     delay: const Duration(milliseconds: 120),
-    constraints: const BoxConstraints(minWidth: kExportWidth, maxWidth: kExportWidth),
+    constraints: BoxConstraints(minWidth: width, maxWidth: width),
   );
-}
-
-/// Guarda en la carpeta temporal con un nombre único y devuelve el archivo
-/// listo para compartir.
-Future<XFile> _saveTemp(Uint8List bytes, String name, String mime) async {
-  final dir = await getTemporaryDirectory();
-  final stamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
-  final dot = name.lastIndexOf('.');
-  final fileName = '${name.substring(0, dot)}_$stamp${name.substring(dot)}';
-  final file = File('${dir.path}/$fileName');
-  await file.writeAsBytes(bytes, flush: true);
-  return XFile(file.path, mimeType: mime, name: fileName);
 }
 
 class _ExportPage extends StatelessWidget {
   const _ExportPage({
+    required this.width,
     required this.heading,
-    required this.page,
-    required this.pageCount,
     required this.legend,
     required this.date,
     required this.table,
-    this.framed = true,
   });
 
-  /// Tabla dentro de un recuadro. En la imagen única con tier list el
-  /// contenido ya trae sus propios recuadros.
-  final bool framed;
+  final double width;
   final String heading;
-  final int page;
-  final int pageCount;
   final String legend;
   final String date;
   final Widget table;
@@ -211,7 +212,7 @@ class _ExportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     const small = TextStyle(fontSize: 13, color: AppColors.textPrimary);
     return Container(
-      width: kExportWidth,
+      width: width,
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
       decoration: const BoxDecoration(
         color: AppColors.background,
@@ -245,21 +246,10 @@ class _ExportPage extends StatelessWidget {
                   ],
                 ),
               ),
-              if (pageCount > 1)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.neon),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text('$page / $pageCount',
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.neon)),
-                ),
             ],
           ),
           const SizedBox(height: 18),
-          if (framed) _TableFrame(child: table) else table,
+          table,
           const SizedBox(height: 12),
           Text(legend, style: small),
           const SizedBox(height: 4),

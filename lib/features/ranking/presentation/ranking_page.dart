@@ -108,8 +108,8 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Text(
-                      'Elige imagen única en alta calidad (se envía como documento), '
-                      'PDF o imágenes de 12 jugadores para ver en el chat.',
+                      'Imagen como archivo (máxima calidad, se envía como documento) '
+                      'o imagen HD para ver en el chat.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),

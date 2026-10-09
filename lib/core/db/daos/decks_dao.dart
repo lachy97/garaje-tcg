@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../features/decks/domain/deck_catalog.dart';
 import '../app_database.dart';
 import '../tables.dart';
 
@@ -26,7 +27,7 @@ class DecksDao extends DatabaseAccessor<AppDatabase> with _$DecksDaoMixin {
 
   /// Devuelve el mazo con ese nombre (ignorando mayúsculas y espacios) o lo crea.
   /// Si estaba borrado lógicamente, lo restaura.
-  Future<Deck> findOrCreate(String rawName, {String game = kDefaultGame}) {
+  Future<Deck> findOrCreate(String rawName, {String game = kDefaultGame, String? imagePath}) {
     final name = cleanDeckName(rawName);
     if (name.isEmpty) {
       throw ArgumentError.value(rawName, 'rawName', 'El nombre del mazo está vacío');
@@ -49,8 +50,43 @@ class DecksDao extends DatabaseAccessor<AppDatabase> with _$DecksDaoMixin {
         game: Value(game),
         name: name,
         normalizedName: norm,
+        imagePath: Value(imagePath ?? kDeckCatalogByName[norm]?.asset),
       ));
     });
+  }
+
+  /// Carga los mazos del catálogo de Edison Format que falten y pone su imagen
+  /// a los que ya existían con ese nombre. Un mazo del catálogo que el usuario
+  /// borró o fusionó no se vuelve a crear.
+  Future<void> seedCatalog({String game = kDefaultGame}) async {
+    final existing = await (select(decks)..where((d) => d.game.equals(game))).get();
+    final byNorm = {for (final d in existing) d.normalizedName: d};
+    final now = DateTime.now();
+    await batch((b) {
+      for (final e in kDeckCatalog) {
+        final norm = normalizeDeckName(e.name);
+        final d = byNorm[norm];
+        if (d == null) {
+          b.insert(decks, DecksCompanion.insert(
+            game: Value(game),
+            name: e.name,
+            normalizedName: norm,
+            imagePath: Value(e.asset),
+          ));
+        } else if (d.imagePath == null) {
+          b.update(decks, DecksCompanion(imagePath: Value(e.asset), updatedAt: Value(now)),
+              where: (t) => t.id.equals(d.id));
+        }
+      }
+    });
+  }
+
+  /// Cambia (o quita, con null) la imagen de un mazo.
+  Future<void> setImage(String id, String? path) {
+    return (update(decks)..where((d) => d.id.equals(id))).write(DecksCompanion(
+      imagePath: Value(path),
+      updatedAt: Value(DateTime.now()),
+    ));
   }
 
   /// Renombra un mazo. Lanza [StateError] si ya existe otro con ese nombre

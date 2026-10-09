@@ -6,11 +6,13 @@ import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
+import 'deck_image.dart';
+import 'deck_picker.dart';
 import 'decks_page.dart' show decksProvider;
 
-/// Gestión de mazos (pantalla secundaria de "Mazos"). Se crean solos al
-/// inscribir a un jugador con un mazo nuevo; aquí se corrigen nombres y se
-/// fusionan duplicados para que la tier list no los cuente por separado.
+/// Gestión de mazos (pantalla secundaria de "Mazos"): la lista de Edison
+/// Format viene cargada con sus imágenes; aquí se añaden mazos nuevos (con foto
+/// opcional), se cambian imágenes, se corrigen nombres y se fusionan duplicados.
 class DeckManagePage extends ConsumerWidget {
   const DeckManagePage({super.key});
 
@@ -21,7 +23,7 @@ class DeckManagePage extends ConsumerWidget {
       appBar: AppBar(title: const Text('GESTIONAR MAZOS')),
       body: AsyncView(
         value: decks,
-        builder: (list) => list.isEmpty
+        builder: (raw) => raw.isEmpty
             ? const EmptyState(
                 icon: Icons.style_outlined,
                 title: 'Aún no hay mazos',
@@ -29,19 +31,14 @@ class DeckManagePage extends ConsumerWidget {
               )
             : ListView.builder(
                 padding: const EdgeInsets.only(top: 8, bottom: 96),
-                itemCount: list.length,
-                itemBuilder: (_, i) => _DeckTile(deck: list[i], all: list),
+                itemCount: raw.length,
+                itemBuilder: (_, i) => _DeckTile(deck: raw[i], all: raw),
               ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
         label: const Text('Mazo'),
-        onPressed: () async {
-          final name = await promptText(context,
-              title: 'Nuevo mazo', label: 'Nombre del mazo', confirm: 'Crear');
-          if (name == null || name.isEmpty || !context.mounted) return;
-          await runGuarded(context, () => ref.read(decksDaoProvider).findOrCreate(name));
-        },
+        onPressed: () => addDeckFlow(context, ref),
       ),
     );
   }
@@ -59,22 +56,57 @@ class _DeckTile extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          const Icon(Icons.style, color: AppColors.leaf),
+          DeckImage(path: deck.imagePath, name: deck.name, width: 40, radius: 4),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(deck.name, style: Theme.of(context).textTheme.titleMedium),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(deck.name, style: Theme.of(context).textTheme.titleMedium),
+                Text(deckCategoryOf(deck).label,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-            onSelected: (v) => v == 'rename' ? _rename(context, ref) : _merge(context, ref),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'rename', child: Text('Renombrar')),
-              PopupMenuItem(value: 'merge', child: Text('Fusionar con otro mazo')),
+            onSelected: (v) => switch (v) {
+              'rename' => _rename(context, ref),
+              'image' => _changeImage(context, ref),
+              'noimage' => _removeImage(context, ref),
+              _ => _merge(context, ref),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'rename', child: Text('Renombrar')),
+              const PopupMenuItem(value: 'image', child: Text('Cambiar imagen')),
+              if (deck.imagePath != null)
+                const PopupMenuItem(value: 'noimage', child: Text('Quitar imagen')),
+              const PopupMenuItem(value: 'merge', child: Text('Fusionar con otro mazo')),
             ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _changeImage(BuildContext context, WidgetRef ref) async {
+    final photo = await pickDeckPhoto();
+    if (photo == null || !context.mounted) return;
+    await runGuarded(context,
+        () => saveDeckPhoto(ref.read(decksDaoProvider), deck.id, photo),
+        success: 'Imagen actualizada');
+  }
+
+  Future<void> _removeImage(BuildContext context, WidgetRef ref) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Quitar imagen',
+      message: '"${deck.name}" se mostrará sin imagen (con su nombre).',
+      confirm: 'Quitar',
+      danger: true,
+    );
+    if (!ok || !context.mounted) return;
+    await ref.read(decksDaoProvider).setImage(deck.id, null);
   }
 
   Future<void> _rename(BuildContext context, WidgetRef ref) async {

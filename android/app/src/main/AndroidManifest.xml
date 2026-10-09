@@ -25,6 +25,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Comparte la imagen exportada como DOCUMENTO: dice a WhatsApp que el
+             archivo es genérico (application/octet-stream) y así no lo trata
+             como foto ni lo comprime. Ver DocumentShareProvider.kt -->
+        <provider
+            android:name=".DocumentShareProvider"
+            android:authorities="${applicationId}.document_provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/document_share_paths" />
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

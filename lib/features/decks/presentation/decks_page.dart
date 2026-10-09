@@ -9,11 +9,14 @@ import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../ranking/presentation/season_picker.dart';
 import '../domain/deck_stats.dart';
+import 'deck_picker.dart' show sortDecks;
 import 'deck_tier_table.dart';
 
 /// Todos los mazos registrados (inscripción, rondas, gestión).
+/// Ordenados como en edisonformat.net (competitivos, rogue, casual) y luego
+/// los añadidos a mano.
 final decksProvider = StreamProvider.autoDispose<List<Deck>>((ref) {
-  return ref.watch(decksDaoProvider).watchAll();
+  return ref.watch(decksDaoProvider).watchAll().map(sortDecks);
 });
 
 final seasonDecksProvider =

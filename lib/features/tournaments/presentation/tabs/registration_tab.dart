@@ -7,7 +7,8 @@ import '../../../../app/widgets/common.dart';
 import '../../../../core/db/app_database.dart';
 import '../../../../core/db/daos/tournaments_dao.dart';
 import '../../../../core/db/database_provider.dart';
-import '../../../decks/presentation/decks_page.dart';
+import '../../../decks/presentation/deck_image.dart';
+import '../../../decks/presentation/deck_picker.dart';
 import '../../../players/presentation/players_page.dart';
 import '../providers.dart';
 
@@ -104,11 +105,18 @@ class _RegisteredTile extends ConsumerWidget {
       onTap: draft ? () => _pickDeck(context, ref) : null,
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: dropped ? AppColors.surfaceHighest : AppColors.forest,
-            foregroundColor: dropped ? AppColors.textDisabled : AppColors.neon,
-            child: Text(item.player.nickname.characters.first.toUpperCase()),
-          ),
+          if (item.deck != null)
+            Opacity(
+              opacity: dropped ? 0.4 : 1,
+              child: DeckImage(
+                  path: item.deck!.imagePath, name: item.deck!.name, width: 34, radius: 4),
+            )
+          else
+            CircleAvatar(
+              backgroundColor: dropped ? AppColors.surfaceHighest : AppColors.forest,
+              foregroundColor: dropped ? AppColors.textDisabled : AppColors.neon,
+              child: Text(item.player.nickname.characters.first.toUpperCase()),
+            ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -174,66 +182,13 @@ class _RegisteredTile extends ConsumerWidget {
   }
 
   Future<void> _pickDeck(BuildContext context, WidgetRef ref) async {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (_) => DeckPickerDialog(initial: item.deck?.name ?? ''),
-    );
+    final name = await showDeckPicker(context, current: item.deck?.name);
     if (name == null || name.isEmpty || !context.mounted) return;
     await runGuarded(
       context,
       () => ref
           .read(tournamentsDaoProvider)
           .setPlayerDeck(tournament.id, item.player.id, name),
-    );
-  }
-}
-
-/// Elegir o escribir un mazo, con autocompletado de los mazos existentes.
-class DeckPickerDialog extends ConsumerStatefulWidget {
-  const DeckPickerDialog({super.key, this.initial = ''});
-
-  final String initial;
-
-  @override
-  ConsumerState<DeckPickerDialog> createState() => _DeckPickerDialogState();
-}
-
-class _DeckPickerDialogState extends ConsumerState<DeckPickerDialog> {
-  late String _value = widget.initial;
-
-  @override
-  Widget build(BuildContext context) {
-    final decks = ref.watch(decksProvider).value ?? const <Deck>[];
-    return AlertDialog(
-      title: const Text('Mazo'),
-      content: Autocomplete<String>(
-        initialValue: TextEditingValue(text: widget.initial),
-        optionsBuilder: (v) {
-          final q = v.text.trim().toLowerCase();
-          final names = decks.map((d) => d.name);
-          return q.isEmpty ? names : names.where((n) => n.toLowerCase().contains(q));
-        },
-        onSelected: (v) => _value = v,
-        fieldViewBuilder: (context, controller, focus, onSubmit) => TextField(
-          controller: controller,
-          focusNode: focus,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Nombre del mazo',
-            helperText: 'Si no existe, se crea',
-          ),
-          onChanged: (v) => _value = v,
-          onSubmitted: (v) => Navigator.pop(context, v.trim()),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _value.trim()),
-          child: const Text('Guardar'),
-        ),
-      ],
     );
   }
 }

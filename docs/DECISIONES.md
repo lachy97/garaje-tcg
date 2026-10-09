@@ -44,11 +44,9 @@
 - Desempates: puntos, mejor posición, winrate, menos torneos.
 - Tabla con: #, jugador, puntos, último mazo, PJ, V, D, E, WR%, torneos y mejor posición. Solo cuentan torneos terminados; PJ excluye BYE.
 - Se puede consultar cualquier temporada (selector en el título), no solo la actual.
-- **Exportación** (ranking y tier list): al exportar se elige el formato:
-  - *Imagen única (alta calidad)*: toda la tabla en un PNG de hasta 2400 px de ancho (la densidad baja en tablas muy largas para no pasar ~8000 px de alto, límite de muchos móviles). Se entrega **dentro de un PDF de una sola página** del tamaño exacto de la imagen: WhatsApp decide por la extensión y un .png siempre lo comprime como foto, mientras que un PDF va como documento intacto.
-  - *Documento PDF*: A4 con los colores de la app, texto vectorial (Inter en TTF, `assets/fonts/pdf/`), varias páginas repitiendo la cabecera de la tabla.
-  - *Imágenes para el chat*: PNG de 1920 px con 12 filas cada uno.
-
+- **Exportación** (ranking y tier list): siempre UNA sola imagen con toda la tabla; si es larga se reparte en 2 o 3 columnas para que la imagen quede casi cuadrada y el texto salga más grande. Dos opciones:
+  - *Imagen como archivo (máxima calidad)*: hasta 6000 px por lado. Se comparte con un FileProvider propio (`DocumentShareProvider.kt`) que anuncia el archivo como `application/octet-stream`: WhatsApp lo envía como **documento** sin comprimir; el nombre termina en .png y al abrirlo se ve como imagen. (Con el FileProvider normal un .png siempre se trata como foto.)
+  - *Imagen HD para el chat*: hasta 4096 px por el lado largo (máximo de WhatsApp en calidad HD). Se envía como foto; hay que tocar "HD" en WhatsApp.
 ## Puntuación de mazos
 - PP = 3·V_swiss + 1·E_swiss + 6·V_top + 3·Entradas_top + 5·Títulos
 - WRp = (V_swiss + 2·V_top + 0.5·E + 5) / (Partidas_swiss + 2·Partidas_top + 10)
@@ -56,6 +54,7 @@
 - Desempates: títulos, victorias en Top, WRp, mejor resultado.
 - Pestaña **Mazos** = tabla de la temporada para la tier list de fin de trimestre: #, tier, mazo, Score, uso (inscripciones), jugadores distintos, PJ, V, D, E, WR%, entradas al Top, V en Top, títulos y mejor posición. Solo torneos terminados; la doble derrota cuenta como derrota para ambos mazos.
 - **Tiers** relativos al mejor Score de la temporada: S ≥ 70 %, A ≥ 45 %, B ≥ 20 %, C el resto. Se muestra la tier list (filas S/A/B/C) y la tabla; se exporta como imágenes (la tier list primero, luego la tabla de 12 en 12).
+- **Catálogo de mazos**: los 55 mazos de https://edisonformat.net/decks (competitivos, rogue y casual) vienen dentro de la app con su imagen (`assets/decks/*.webp`, `deck_catalog.dart`) y se cargan en la BD al abrir (BD v5: `decks.image_path`). Al asignar mazo se abre una cuadrícula con imágenes, búsqueda y filtro por categoría; un mazo que no esté se añade con nombre y foto opcional de la galería. En la tier list aparece la imagen de cada mazo con su puesto en lugar del nombre; los mazos sin foto muestran su nombre en el recuadro. Las fotos propias no viajan en la copia de seguridad.
 - Crear, renombrar y fusionar mazos pasa a "Gestionar mazos" (botón en la barra de Mazos).
 
 ## Licencias (offline)
