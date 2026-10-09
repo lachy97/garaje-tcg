@@ -7,4 +7,4 @@
 ///
 /// La clave pública no es secreta: se puede subir a GitHub sin problema.
 /// La clave PRIVADA nunca va en el código.
-const kLicensePublicKey = '';
+const kLicensePublicKey = 'QmWtT23GvXB0dHqkW23ihhghdSXJMtUvt_-3oK-pLLA';
