@@ -72,3 +72,7 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 
 ## Pendiente de confirmar
 - Torneos de menos de 6 jugadores: no tienen Top Cut, así que no dan puntos de ranking.
+
+## Bloqueo de capturas de pantalla
+- Android `FLAG_SECURE` en toda la app: no se pueden hacer capturas ni grabar la pantalla (sale en negro, también en "apps recientes"). Exportar ranking/tier list sigue funcionando (la imagen la genera la app).
+- Activo por defecto. Solo se desactiva desde **Modo administrador → Seguridad**, con la clave desbloqueada con el PIN; vale para ese teléfono (preferencia `screen_protection_off`, la lee MainActivity al arrancar). No evita fotos con otra cámara.

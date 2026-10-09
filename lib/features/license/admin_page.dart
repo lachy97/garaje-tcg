@@ -12,6 +12,7 @@ import '../../app/widgets/common.dart';
 import '../../core/license/admin_vault.dart';
 import '../../core/license/license_codec.dart';
 import '../../core/license/license_service.dart';
+import '../../core/security/screen_protection.dart';
 import 'license_widgets.dart';
 
 /// Modo administrador: claves de licencias y generador de licencias.
@@ -41,11 +42,15 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   bool _unlocking = false;
   String? _license;
   DateTime? _licenseExpires;
+  bool? _screenProtection;
 
   @override
   void initState() {
     super.initState();
     _load();
+    ScreenProtection.isEnabled().then((v) {
+      if (mounted) setState(() => _screenProtection = v);
+    });
   }
 
   @override
@@ -329,9 +334,39 @@ class _AdminPageState extends ConsumerState<AdminPage> {
                 if (hasKey) ...[
                   const SectionLabel('Generar licencia'),
                   NeonCard(child: _generator()),
+                  const SectionLabel('Seguridad'),
+                  NeonCard(child: _screenProtectionTile()),
                 ],
               ],
             ),
+    );
+  }
+
+  /// Interruptor del bloqueo de capturas (solo con la clave desbloqueada).
+  Widget _screenProtectionTile() {
+    final on = _screenProtection ?? true;
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      value: on,
+      onChanged: _screenProtection == null
+          ? null
+          : (v) async {
+              setState(() => _screenProtection = v);
+              await ScreenProtection.setEnabled(v);
+              if (mounted) {
+                showMessage(context,
+                    v ? 'Capturas bloqueadas' : 'Capturas permitidas en este teléfono');
+              }
+            },
+      title: const Text('Bloquear capturas y grabación de pantalla'),
+      subtitle: Text(
+        on
+            ? 'Activo: no se pueden hacer capturas ni grabar la pantalla de la app. '
+                'Exportar el ranking y la tier list sigue funcionando.'
+            : 'Desactivado en este teléfono: se pueden hacer capturas. '
+                'Vuelve a activarlo cuando termines.',
+        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+      ),
     );
   }
 
