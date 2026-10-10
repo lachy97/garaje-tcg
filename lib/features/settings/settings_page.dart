@@ -26,14 +26,14 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _busy = false;
-  int _versionTaps = 0;
   bool? _adminUnlocked;
 
   @override
   void initState() {
     super.initState();
-    ref.read(licenseServiceProvider.future).then((s) {
-      if (mounted) setState(() => _adminUnlocked = s.adminUnlocked);
+    // El Modo administrador solo existe en el teléfono del administrador.
+    ref.read(licenseServiceProvider.future).then((s) => s.isAdminDevice()).then((v) {
+      if (mounted) setState(() => _adminUnlocked = v);
     });
   }
 
@@ -174,16 +174,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   // ───────────────────── Acerca de ─────────────────────
 
-  Future<void> _onVersionTap() async {
-    if (_adminUnlocked ?? false) return;
-    if (++_versionTaps < 7) return;
-    final service = await ref.read(licenseServiceProvider.future);
-    await service.setAdminUnlocked(true);
-    if (!mounted) return;
-    setState(() => _adminUnlocked = true);
-    showMessage(context, 'Modo administrador activado');
-  }
-
   @override
   Widget build(BuildContext context) {
     final license = ref.watch(licenseProvider);
@@ -272,7 +262,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
               const SectionLabel('Acerca de'),
               NeonCard(
-                onTap: _onVersionTap,
                 child: Row(
                   children: [
                     const GlowLogo(size: 48),

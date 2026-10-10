@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'admin_devices.dart';
 import 'admin_vault.dart';
 import 'device_id.dart';
 import 'license_codec.dart';
@@ -181,6 +182,10 @@ class LicenseService {
   }
 
   // ───────────────────── Administrador ─────────────────────
+
+  /// Este teléfono es el del administrador (ver admin_devices.dart). Solo en
+  /// él se muestra y se puede abrir el Modo administrador.
+  Future<bool> isAdminDevice() async => isAdminDeviceCode(await deviceCode());
 
   bool get adminUnlocked => _prefs.getBool(_keyAdminUnlocked) ?? false;
 

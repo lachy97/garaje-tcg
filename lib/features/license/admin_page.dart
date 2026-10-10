@@ -44,6 +44,9 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   DateTime? _licenseExpires;
   bool? _screenProtection;
 
+  /// Solo el teléfono del administrador puede usar esta pantalla.
+  bool? _isAdminDevice;
+
   @override
   void initState() {
     super.initState();
@@ -64,10 +67,12 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   Future<void> _load() async {
     final service = await ref.read(licenseServiceProvider.future);
     final code = await service.deviceCode();
+    final isAdmin = await service.isAdminDevice();
     if (!mounted) return;
     setState(() {
       _service = service;
       _ownCode = code;
+      _isAdminDevice = isAdmin;
     });
   }
 
@@ -298,6 +303,16 @@ class _AdminPageState extends ConsumerState<AdminPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isAdminDevice == false) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('MODO ADMINISTRADOR')),
+        body: const EmptyState(
+          icon: Icons.lock_outline,
+          title: 'No disponible',
+          subtitle: 'El Modo administrador solo funciona en el teléfono del organizador.',
+        ),
+      );
+    }
     final service = _service;
     final hasKey = _keyPair != null;
     final Widget keyCard;

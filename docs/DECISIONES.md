@@ -76,3 +76,7 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 ## Bloqueo de capturas de pantalla
 - Android `FLAG_SECURE` en toda la app: no se pueden hacer capturas ni grabar la pantalla (sale en negro, también en "apps recientes"). Exportar ranking/tier list sigue funcionando (la imagen la genera la app).
 - Activo por defecto. Solo se desactiva desde **Modo administrador → Seguridad**, con la clave desbloqueada con el PIN; vale para ese teléfono (preferencia `screen_protection_off`, la lee MainActivity al arrancar). No evita fotos con otra cámara.
+
+## Modo administrador solo en el teléfono del organizador
+- Solo aparece (Ajustes → Administrador) y solo se puede abrir en los teléfonos de `lib/core/license/admin_devices.dart` (código de teléfono de Ajustes → Licencia; hoy solo el de Lachy, QT4Q-G5NW-BHMW-BJY4). Se quitó el desbloqueo tocando 7 veces la versión.
+- Si el administrador cambia de teléfono o lo restablece de fábrica, hay que añadir el código nuevo y compilar. Con ello, el interruptor de capturas también queda solo en su teléfono.
