@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../db/app_database.dart';
 import '../db/database_provider.dart';
 import 'backup_codec.dart';
+import 'backup_merge.dart';
 import 'pending_import.dart';
 
 /// Copia lista para importar (ya validada).
@@ -127,7 +128,17 @@ class BackupService {
     return BackupPreview(header, sqlite);
   }
 
-  /// Reemplaza TODOS los datos por los de la copia. Antes guarda una copia
+  /// INTEGRA la copia en los datos del teléfono sin borrar nada: los torneos
+  /// con el mismo nombre se actualizan con los de la copia y los demás se
+  /// añaden (ver [BackupMerger]). Antes guarda una copia automática.
+  Future<MergeReport> merge(BackupPreview preview) async {
+    final current = await createBackup();
+    await _saveAuto(current);
+    return BackupMerger(_db).merge(preview.sqlite);
+  }
+
+  /// Reemplaza TODOS los datos por los de la copia (se usa para "Deshacer una
+  /// importación" con las copias automáticas). Antes guarda una copia
   /// automática de los datos actuales dentro de la app.
   ///
   /// La copia se deja como importación pendiente y se coloca en su sitio con

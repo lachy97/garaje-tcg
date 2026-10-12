@@ -191,6 +191,10 @@ const kDeckCatalog = <DeckCatalogEntry>[
   DeckCatalogEntry('Instant Zombie', DeckCategory.more, 'instant_zombie'),
   DeckCatalogEntry('GB Turbo', DeckCategory.more, 'gb_turbo'),
   DeckCatalogEntry('X-Insects', DeckCategory.more, 'x_insects'),
+  // Mazos del Torneo #2 · T4 2026.
+  DeckCatalogEntry('Vayusworn', DeckCategory.more, 'vayusworn'),
+  DeckCatalogEntry('Heart of the Underdog', DeckCategory.more, 'heart_of_the_underdog'),
+  DeckCatalogEntry('Krystiasworn', DeckCategory.more, 'krystiasworn'),
 ];
 
 /// Nombres viejos que son el mismo mazo que otro del catálogo. Al abrir la app

@@ -95,7 +95,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final service = ref.read(backupServiceProvider);
       final preview = await service.pickAndInspect();
       if (preview == null || !mounted) return;
-      await _confirmAndRestore(preview);
+      await _confirmAndMerge(preview);
     });
   }
 
@@ -133,17 +133,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
   }
 
-  Future<void> _confirmAndRestore(BackupPreview preview) async {
+  /// Importar: integra la copia con los datos del teléfono.
+  Future<void> _confirmAndMerge(BackupPreview preview) async {
     final h = preview.header;
     final ok = await confirmDialog(
       context,
       title: 'Importar base de datos',
       message: 'Copia del ${DateFormat('dd/MM/yyyy HH:mm').format(h.exportedAt)}\n'
           '${h.players} jugadores · ${h.tournaments} torneos · ${h.decks} mazos\n\n'
+          'Se INTEGRA con los datos de este teléfono: los torneos con el mismo '
+          'nombre se actualizan con los de la copia y los demás se añaden. No se '
+          'borra nada más. Antes se guarda una copia automática por si necesitas '
+          'volver atrás.',
+      confirm: 'Importar',
+    );
+    if (!ok || !mounted) return;
+    final report = await ref.read(backupServiceProvider).merge(preview);
+    if (mounted) showMessage(context, 'Datos importados: $report');
+  }
+
+  /// Deshacer una importación: vuelve EXACTAMENTE a una copia automática.
+  Future<void> _confirmAndRestore(BackupPreview preview) async {
+    final h = preview.header;
+    final ok = await confirmDialog(
+      context,
+      title: 'Volver a esta copia',
+      message: 'Copia del ${DateFormat('dd/MM/yyyy HH:mm').format(h.exportedAt)}\n'
+          '${h.players} jugadores · ${h.tournaments} torneos · ${h.decks} mazos\n\n'
           'Se REEMPLAZARÁN todos los datos de este teléfono por los de la copia. '
           'Antes se guarda una copia automática de los datos actuales por si '
           'necesitas volver atrás.',
-      confirm: 'Importar',
+      confirm: 'Volver a esta copia',
       danger: true,
     );
     if (!ok || !mounted) return;
@@ -223,6 +243,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     const Text(
                       'Guarda todos los datos (jugadores, mazos, torneos, ranking) en un '
                       'archivo .gtcg. Se puede cargar en cualquier teléfono con Garage TCG. '
+                      'Al importar se integra con lo que ya hay: los torneos con el mismo '
+                      'nombre se actualizan y los demás se añaden. '
                       'Solo se aceptan archivos exportados por esta app.',
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                     ),
