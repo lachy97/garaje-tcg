@@ -26,6 +26,12 @@ void main() {
       }
     });
 
+    test('ID: empate 0-0-0 fuera de los marcadores normales', () {
+      expect(GameScore.intentionalDraw.result, MatchResult.draw);
+      expect(GameScore.intentionalDraw.gamesPlayed, 0);
+      expect(GameScore.intentionalDraw.isValid, isFalse);
+    });
+
     test('En Top Cut no se acepta 1-1-1', () {
       expect(const GameScore(1, 1, 1).isValidForTopCut, isFalse);
       expect(GameScore.allowedTopCut.length, 4);

@@ -40,6 +40,16 @@ void main() {
       expect(TournamentRules.allowedTopCuts(30), [8, 16]);
       expect(TournamentRules.suggestedTopCut(50), 32);
     });
+
+    test('Top Cut efectivo con drops', () {
+      expect(TournamentRules.effectiveTopCut(8, 20), 8);
+      expect(TournamentRules.effectiveTopCut(8, 8), 8);
+      expect(TournamentRules.effectiveTopCut(8, 7), 4);
+      expect(TournamentRules.effectiveTopCut(16, 12), 8);
+      expect(TournamentRules.effectiveTopCut(4, 3), 2);
+      expect(TournamentRules.effectiveTopCut(4, 1), 0);
+      expect(TournamentRules.effectiveTopCut(0, 30), 0);
+    });
   });
 
   group('Temporadas', () {

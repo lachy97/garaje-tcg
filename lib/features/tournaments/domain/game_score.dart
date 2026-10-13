@@ -28,6 +28,11 @@ class GameScore {
   /// Un BYE se registra como 2-0-0.
   static const bye = GameScore(2, 0, 0);
 
+  /// Empate intencional (ID): se registra como empate 0-0-0, sin juegos, así
+  /// no altera el GW% de nadie. Solo en Swiss. No está en [allowed] porque no
+  /// se elige con el marcador: tiene su propio botón.
+  static const intentionalDraw = GameScore(0, 0, 0);
+
   MatchResult get result => p1 > p2
       ? MatchResult.p1Win
       : p2 > p1

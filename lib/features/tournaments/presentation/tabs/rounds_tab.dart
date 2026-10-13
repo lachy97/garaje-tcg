@@ -10,6 +10,7 @@ import '../../../decks/presentation/decks_page.dart';
 import '../../application/tournament_service.dart';
 import '../../domain/tournament_rules.dart';
 import '../providers.dart';
+import '../share_tournament.dart';
 import 'match_score_card.dart';
 import 'round_timer.dart';
 
@@ -92,6 +93,7 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                       )
                     else
                       _MatchesSliver(
+                        tournament: t,
                         round: selected,
                         isCurrent: selected.id == current?.id &&
                             t.status != TournamentStatus.finished,
@@ -111,6 +113,7 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                   child: _AdvanceFab(
                     tournament: t,
                     currentRound: current,
+                    activePlayers: players.where((p) => !p.entry.dropped).length,
                     busy: _busy,
                     onRun: _run,
                   ),
@@ -272,6 +275,7 @@ class TopCutSelector extends StatelessWidget {
 
 class _MatchesSliver extends ConsumerWidget {
   const _MatchesSliver({
+    required this.tournament,
     required this.round,
     required this.isCurrent,
     required this.names,
@@ -279,6 +283,7 @@ class _MatchesSliver extends ConsumerWidget {
     required this.roundMinutes,
   });
 
+  final Tournament tournament;
   final Round round;
   final bool isCurrent;
   final Map<String, String> names;
@@ -289,7 +294,7 @@ class _MatchesSliver extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final matches = ref.watch(roundMatchesProvider(round.id));
     final title = round.phase == RoundPhase.swiss
-        ? 'Ronda : ${round.number}'
+        ? 'Ronda ${round.number}'
         : roundLabel(round);
     return matches.when(
       loading: () => const SliverToBoxAdapter(
@@ -320,6 +325,20 @@ class _MatchesSliver extends ConsumerWidget {
               color: pending == 0 ? AppColors.leaf : AppColors.textSecondary,
             ),
           ),
+          Center(
+            child: TextButton.icon(
+              onPressed: () => shareRound(
+                context,
+                tournament: tournament,
+                roundTitle: title,
+                isTopCut: round.phase == RoundPhase.topCut,
+                matches: list,
+                names: names,
+              ),
+              icon: const Icon(Icons.share, size: 20),
+              label: const Text('Compartir ronda'),
+            ),
+          ),
           if (isCurrent) RoundTimer(round: round, minutes: roundMinutes),
           const SizedBox(height: 8),
           for (final m in list)
@@ -346,12 +365,14 @@ class _AdvanceFab extends ConsumerWidget {
   const _AdvanceFab({
     required this.tournament,
     required this.currentRound,
+    required this.activePlayers,
     required this.busy,
     required this.onRun,
   });
 
   final Tournament tournament;
   final Round? currentRound;
+  final int activePlayers;
   final bool busy;
   final Future<void> Function(Future<void> Function() action, {String? success}) onRun;
 
@@ -385,18 +406,28 @@ class _AdvanceFab extends ConsumerWidget {
                   'Aviso: ${out.rematches} cruce(s) repetidos (no había otra opción).');
             }
           };
-        } else if (t.topCutSize == 0) {
-          title = 'Finalizar torneo';
-          message = 'Se cierra el Swiss y se guardan las posiciones finales.';
-          success = 'Torneo terminado.';
-          icon = Icons.flag;
-          step = () => service.startTopCut(t.id);
         } else {
-          title = 'Iniciar Top ${t.topCutSize}';
-          message = 'Los ${t.topCutSize} primeros pasan al Top Cut. '
-              'Ya no se podrán jugar más rondas Swiss.';
-          success = '¡Top ${t.topCutSize} generado!';
-          icon = Icons.emoji_events;
+          final size = TournamentRules.effectiveTopCut(t.topCutSize, activePlayers);
+          final reduced = t.topCutSize != 0 && size != t.topCutSize;
+          final why = reduced
+              ? 'Por los drops solo quedan $activePlayers jugadores activos, '
+                  'no alcanzan para el Top ${t.topCutSize}. '
+              : '';
+          if (size == 0) {
+            title = 'Finalizar torneo';
+            message = '${why}Se cierra el Swiss y se guardan las posiciones finales.';
+            success = 'Torneo terminado.';
+            icon = Icons.flag;
+          } else {
+            title = 'Iniciar Top $size';
+            message = reduced
+                ? '${why}Se juega un Top $size con los $size primeros. '
+                    'Ya no se podrán jugar más rondas Swiss.'
+                : 'Los $size primeros pasan al Top Cut. '
+                    'Ya no se podrán jugar más rondas Swiss.';
+            success = '¡Top $size generado!';
+            icon = Icons.emoji_events;
+          }
           step = () => service.startTopCut(t.id);
         }
       case TournamentStatus.topCut:

@@ -7,7 +7,9 @@ import '../../../../app/widgets/common.dart';
 import '../../../../app/widgets/neon_table.dart';
 import '../../../../core/db/app_database.dart';
 import '../../application/tournament_service.dart';
+import '../../domain/tournament_rules.dart';
 import '../providers.dart';
+import '../share_tournament.dart';
 
 /// Clasificación Swiss en vivo; al terminar, resultado final con puntos de ranking.
 class StandingsTab extends ConsumerWidget {
@@ -115,12 +117,36 @@ class _SwissStandings extends ConsumerWidget {
             ),
           );
         }
-        final cut = tournament.topCutSize;
+        // Los drops no cuentan para el corte: pasan los primeros ACTIVOS, y si
+        // no alcanzan para el Top elegido se muestra el Top reducido.
+        final activeIds = [for (final s in list) if (!s.dropped) s.playerId];
+        final cut = TournamentRules.effectiveTopCut(tournament.topCutSize, activeIds.length);
+        final qualified = activeIds.take(cut).toSet();
+        final lastQualified = qualified.isEmpty ? null : activeIds[qualified.length - 1];
         String pct(double v) => (v * 100).toStringAsFixed(1);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SectionLabel('Clasificación Swiss'),
+            Row(
+              children: [
+                const Expanded(child: SectionLabel('Clasificación Swiss')),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, right: 4),
+                  child: TextButton.icon(
+                    onPressed: () => shareStandings(
+                      context,
+                      tournament: tournament,
+                      standings: list,
+                      names: names,
+                      decks: decks,
+                      cut: cut,
+                    ),
+                    icon: const Icon(Icons.share, size: 20),
+                    label: const Text('Compartir'),
+                  ),
+                ),
+              ],
+            ),
             NeonTable(
               columns: const [
                 NeonColumn('#', width: 32, align: TextAlign.start),
@@ -134,9 +160,9 @@ class _SwissStandings extends ConsumerWidget {
               rows: [
                 for (final s in list)
                   NeonTableRow(
-                    highlight: cut > 0 && s.rank <= cut && !s.dropped,
+                    highlight: qualified.contains(s.playerId),
                     dim: s.dropped,
-                    footer: cut > 0 && s.rank == cut ? _CutLine(cut: cut) : null,
+                    footer: s.playerId == lastQualified ? _CutLine(cut: cut) : null,
                     cells: [
                       Text('${s.rank}', style: const TextStyle(fontWeight: FontWeight.w800)),
                       _NameCell(
@@ -144,7 +170,7 @@ class _SwissStandings extends ConsumerWidget {
                             ? '${names[s.playerId] ?? '?'} (drop)'
                             : names[s.playerId] ?? '?',
                         deck: decks[s.playerId],
-                        accent: cut > 0 && s.rank <= cut && !s.dropped,
+                        accent: qualified.contains(s.playerId),
                       ),
                       Text('${s.wins}-${s.losses}-${s.draws}'),
                       Text('${s.points}',

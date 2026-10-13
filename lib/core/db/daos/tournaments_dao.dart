@@ -350,6 +350,21 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
+  /// Empate intencional (ID): empate 0-0-0, cada uno suma el punto del empate.
+  Future<void> reportIntentionalDraw(String matchId) {
+    final now = DateTime.now();
+    return (update(matches)..where((m) => m.id.equals(matchId))).write(
+      MatchesCompanion(
+        result: const Value(MatchResult.draw),
+        games1: const Value(0),
+        gamesDraw: const Value(0),
+        games2: const Value(0),
+        reportedAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
   /// Borra el resultado (vuelve a pendiente), p. ej. si se reportó por error.
   Future<void> clearResult(String matchId) {
     return (update(matches)..where((m) => m.id.equals(matchId))).write(

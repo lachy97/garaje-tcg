@@ -50,4 +50,17 @@ class TournamentRules {
     final allowed = allowedTopCuts(playerCount);
     return allowed.isEmpty ? 0 : allowed.last;
   }
+
+  /// Tamaño real del Top Cut al terminar el Swiss. Si por los drops quedan
+  /// menos jugadores activos que el Top elegido, se baja al mayor cuadro que
+  /// se pueda llenar (Top 8 con 7 activos → Top 4; con 3 → final directa).
+  /// 0 = sin Top Cut (no se eligió, o quedan menos de 2 activos).
+  static int effectiveTopCut(int configured, int activePlayers) {
+    if (configured <= 0 || activePlayers < 2) return 0;
+    var size = 2;
+    while (size * 2 <= configured && size * 2 <= activePlayers) {
+      size *= 2;
+    }
+    return size;
+  }
 }

@@ -90,6 +90,44 @@ class TournamentService {
     await _dao.reportDoubleLoss(matchId);
   }
 
+  /// Empate intencional (ID): los dos jugadores acuerdan empatar. Solo en Swiss.
+  Future<void> reportIntentionalDraw(String matchId) async {
+    final m = await _dao.matchById(matchId);
+    if (m == null) throw const TournamentException('Match no encontrado.');
+    if (m.isBye) throw const TournamentException('El BYE no se reporta.');
+    final ctx = await _load(m.tournamentId);
+    final round = ctx.roundById[m.roundId]!;
+    if (round.id != ctx.currentRound?.id) {
+      throw const TournamentException(
+          'Solo se pueden reportar o corregir resultados de la ronda actual.');
+    }
+    if (round.phase == RoundPhase.topCut) {
+      throw const TournamentException(
+          'En el Top Cut no puede haber empate intencional: debe haber un ganador.');
+    }
+    await _dao.reportIntentionalDraw(matchId);
+  }
+
+  /// Vuelve un match al resultado que tenía (para "Deshacer").
+  Future<void> restoreResult(
+    String matchId, {
+    required MatchResult result,
+    int? games1,
+    int? gamesDraw,
+    int? games2,
+  }) async {
+    switch (result) {
+      case MatchResult.pending:
+        await clearResult(matchId);
+      case MatchResult.doubleLoss:
+        await reportDoubleLoss(matchId);
+      case MatchResult.draw when (games1 ?? 0) + (gamesDraw ?? 0) + (games2 ?? 0) == 0:
+        await reportIntentionalDraw(matchId);
+      default:
+        await reportScore(matchId, GameScore(games1 ?? 0, gamesDraw ?? 0, games2 ?? 0));
+    }
+  }
+
   Future<void> clearResult(String matchId) async {
     final m = await _dao.matchById(matchId);
     if (m == null || m.isBye) return;
@@ -224,25 +262,28 @@ class TournamentService {
         players: ctx.swissPlayers, matches: ctx.swissRecords);
     final swissPositions = {for (final s in table) s.playerId: s.rank};
 
-    if (t.topCutSize == 0) {
+    // Con drops pueden quedar menos activos que el Top elegido: se reduce el
+    // cuadro en vez de bloquear el torneo.
+    final active = table.where((s) => !s.dropped).toList();
+    final size = TournamentRules.effectiveTopCut(t.topCutSize, active.length);
+
+    if (size == 0) {
       await _db.transaction(() async {
         await _dao.closeRound(ctx.currentRound!.id);
         await _dao.saveSwissPositions(tournamentId, swissPositions);
+        if (t.topCutSize != 0) await _dao.updateSettings(tournamentId, topCutSize: 0);
         await _dao.finishTournament(tournamentId, swissPositions);
       });
       return;
     }
 
-    final seeds = table.where((s) => !s.dropped).take(t.topCutSize).map((s) => s.playerId).toList();
-    if (seeds.length < t.topCutSize) {
-      throw TournamentException(
-          'No hay suficientes jugadores activos para un Top ${t.topCutSize}.');
-    }
+    final seeds = active.take(size).map((s) => s.playerId).toList();
     final first = TopCutBracket.firstRound(seeds);
 
     await _db.transaction(() async {
       await _dao.closeRound(ctx.currentRound!.id);
       await _dao.saveSwissPositions(tournamentId, swissPositions);
+      if (size != t.topCutSize) await _dao.updateSettings(tournamentId, topCutSize: size);
       await _createTopCutRound(ctx, t.currentRound + 1, first);
     });
   }

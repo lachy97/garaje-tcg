@@ -53,14 +53,20 @@ class LicenseStatus {
 /// Licencias offline: guarda la licencia, la comprueba y protege contra
 /// atrasar la fecha del teléfono.
 class LicenseService {
-  LicenseService(this._prefs);
+  LicenseService(this._prefs, {Uint8List? publicKey}) : _publicKeyOverride = publicKey;
 
   final SharedPreferences _prefs;
+
+  /// Solo para pruebas: clave pública distinta de la compilada.
+  final Uint8List? _publicKeyOverride;
+
+  Uint8List? get _publicKey => _publicKeyOverride ?? appPublicKey;
 
   static const warnDays = 7;
   static const _keyLicense = 'license.key';
   static const _keyLastSeen = 'license.lastSeenMs';
   static const _keyLastWarn = 'license.lastWarnDay';
+  static const _keyMaxIssued = 'license.maxIssuedDay';
   static const _keyAdminSeed = 'admin.seed';
   static const _keyAdminUnlocked = 'admin.unlocked';
   static const _keyAdminSealed = 'admin.sealedSeed';
@@ -90,7 +96,7 @@ class LicenseService {
     now ??= DateTime.now();
     final fp = await fingerprint();
     final code = LicenseCodec.deviceCode(fp);
-    final key = appPublicKey;
+    final key = _publicKey;
     final text = storedLicense;
 
     if (key == null) {
@@ -130,6 +136,11 @@ class LicenseService {
     if (!data.isForDevice(fp)) {
       return LicenseStatus(state: LicenseState.wrongDevice, deviceCode: code, data: data);
     }
+    // Recuerda la emisión más reciente usada (no se puede volver a pegar esta
+    // misma licencia para quitar un bloqueo de reloj).
+    if (data.issuedDay > (_prefs.getInt(_keyMaxIssued) ?? -1)) {
+      await _prefs.setInt(_keyMaxIssued, data.issuedDay);
+    }
     final left = data.daysLeft(now);
     if (left < 0) return LicenseStatus(state: LicenseState.expired, deviceCode: code, data: data);
     return LicenseStatus(
@@ -141,8 +152,9 @@ class LicenseService {
 
   /// Comprueba y guarda una licencia nueva (o renovación). Lanza
   /// [LicenseFormatException] con el motivo si no sirve.
-  Future<LicenseData> activate(String text) async {
-    final key = appPublicKey;
+  Future<LicenseData> activate(String text, {DateTime? now}) async {
+    now ??= DateTime.now();
+    final key = _publicKey;
     final LicenseData data;
     if (key == null) {
       // Modo desarrollo: solo se comprueba el formato; se validará al configurar la clave.
@@ -154,21 +166,43 @@ class LicenseService {
       throw LicenseFormatException(
           'Esta licencia es para otro teléfono (código ${data.deviceCode}).');
     }
-    if (data.daysLeft(DateTime.now()) < 0) {
+    final today = LicenseCodec.dayOf(now);
+    // La fecha del teléfono no puede ser anterior a la emisión de la licencia
+    // (1 día de margen por zonas horarias).
+    if (today < data.issuedDay - 1) {
+      throw const LicenseFormatException(
+          'La fecha del teléfono está atrasada. Pon la fecha y hora correctas.');
+    }
+    if (data.daysLeft(now) < 0) {
       throw const LicenseFormatException('Esta licencia ya está vencida.');
     }
+
+    final lastSeen = _prefs.getInt(_keyLastSeen) ?? 0;
+    final clockBack = now.millisecondsSinceEpoch < lastSeen - _clockTolerance.inMilliseconds;
+    // Solo una licencia MÁS NUEVA que todas las usadas en este teléfono, y
+    // recién emitida, puede desbloquear un reloj atrasado (p. ej. si se
+    // adelantó la fecha por error). Volver a pegar la misma licencia, o una
+    // vieja, no quita el bloqueo: así no se puede atrasar la fecha para
+    // alargar una licencia vencida.
+    final maxIssued = _prefs.getInt(_keyMaxIssued) ?? -1;
+    final isNewer = data.issuedDay > maxIssued;
+    final freshlyIssued = data.issuedDay >= today - 1;
+    if (clockBack && !(isNewer && freshlyIssued)) {
+      throw const LicenseFormatException(
+          'La fecha del teléfono está atrasada. Pon la fecha y hora correctas '
+          'o pide una licencia nueva al administrador.');
+    }
+
     await _prefs.setString(_keyLicense, text.replaceAll(RegExp(r'\s'), ''));
-    final now = DateTime.now();
-    if (data.issuedDay >= LicenseCodec.dayOf(now) - 1) {
-      // Licencia recién emitida por el administrador: también sirve para
-      // desbloquear un teléfono al que se le adelantó la fecha por error.
+    if (isNewer) await _prefs.setInt(_keyMaxIssued, data.issuedDay);
+    if (clockBack) {
+      // Desbloqueo autorizado por una licencia nueva: la fecha vuelve a hoy.
       await _prefs.setInt(_keyLastSeen, now.millisecondsSinceEpoch);
     } else {
-      // La fecha nunca podrá ser anterior a la emisión de la licencia.
+      // lastSeen solo avanza: nunca antes de hoy ni de la emisión.
       final issuedMs = data.issued.millisecondsSinceEpoch;
-      if ((_prefs.getInt(_keyLastSeen) ?? 0) < issuedMs) {
-        await _prefs.setInt(_keyLastSeen, issuedMs);
-      }
+      final next = [lastSeen, issuedMs, now.millisecondsSinceEpoch].reduce((a, b) => a > b ? a : b);
+      if (next > lastSeen) await _prefs.setInt(_keyLastSeen, next);
     }
     return data;
   }

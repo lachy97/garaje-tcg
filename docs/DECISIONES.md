@@ -86,3 +86,12 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - **Torneos**: el de la copia reemplaza al del teléfono con el mismo nombre (sin distinguir mayúsculas/espacios) o el mismo id, con rondas, partidas, inscripciones y puntos; los demás se añaden; los que solo están en el teléfono se quedan. Los torneos borrados en la copia se ignoran.
 - **Jugadores** por id o apodo (se completan datos vacíos), **mazos** por id o nombre, **temporadas** por año y trimestre. La escala de puntos y los ajustes del teléfono no se tocan. Las fotos de otro teléfono no viajan.
 - Antes se guarda una copia automática. "Deshacer una importación" sí REEMPLAZA todo por la copia automática elegida.
+
+## Mejoras Fase 1 (análisis de octubre 2026)
+- **Top Cut con drops**: si al terminar el Swiss quedan menos jugadores activos que el Top elegido, el cuadro se reduce al mayor que se pueda llenar (Top 8 con 7 activos → Top 4; con 3 → final directa; con 1 → sin Top) y se guarda ese tamaño en el torneo. El botón de avanzar avisa antes. La línea de corte de la clasificación cuenta solo jugadores activos.
+- **Resultado de un toque**: botones 2-0 · 2-1 · Empate · 1-2 · 0-2 (leídos desde el jugador de la izquierda) y, en Swiss, ID y Doble derrota. Cada toque guarda al instante y muestra "Deshacer" (vuelve al resultado anterior, también a pendiente).
+- **ID (empate intencional)**: se guarda como empate 0-0-0: 1 punto cada uno y no cuenta juegos (no altera el GW%). Solo en Swiss.
+- **Compartir**: "Compartir ronda" (pestaña Rondas) y "Compartir" (Clasificación), como texto para WhatsApp (ganador en negrita) o como imagen.
+- **Licencia**: no se puede activar con la fecha anterior a la emisión. Volver a pegar la misma licencia (o una más vieja) ya no quita el bloqueo de fecha atrasada; solo una licencia nueva y recién emitida lo quita. La última fecha vista nunca retrocede. Limitación: borrar los datos de la app borra también esa fecha (sin servidor no se puede evitar del todo).
+- **Firma**: en el servidor de compilación (CI=true) la compilación falla si faltan los secretos de firma, en vez de firmar con la clave de debug (cambiaría el código de todos los teléfonos y las licencias dejarían de valer). En la PC sigue el respaldo con la clave de debug.
+- **Copia de Android desactivada** (`allowBackup=false` y reglas de extracción): los datos y la licencia no viajan solos a la nube de Google ni a otro teléfono; las copias se hacen con `.gtcg`.

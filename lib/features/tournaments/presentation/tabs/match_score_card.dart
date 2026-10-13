@@ -7,17 +7,15 @@ import '../../../../core/db/app_database.dart';
 import '../../application/tournament_service.dart';
 import '../../domain/game_score.dart';
 
-/// Tarjeta de un match con el reporte en línea:
+/// Tarjeta de un match con el reporte de un toque:
 ///
 ///   Jugador1        vs        Jugador2
-///                 Empate
-///   ○ 0           ○ 0           ○ 0
-///   ○ 1           ○ 1           ○ 1
-///   ○ 2           ○ 2           ○ 2
+///   [2-0] [2-1] [Empate] [1-2] [0-2]
+///        [ID]   [Doble derrota]
 ///
-/// Columna izquierda = juegos ganados por J1, centro = juegos empatados,
-/// derecha = juegos ganados por J2. En cuanto la combinación forma un marcador
-/// válido (2-0-0, 2-0-1, 0-0-2, 1-0-2, 1-1-1) se guarda sola.
+/// Los marcadores se leen desde el Jugador 1 (izquierda): "2-1" = gana J1 2-1,
+/// "1-2" = gana J2 2-1. Cada botón guarda el resultado al instante y aparece
+/// un aviso con "Deshacer" para volver al resultado anterior.
 class MatchScoreCard extends ConsumerStatefulWidget {
   const MatchScoreCard({
     super.key,
@@ -38,100 +36,98 @@ class MatchScoreCard extends ConsumerStatefulWidget {
   ConsumerState<MatchScoreCard> createState() => _MatchScoreCardState();
 }
 
-class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
-  late int _p1;
-  late int _draws;
-  late int _p2;
+/// Un botón de resultado.
+enum _Pick { p1Clean, p1Close, draw, p2Close, p2Clean, intentionalDraw, doubleLoss }
 
-  /// Doble derrota marcada (se acabó el tiempo y pierden los dos).
-  late bool _doubleLoss;
+extension on _Pick {
+  String get label => switch (this) {
+        _Pick.p1Clean => '2-0',
+        _Pick.p1Close => '2-1',
+        _Pick.draw => 'Empate',
+        _Pick.p2Close => '1-2',
+        _Pick.p2Clean => '0-2',
+        _Pick.intentionalDraw => 'ID (empate acordado)',
+        _Pick.doubleLoss => 'Doble derrota',
+      };
+
+  GameScore? get score => switch (this) {
+        _Pick.p1Clean => const GameScore(2, 0, 0),
+        _Pick.p1Close => const GameScore(2, 0, 1),
+        _Pick.draw => const GameScore(1, 1, 1),
+        _Pick.p2Close => const GameScore(1, 0, 2),
+        _Pick.p2Clean => const GameScore(0, 0, 2),
+        _Pick.intentionalDraw => GameScore.intentionalDraw,
+        _Pick.doubleLoss => null,
+      };
+}
+
+class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
+  /// Evita dobles toques mientras se guarda.
+  bool _saving = false;
 
   Match get m => widget.match;
   bool get _isTopCut => widget.phase == RoundPhase.topCut;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadFromMatch();
+  /// Botón que corresponde al resultado guardado (null = pendiente).
+  _Pick? get _saved {
+    if (!m.result.isReported) return null;
+    if (m.result == MatchResult.doubleLoss) return _Pick.doubleLoss;
+    final s = GameScore(m.games1 ?? 0, m.gamesDraw ?? 0, m.games2 ?? 0);
+    if (m.result == MatchResult.draw && s.gamesPlayed == 0) return _Pick.intentionalDraw;
+    for (final p in _Pick.values) {
+      if (p.score == s && s.result == m.result) return p;
+    }
+    return null;
   }
 
-  @override
-  void didUpdateWidget(MatchScoreCard old) {
-    super.didUpdateWidget(old);
-    // Solo se sincroniza desde la BD si cambia el match o llega un marcador
-    // guardado distinto; al borrar el resultado se conserva la selección local.
-    final changedMatch = old.match.id != m.id;
-    // (solo si cambió la fila de este match, no por cambios en otras mesas)
-    final saved = old.match != m &&
-        m.games1 != null &&
-        (m.games1 != _p1 || (m.gamesDraw ?? 0) != _draws || (m.games2 ?? 0) != _p2);
-    final dl = old.match != m && (m.result == MatchResult.doubleLoss) != _doubleLoss;
-    if (changedMatch || saved || dl) _loadFromMatch();
-  }
+  String _describe(_Pick p, String p1, String p2) => switch (p) {
+        _Pick.p1Clean || _Pick.p1Close => 'Gana $p1 ${p.label}',
+        _Pick.p2Clean || _Pick.p2Close => 'Gana $p2 ${p.score!.p2}-${p.score!.p1}',
+        _Pick.draw => 'Empate 1-1-1',
+        _Pick.intentionalDraw => 'Empate intencional (ID)',
+        _Pick.doubleLoss => 'Doble derrota (pierden los dos)',
+      };
 
-  void _loadFromMatch() {
-    _p1 = m.games1 ?? 0;
-    _draws = m.gamesDraw ?? 0;
-    _p2 = m.games2 ?? 0;
-    _doubleLoss = m.result == MatchResult.doubleLoss;
-  }
-
-  GameScore get _local => GameScore(_p1, _draws, _p2);
-
-  bool _isValid(GameScore s) => _isTopCut ? s.isValidForTopCut : s.isValid;
-
-  /// Opciones que nunca pueden formar un marcador válido se muestran apagadas.
-  bool _optionPossible(int column, int value) {
-    final options = _isTopCut ? GameScore.allowedTopCut : GameScore.allowed;
-    return options.any((s) => switch (column) {
-          0 => s.p1 == value,
-          1 => s.draws == value,
-          _ => s.p2 == value,
-        });
-  }
-
-  Future<void> _select(int column, int value) async {
-    setState(() {
-      switch (column) {
-        case 0:
-          _p1 = value;
-        case 1:
-          _draws = value;
+  Future<void> _pick(_Pick pick, String p1, String p2) async {
+    if (_saving || pick == _saved) return;
+    // Resultado anterior, para "Deshacer".
+    final matchId = m.id;
+    final prev = (result: m.result, g1: m.games1, gd: m.gamesDraw, g2: m.games2);
+    final service = ref.read(tournamentServiceProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _saving = true);
+    final ok = await runGuarded(context, () async {
+      switch (pick) {
+        case _Pick.doubleLoss:
+          await service.reportDoubleLoss(matchId);
+        case _Pick.intentionalDraw:
+          await service.reportIntentionalDraw(matchId);
         default:
-          _p2 = value;
+          await service.reportScore(matchId, pick.score!);
       }
     });
-    final service = ref.read(tournamentServiceProvider);
-    final score = _local;
-    // Solo se guarda un marcador válido. Si la combinación no es válida, el
-    // resultado guardado (si lo hay) se mantiene: borrar exige confirmación.
-    if (_isValid(score)) {
-      await runGuarded(context, () => service.reportScore(m.id, score));
-    }
-  }
-
-  Future<void> _toggleDoubleLoss(bool? value) async {
-    if (value == true) {
-      if (m.result.isReported && !_doubleLoss) {
-        final ok = await confirmDialog(
-          context,
-          title: 'Doble derrota',
-          message: 'Se reemplazará el resultado ${_savedLabel()} por 0-0-0 '
-              '(pierden los dos).',
-          confirm: 'Aplicar',
-          danger: true,
-        );
-        if (!ok || !mounted) return;
-      }
-      setState(() {
-        _p1 = _draws = _p2 = 0;
-        _doubleLoss = true;
-      });
-      await runGuarded(
-          context, () => ref.read(tournamentServiceProvider).reportDoubleLoss(m.id));
-    } else {
-      await _clear();
-    }
+    if (mounted) setState(() => _saving = false);
+    if (!ok) return;
+    final table = m.tableNumber == null ? '' : 'Mesa ${m.tableNumber}: ';
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        duration: const Duration(seconds: 5),
+        content: Text('$table${_describe(pick, p1, p2)}'),
+        action: SnackBarAction(
+          label: 'Deshacer',
+          onPressed: () async {
+            try {
+              await service.restoreResult(matchId,
+                  result: prev.result, games1: prev.g1, gamesDraw: prev.gd, games2: prev.g2);
+            } on Exception catch (e) {
+              messenger.showSnackBar(SnackBar(
+                  content: Text('No se pudo deshacer: $e',
+                      style: const TextStyle(color: AppColors.loss))));
+            }
+          },
+        ),
+      ));
   }
 
   Future<void> _clear() async {
@@ -144,19 +140,13 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
     );
     if (!ok || !mounted) return;
     await runGuarded(context, () => ref.read(tournamentServiceProvider).clearResult(m.id));
-    if (mounted) {
-      setState(() {
-        _p1 = _draws = _p2 = 0;
-        _doubleLoss = false;
-      });
-    }
   }
 
-  String _savedLabel() => m.result == MatchResult.doubleLoss
-      ? '0-0-0 (doble derrota)'
-      : m.games1 == null
-      ? ''
-      : '${m.games1}-${m.gamesDraw ?? 0}-${m.games2 ?? 0}';
+  String _savedLabel() => switch (_saved) {
+        _Pick.doubleLoss => '0-0-0 (doble derrota)',
+        _Pick.intentionalDraw => 'ID (empate acordado)',
+        _ => m.games1 == null ? '' : '${m.games1}-${m.gamesDraw ?? 0}-${m.games2 ?? 0}',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -165,17 +155,38 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
 
     if (m.isBye) return _ByeCard(name: p1, deck: widget.deckNames[m.deck1Id]);
 
-    final score = _local;
-    final valid = _isValid(score) || _doubleLoss;
-    final untouched = _p1 == 0 && _draws == 0 && _p2 == 0;
-    final status = _doubleLoss
-        ? ('Doble derrota · 0-0-0 (pierden los dos)', AppColors.loss)
-        : _statusFor(score, valid, untouched, p1, p2!);
+    final saved = _saved;
+    final reported = m.result.isReported;
+    final p1Wins = m.result == MatchResult.p1Win;
+    final p2Wins = m.result == MatchResult.p2Win;
+    final isDoubleLoss = m.result == MatchResult.doubleLoss;
+    final status = !reported
+        ? (widget.editable
+            ? ('Pendiente', AppColors.textSecondary)
+            : ('Sin resultado', AppColors.textDisabled))
+        : saved == null
+            ? ('Guardado: ${_savedLabel()}', AppColors.textSecondary)
+            : (
+                _describe(saved, p1, p2!),
+                isDoubleLoss
+                    ? AppColors.loss
+                    : (p1Wins || p2Wins)
+                        ? AppColors.neon
+                        : AppColors.draw,
+              );
     final title = m.isThirdPlace
         ? '3ER PUESTO'
         : _isTopCut
             ? 'MATCH ${m.tableNumber ?? ''}'
             : 'MESA ${m.tableNumber ?? ''}';
+    final enabled = widget.editable && !_saving;
+
+    Widget button(_Pick p) => _ResultButton(
+          label: p.label,
+          selected: saved == p,
+          danger: p == _Pick.doubleLoss,
+          onTap: enabled ? () => _pick(p, p1, p2!) : null,
+        );
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -184,25 +195,24 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: _doubleLoss
+          color: isDoubleLoss
               ? AppColors.loss
-              : valid
+              : reported
                   ? AppColors.neon
                   : AppColors.outline,
-          width: valid ? 1.2 : 0.8,
+          width: reported ? 1.2 : 0.8,
         ),
-        boxShadow: valid && !_doubleLoss ? AppColors.glow(strength: 0.5) : null,
+        boxShadow: reported && !isDoubleLoss ? AppColors.glow(strength: 0.5) : null,
       ),
       child: Column(
         children: [
           Text(title,
               style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: 1.1,
                   color: AppColors.textSecondary)),
           const SizedBox(height: 6),
-          // Cabecera: J1 | vs / Empate | J2
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -210,102 +220,64 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                 child: _PlayerHeader(
                   name: p1,
                   deck: widget.deckNames[m.deck1Id],
-                  highlight: !_doubleLoss && valid && score.p1 > score.p2,
+                  highlight: p1Wins,
                 ),
               ),
               const SizedBox(
-                width: 72,
-                child: Column(
-                  children: [
-                    Text('vs',
-                        style: TextStyle(
-                            color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                    Text('Empate',
-                        style: TextStyle(
-                            color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-                  ],
-                ),
+                width: 36,
+                child: Text('vs',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
               ),
               Expanded(
                 child: _PlayerHeader(
                   name: p2!,
                   deck: widget.deckNames[m.deck2Id],
-                  highlight: !_doubleLoss && valid && score.p2 > score.p1,
+                  highlight: p2Wins,
                   alignEnd: true,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Filas 0 / 1 / 2 con un radio por columna
-          for (final value in const [0, 1, 2])
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
+          if (widget.editable) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: button(_Pick.p1Clean)),
+                const SizedBox(width: 6),
+                Expanded(child: button(_Pick.p1Close)),
+                if (!_isTopCut) ...[
+                  const SizedBox(width: 6),
+                  Expanded(flex: 2, child: button(_Pick.draw)),
+                ] else
+                  const SizedBox(width: 18),
+                const SizedBox(width: 6),
+                Expanded(child: button(_Pick.p2Close)),
+                const SizedBox(width: 6),
+                Expanded(child: button(_Pick.p2Clean)),
+              ],
+            ),
+            if (!_isTopCut) ...[
+              const SizedBox(height: 6),
+              Row(
                 children: [
-                  for (final column in const [0, 1, 2])
-                    Expanded(
-                      child: Align(
-                        alignment: switch (column) {
-                          0 => Alignment.centerLeft,
-                          1 => Alignment.center,
-                          _ => Alignment.centerRight,
-                        },
-                        child: _ScoreRadio(
-                          value: value,
-                          selected: switch (column) {
-                            0 => _p1 == value,
-                            1 => _draws == value,
-                            _ => _p2 == value,
-                          },
-                          enabled: widget.editable &&
-                              !_doubleLoss &&
-                              _optionPossible(column, value),
-                          onTap: () => _select(column, value),
-                        ),
-                      ),
-                    ),
+                  Expanded(child: button(_Pick.intentionalDraw)),
+                  const SizedBox(width: 6),
+                  Expanded(child: button(_Pick.doubleLoss)),
                 ],
               ),
-            ),
-          if (!_isTopCut && (widget.editable || _doubleLoss))
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: widget.editable ? () => _toggleDoubleLoss(!_doubleLoss) : null,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Checkbox(
-                    value: _doubleLoss,
-                    onChanged: widget.editable ? _toggleDoubleLoss : null,
-                    activeColor: AppColors.loss,
-                    side: const BorderSide(color: AppColors.textSecondary, width: 1.5),
-                  ),
-                  Flexible(
-                    child: Text(
-                      'Doble derrota (se acabó el tiempo)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _doubleLoss ? AppColors.loss : AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 6),
+            ],
+          ],
+          const SizedBox(height: 8),
           Text(
             status.$1,
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.w700, color: status.$2),
           ),
-          if (!valid && !_doubleLoss && m.result.isReported)
-            Text('Guardado: ${_savedLabel()}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          if (widget.editable && m.result.isReported)
+          if (widget.editable && reported)
             TextButton.icon(
-              onPressed: _clear,
+              onPressed: enabled ? _clear : null,
               icon: const Icon(Icons.undo, size: 18, color: AppColors.loss),
               label: const Text('Borrar resultado',
                   style: TextStyle(color: AppColors.loss, fontSize: 13)),
@@ -314,81 +286,65 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
       ),
     );
   }
-
-  (String, Color) _statusFor(GameScore s, bool valid, bool untouched, String p1, String p2) {
-    if (valid) {
-      return switch (s.result) {
-        MatchResult.p1Win => ('Gana $p1 · $s', AppColors.neon),
-        MatchResult.p2Win => ('Gana $p2 · $s', AppColors.neon),
-        _ => ('Empate · $s', AppColors.draw),
-      };
-    }
-    if (untouched) {
-      return widget.editable
-          ? ('Pendiente', AppColors.textSecondary)
-          : ('Sin resultado', AppColors.textDisabled);
-    }
-    if (_isTopCut && s == const GameScore(1, 1, 1)) {
-      return ('En el Top Cut no hay empates', AppColors.loss);
-    }
-    return ('Marcador incompleto o no válido ($s)', AppColors.loss);
-  }
 }
 
-/// Radio redondo con número, con los colores del tema.
-class _ScoreRadio extends StatelessWidget {
-  const _ScoreRadio({
-    required this.value,
+/// Botón de resultado (mínimo 48 dp de alto para tocarlo sin fallar).
+class _ResultButton extends StatelessWidget {
+  const _ResultButton({
+    required this.label,
     required this.selected,
-    required this.enabled,
     required this.onTap,
+    this.danger = false,
   });
 
-  final int value;
+  final String label;
   final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
+  final bool danger;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = !enabled && !selected
-        ? AppColors.textDisabled
-        : selected
-            ? AppColors.neon
-            : AppColors.textPrimary;
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      customBorder: const StadiumBorder(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: color, width: 2),
-                boxShadow: selected ? AppColors.glow(strength: 0.5) : null,
-              ),
-              alignment: Alignment.center,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                width: selected ? 13 : 0,
-                height: selected ? 13 : 0,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.neon,
+    final accent = danger ? AppColors.loss : AppColors.neon;
+    final enabled = onTap != null;
+    return Material(
+      color: selected ? accent.withValues(alpha: 0.18) : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: selected
+              ? accent
+              : enabled
+                  ? AppColors.outline
+                  : AppColors.textDisabled.withValues(alpha: 0.4),
+          width: selected ? 2 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: selected
+                        ? accent
+                        : enabled
+                            ? AppColors.textPrimary
+                            : AppColors.textDisabled,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            Text('$value',
-                style: TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.w700, color: color)),
-          ],
+          ),
         ),
       ),
     );

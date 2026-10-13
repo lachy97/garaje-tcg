@@ -10,8 +10,9 @@ plugins {
 // Firma de release. Las claves NO van en el repositorio:
 // - En la PC: android/key.properties (ignorado por git).
 // - En GitHub Actions / Codemagic: se genera desde los secretos del repositorio.
-// Si no existe, se firma con la clave de debug (sirve para probar, pero esas
+// Si no existe, en la PC se firma con la clave de debug (solo para probar: esas
 // APK no se pueden actualizar encima de una firmada con la clave de release).
+// En el servidor de compilación (CI=true) la falta de clave detiene la build.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKey = keystorePropertiesFile.exists()
@@ -58,6 +59,14 @@ android {
         release {
             signingConfig = if (hasReleaseKey) {
                 signingConfigs.getByName("release")
+            } else if (System.getenv("CI") == "true") {
+                // En GitHub Actions / Codemagic NUNCA se firma con la clave de
+                // debug: cambiaría el ANDROID_ID y todas las licencias emitidas
+                // dejarían de valer. Mejor que la compilación falle.
+                throw GradleException(
+                    "Faltan los secretos de firma (KEYSTORE_BASE64, KEYSTORE_PASSWORD, " +
+                        "KEY_ALIAS, KEY_PASSWORD). No se compila la APK de release."
+                )
             } else {
                 signingConfigs.getByName("debug")
             }
