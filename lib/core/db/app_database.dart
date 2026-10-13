@@ -32,6 +32,7 @@ const kDatabaseName = 'garaje_tcg';
     SeasonResults,
     RankingSnapshots,
     DeckSnapshots,
+    Penalties,
   ],
   daos: [PlayersDao, DecksDao, SeasonsDao, TournamentsDao, RankingDao],
 )
@@ -60,7 +61,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -86,11 +87,27 @@ class AppDatabase extends _$AppDatabase {
             // v5: imagen de cada mazo
             await m.addColumn(decks, decks.imagePath);
           }
+          if (from < 6) {
+            // v6: inscripción tardía y penalizaciones
+            await m.addColumn(tournamentPlayers, tournamentPlayers.lateRounds);
+            await m.createTable(penalties);
+            // createTable no crea los índices de @TableIndex (createAll sí).
+            await customStatement('CREATE INDEX IF NOT EXISTS idx_penalty_tournament '
+                'ON penalties (tournament_id)');
+            await customStatement('CREATE INDEX IF NOT EXISTS idx_penalty_player '
+                'ON penalties (player_id)');
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
           await seedDefaultPointsScales();
           await decksDao.seedCatalog();
+          // Fotos propias de mazos: rutas absolutas antiguas → relativas (AppPaths).
+          await customStatement(
+            "UPDATE decks SET image_path = 'docs:' || "
+            "substr(image_path, instr(image_path, '/deck_images/') + 1) "
+            "WHERE image_path LIKE '%/deck_images/%' AND image_path NOT LIKE 'docs:%'",
+          );
         },
       );
 

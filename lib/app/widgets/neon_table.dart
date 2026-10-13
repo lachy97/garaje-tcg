@@ -20,7 +20,11 @@ class NeonTableRow {
     this.dim = false,
     this.footer,
     this.accent,
+    this.onTap,
   });
+
+  /// Al tocar la fila (p. ej. abrir la ficha). null = no se puede tocar.
+  final VoidCallback? onTap;
 
   /// Color propio de la fila (p. ej. puestos del ranking): fondo suave de ese
   /// color y una franja a la izquierda. Tiene prioridad sobre [highlight].
@@ -81,6 +85,9 @@ class NeonTable extends StatelessWidget {
     });
   }
 
+  static Widget _tappable(VoidCallback? onTap, Widget child) =>
+      onTap == null ? child : InkWell(onTap: onTap, child: child);
+
   Widget _table(double width) {
     final extra = (width - _minWidth).clamp(0.0, double.infinity);
     final flexCount = columns.where((c) => c.flex).length;
@@ -120,7 +127,7 @@ class NeonTable extends StatelessWidget {
             ]),
           ),
           for (final r in rows) ...[
-            Container(
+            _tappable(r.onTap, Container(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: rowPadding),
               decoration: BoxDecoration(
                 color: r.accent != null
@@ -151,7 +158,7 @@ class NeonTable extends StatelessWidget {
                     ),
                 ]),
               ),
-            ),
+            )),
             if (r.footer != null) r.footer!,
           ],
         ],

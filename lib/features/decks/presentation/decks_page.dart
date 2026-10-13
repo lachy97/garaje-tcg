@@ -11,6 +11,7 @@ import '../../ranking/presentation/season_picker.dart';
 import '../domain/deck_stats.dart';
 import 'deck_picker.dart' show sortDecks;
 import '../domain/tier_style.dart';
+import 'deck_matrix.dart';
 import 'deck_tier_table.dart';
 import 'tier_board.dart';
 
@@ -38,6 +39,12 @@ class DecksPage extends ConsumerStatefulWidget {
 class _DecksPageState extends ConsumerState<DecksPage> {
   String? _seasonId;
   bool _exporting = false;
+
+  /// false = tier list y tabla · true = matriz de enfrentamientos.
+  bool _matrix = false;
+
+  void _openDeck(Season season, DeckSeasonStats d) =>
+      context.push('/mazos/ficha/${d.deckId}?t=${season.id}');
 
   Future<void> _export(Season season, List<DeckSeasonStats> decks) async {
     setState(() => _exporting = true);
@@ -105,6 +112,26 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     ),
                   )
                 else ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(value: false, label: Text('Tier list')),
+                        ButtonSegment(value: true, label: Text('Enfrentamientos')),
+                      ],
+                      selected: {_matrix},
+                      onSelectionChanged: (v) => setState(() => _matrix = v.first),
+                    ),
+                  ),
+                  if (_matrix) ...[
+                    const SectionLabel('Matriz de enfrentamientos'),
+                    DeckMatrixView(
+                      seasonId: season.id,
+                      decks: decks,
+                      onTapDeck: (d) => _openDeck(season, d),
+                    ),
+                  ] else ...[
                   const SectionLabel('Tier list'),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -118,7 +145,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     ),
                   ),
                   const SectionLabel('Tabla de mazos'),
-                  DeckTierTable(decks: decks),
+                  DeckTierTable(decks: decks, onTapDeck: (d) => _openDeck(season, d)),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Text(
@@ -127,7 +154,8 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                       'Tier según el Power del mejor mazo: S ≥ 70 % · A ≥ 40 % · B ≥ 15 % · C el resto · '
                       'Rogue/Local = sin Top.\n'
                       'Desempates: Conversión → Presencia. '
-                      'Solo cuentan torneos terminados. Desliza la tabla para ver todas las columnas.',
+                      'Solo cuentan torneos terminados. Desliza la tabla para ver todas las columnas; '
+                      'toca un mazo para ver su ficha.',
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ),
@@ -153,6 +181,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ),
+                  ],
                 ],
               ],
             ),

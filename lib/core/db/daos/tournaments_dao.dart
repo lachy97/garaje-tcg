@@ -152,9 +152,10 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     final now = DateTime.now();
     return transaction(() async {
       await ensureEditable(id);
-      await (delete(attachedDatabase.seasonResults)
+      // Borrado lógico también de sus puntos (listo para sincronizar).
+      await (update(attachedDatabase.seasonResults)
             ..where((r) => r.tournamentId.equals(id)))
-          .go();
+          .write(SeasonResultsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
       await (update(tournaments)..where((t) => t.id.equals(id))).write(
         TournamentsCompanion(deletedAt: Value(now), updatedAt: Value(now)),
       );
@@ -199,6 +200,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     String tournamentId,
     String playerId, {
     String? deckName,
+    int lateRounds = 0,
   }) {
     return transaction(() async {
       await ensureEditable(tournamentId);
@@ -211,10 +213,12 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
           tournamentId: tournamentId,
           playerId: playerId,
           deckId: Value(deckId),
+          lateRounds: Value(lateRounds),
         ),
         onConflict: DoUpdate(
           (old) => TournamentPlayersCompanion(
             deckId: Value(deckId),
+            lateRounds: Value(lateRounds),
             dropped: const Value(false),
             dropRound: const Value(null),
             deletedAt: const Value(null),
@@ -443,6 +447,20 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
           RoundsCompanion(status: const Value(RoundStatus.open), updatedAt: Value(now)),
         );
       }
+      // Inscritos tarde: no pueden haberse perdido más rondas de las que quedan.
+      final remaining = previous?.number ?? 0;
+      // customUpdate (no customStatement) para que las pantallas se refresquen.
+      await customUpdate(
+        'UPDATE tournament_players SET late_rounds = ? '
+        'WHERE tournament_id = ? AND late_rounds > ?',
+        variables: [
+          Variable.withInt(remaining),
+          Variable.withString(tournamentId),
+          Variable.withInt(remaining),
+        ],
+        updates: {tournamentPlayers},
+        updateKind: UpdateKind.update,
+      );
       if (leavingTopCut) {
         await (update(tournamentPlayers)
               ..where((tp) => tp.tournamentId.equals(tournamentId)))
@@ -461,6 +479,78 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
         ),
       );
     });
+  }
+
+  /// Intercambia dos jugadores de la ronda actual (emparejamiento manual).
+  /// [slotA]/[slotB]: 1 = jugador 1, 2 = jugador 2 de cada match. El mazo
+  /// viaja con el jugador. Si uno de los dos matches es un BYE, el que entra
+  /// recibe el BYE y el otro match queda pendiente.
+  Future<void> swapPlayers({
+    required Match a,
+    required int slotA,
+    required Match b,
+    required int slotB,
+  }) {
+    return transaction(() async {
+      await ensureEditable(a.tournamentId);
+      final now = DateTime.now();
+      final pa = slotA == 1 ? a.player1Id : a.player2Id!;
+      final da = slotA == 1 ? a.deck1Id : a.deck2Id;
+      final pb = slotB == 1 ? b.player1Id : b.player2Id!;
+      final deckB = slotB == 1 ? b.deck1Id : b.deck2Id;
+      MatchesCompanion put(int slot, String player, String? deck) => slot == 1
+          ? MatchesCompanion(player1Id: Value(player), deck1Id: Value(deck), updatedAt: Value(now))
+          : MatchesCompanion(player2Id: Value(player), deck2Id: Value(deck), updatedAt: Value(now));
+      await (update(matches)..where((m) => m.id.equals(a.id))).write(put(slotA, pb, deckB));
+      await (update(matches)..where((m) => m.id.equals(b.id))).write(put(slotB, pa, da));
+    });
+  }
+
+  // ───────────────────────── Penalizaciones ─────────────────────────
+
+  Future<void> addPenalty({
+    required String tournamentId,
+    required String playerId,
+    required int round,
+    required PenaltyKind kind,
+    String? reason,
+  }) async {
+    await ensureEditable(tournamentId);
+    final r = reason?.trim();
+    await into(attachedDatabase.penalties).insert(PenaltiesCompanion.insert(
+      tournamentId: tournamentId,
+      playerId: playerId,
+      round: Value(round),
+      kind: kind,
+      reason: Value(r == null || r.isEmpty ? null : r),
+    ));
+  }
+
+  Future<void> deletePenalty(Penalty p) async {
+    await ensureEditable(p.tournamentId);
+    final now = DateTime.now();
+    await (update(attachedDatabase.penalties)..where((x) => x.id.equals(p.id)))
+        .write(PenaltiesCompanion(deletedAt: Value(now), updatedAt: Value(now)));
+  }
+
+  Stream<List<Penalty>> watchPenalties(String tournamentId) {
+    final t = attachedDatabase.penalties;
+    return (select(t)
+          ..where((x) => x.tournamentId.equals(tournamentId) & x.deletedAt.isNull())
+          ..orderBy([(x) => OrderingTerm.asc(x.round), (x) => OrderingTerm.asc(x.createdAt)]))
+        .watch();
+  }
+
+  /// Penalizaciones de un jugador en todos los torneos (para su ficha).
+  Stream<List<(Penalty, Tournament)>> watchPlayerPenalties(String playerId) {
+    final p = attachedDatabase.penalties;
+    return (select(p).join([innerJoin(tournaments, tournaments.id.equalsExp(p.tournamentId))])
+          ..where(p.playerId.equals(playerId) &
+              p.deletedAt.isNull() &
+              tournaments.deletedAt.isNull())
+          ..orderBy([OrderingTerm.desc(tournaments.date)]))
+        .watch()
+        .map((rows) => [for (final r in rows) (r.readTable(p), r.readTable(tournaments))]);
   }
 
   // ───────────────────────── Cierre ─────────────────────────

@@ -9,6 +9,7 @@ import '../tournament_rules.dart';
 /// - Doble derrota: los dos suman una derrota (0 puntos) y cuentan como rivales.
 /// - El BYE NO cuenta como rival para OMW% (no hay rival).
 /// - MWP con piso de 33 %. Los matches pendientes se ignoran.
+/// - Inscripción tardía: cada ronda perdida suma una derrota 0-2 sin rival.
 class StandingsCalculator {
   const StandingsCalculator._();
 
@@ -19,6 +20,11 @@ class StandingsCalculator {
     required Iterable<MatchRecord> matches,
   }) {
     final stats = {for (final p in players) p.id: _Acc(p)};
+    // Inscripción tardía: cada ronda perdida es una derrota 0-2 sin rival.
+    for (final s in stats.values) {
+      s.losses += s.player.lateLosses;
+      s.gamesPlayed += 2 * s.player.lateLosses;
+    }
 
     for (final m in matches) {
       if (!m.result.isReported) continue;

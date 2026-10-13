@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/utils/app_paths.dart';
 
 /// Las imágenes de mazo son cuadradas y se muestran en círculo.
 const kDeckImageAspect = 1.0;
@@ -11,7 +12,9 @@ const kDeckImageAspect = 1.0;
 ImageProvider? deckImageProvider(String? path) {
   if (path == null || path.isEmpty) return null;
   if (path.startsWith('assets/')) return AssetImage(path);
-  final f = File(path);
+  final real = AppPaths.resolve(path);
+  if (real == null) return null;
+  final f = File(real);
   return f.existsSync() ? FileImage(f) : null;
 }
 

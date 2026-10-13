@@ -5,10 +5,14 @@ import '../../../core/db/enums.dart';
 
 /// Jugador inscrito, visto por el motor Swiss.
 class SwissPlayer {
-  const SwissPlayer(this.id, {this.dropped = false, this.dropRound});
+  const SwissPlayer(this.id, {this.dropped = false, this.dropRound, this.lateLosses = 0});
 
   final String id;
   final bool dropped;
+
+  /// Inscripción tardía: rondas que se perdió. Cada una cuenta como derrota
+  /// 0-2 sin rival (no afecta al OMW% de nadie).
+  final int lateLosses;
 
   /// Última ronda que jugó antes de retirarse (no se empareja en dropRound + 1).
   final int? dropRound;

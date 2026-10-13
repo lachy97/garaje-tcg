@@ -24,3 +24,19 @@ enum MatchResult {
 
   bool get isReported => this != MatchResult.pending;
 }
+
+/// Penalización registrada a un jugador en un torneo (solo registro: el
+/// resultado de la mesa, si hace falta, lo cambia el organizador a mano).
+enum PenaltyKind {
+  warning,
+  gameLoss,
+  matchLoss,
+  disqualification;
+
+  String get label => switch (this) {
+        PenaltyKind.warning => 'Aviso',
+        PenaltyKind.gameLoss => 'Game loss',
+        PenaltyKind.matchLoss => 'Match loss',
+        PenaltyKind.disqualification => 'Descalificación',
+      };
+}

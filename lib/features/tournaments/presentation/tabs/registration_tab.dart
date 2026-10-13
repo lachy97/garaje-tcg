@@ -10,16 +10,24 @@ import '../../../../core/db/database_provider.dart';
 import '../../../decks/presentation/deck_image.dart';
 import '../../../decks/presentation/deck_picker.dart';
 import '../../../players/presentation/players_page.dart';
+import '../../application/tournament_service.dart';
 import '../providers.dart';
+import 'penalties.dart';
 
-/// Inscripción: jugadores + mazo. Abierta solo antes de la ronda 1;
-/// después permite retirar (drop) jugadores.
+/// Inscripción: jugadores + mazo. Antes de la ronda 1 se inscribe normal;
+/// durante el Swiss se puede inscribir tarde (las rondas perdidas cuentan como
+/// derrotas) y retirar (drop) jugadores. Penalizaciones: menú de cada jugador.
 class RegistrationTab extends ConsumerWidget {
   const RegistrationTab({super.key, required this.tournament});
 
   final Tournament tournament;
 
   bool get _open => tournament.status == TournamentStatus.draft;
+
+  /// Inscripción tardía: durante el Swiss, si aún quedan rondas por generar.
+  bool get _lateOpen =>
+      tournament.status == TournamentStatus.swiss &&
+      tournament.currentRound < tournament.swissRounds;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -51,9 +59,19 @@ class RegistrationTab extends ConsumerWidget {
                       onPressed: () => _openRegisterSheet(context, list),
                       icon: const Icon(Icons.person_add_alt_1),
                       label: const Text('Inscribir'),
+                    )
+                  else if (_lateOpen)
+                    OutlinedButton.icon(
+                      onPressed: () => _openRegisterSheet(context, list, late: true),
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('Inscribir tarde'),
                     ),
                 ],
               ),
+            ),
+            PenaltiesSection(
+              tournament: tournament,
+              names: {for (final r in list) r.player.id: r.player.nickname},
             ),
             Expanded(
               child: list.isEmpty
@@ -75,13 +93,15 @@ class RegistrationTab extends ConsumerWidget {
     );
   }
 
-  void _openRegisterSheet(BuildContext context, List<RegisteredPlayer> current) {
+  void _openRegisterSheet(BuildContext context, List<RegisteredPlayer> current,
+      {bool late = false}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => _RegisterSheet(
-        tournamentId: tournament.id,
-        alreadyIn: current.map((r) => r.player.id).toSet(),
+        tournament: tournament,
+        late: late,
+        alreadyIn: current.where((r) => r.entry.deletedAt == null).map((r) => r.player.id).toSet(),
       ),
     );
   }
@@ -99,10 +119,14 @@ class _RegisteredTile extends ConsumerWidget {
     final draft = tournament.status == TournamentStatus.draft;
     final running = tournament.status == TournamentStatus.swiss;
     final dropped = item.entry.dropped;
+    final finished = tournament.status == TournamentStatus.finished;
+    // El mazo se elige en la inscripción, o después si aún no tiene (p. ej. tardíos).
+    final canPickDeck = draft || (!finished && item.deck == null);
+    final late = item.entry.lateRounds;
 
     return NeonCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      onTap: draft ? () => _pickDeck(context, ref) : null,
+      onTap: canPickDeck ? () => _pickDeck(context, ref) : null,
       child: Row(
         children: [
           if (item.deck != null)
@@ -132,13 +156,17 @@ class _RegisteredTile extends ConsumerWidget {
                 Text(
                   dropped
                       ? 'Retirado tras la ronda ${item.entry.dropRound ?? '-'}'
-                      : item.deck?.name ?? 'Sin mazo · toca para asignar',
+                      : item.deck?.name ??
+                          (canPickDeck ? 'Sin mazo · toca para asignar' : 'Sin mazo'),
                   style: TextStyle(
                     color: item.deck == null && !dropped
                         ? AppColors.draw
                         : AppColors.textSecondary,
                   ),
                 ),
+                if (late > 0)
+                  Text('Inscripción tardía · entró en la ronda ${late + 1}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -155,12 +183,15 @@ class _RegisteredTile extends ConsumerWidget {
                   confirm: 'Quitar',
                   danger: true,
                 );
-                if (ok) await dao.unregisterPlayer(tournament.id, item.player.id);
+                if (ok && context.mounted) {
+                  await runGuarded(
+                      context, () => dao.unregisterPlayer(tournament.id, item.player.id));
+                }
               },
             ),
           if (running && !dropped)
             TextButton(
-              onPressed: () async {
+              onPressed: () => runGuarded(context, () async {
                 final ok = await confirmDialog(
                   context,
                   title: 'Retirar jugador',
@@ -169,12 +200,17 @@ class _RegisteredTile extends ConsumerWidget {
                   confirm: 'Retirar',
                   danger: true,
                 );
-                if (ok) {
-                  await dao.dropPlayer(
-                      tournament.id, item.player.id, tournament.currentRound);
-                }
-              },
+                if (!ok) throw const ActionCancelled();
+                await dao.dropPlayer(tournament.id, item.player.id, tournament.currentRound);
+              }),
               child: const Text('Drop', style: TextStyle(color: AppColors.loss)),
+            ),
+          if (!draft)
+            IconButton(
+              tooltip: 'Penalización',
+              icon: const Icon(Icons.gavel, size: 20, color: AppColors.textSecondary),
+              onPressed: () => addPenaltyDialog(context, ref,
+                  tournament: tournament, player: item.player),
             ),
         ],
       ),
@@ -195,10 +231,13 @@ class _RegisteredTile extends ConsumerWidget {
 
 /// Hoja para inscribir varios jugadores de una vez (o crear uno nuevo).
 class _RegisterSheet extends ConsumerStatefulWidget {
-  const _RegisterSheet({required this.tournamentId, required this.alreadyIn});
+  const _RegisterSheet({required this.tournament, required this.alreadyIn, this.late = false});
 
-  final String tournamentId;
+  final Tournament tournament;
   final Set<String> alreadyIn;
+
+  /// Inscripción tardía (Swiss empezado).
+  final bool late;
 
   @override
   ConsumerState<_RegisterSheet> createState() => _RegisterSheetState();
@@ -210,13 +249,34 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
   bool _saving = false;
 
   Future<void> _confirm() async {
-    setState(() => _saving = true);
-    final dao = ref.read(tournamentsDaoProvider);
-    for (final id in _selected) {
-      await dao.registerPlayer(widget.tournamentId, id);
+    final t = widget.tournament;
+    if (widget.late) {
+      final missed = t.currentRound;
+      final ok = await confirmDialog(
+        context,
+        title: 'Inscripción tardía',
+        message: 'Entran en la ronda ${missed + 1}. Las $missed ronda(s) ya '
+            'generadas cuentan como derrota 0-2 sin rival (0 puntos).',
+        confirm: 'Inscribir',
+      );
+      if (!ok || !mounted) return;
     }
-    if (mounted) {
-      showMessage(context, '${_selected.length} jugador(es) inscrito(s)');
+    setState(() => _saving = true);
+    final ids = _selected.toList();
+    final ok = await runGuarded(context, () async {
+      if (widget.late) {
+        await ref.read(tournamentServiceProvider).registerLate(t.id, ids);
+      } else {
+        final dao = ref.read(tournamentsDaoProvider);
+        for (final id in ids) {
+          await dao.registerPlayer(t.id, id);
+        }
+      }
+    });
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (ok) {
+      showMessage(context, '${ids.length} jugador(es) inscrito(s)');
       Navigator.pop(context);
     }
   }
@@ -240,7 +300,7 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text('Inscribir jugadores',
+                    child: Text(widget.late ? 'Inscripción tardía' : 'Inscribir jugadores',
                         style: Theme.of(context).textTheme.titleLarge),
                   ),
                   TextButton.icon(

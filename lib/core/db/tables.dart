@@ -142,6 +142,10 @@ class TournamentPlayers extends Table with SyncColumns {
   /// Posición final del torneo (Top Cut primero, luego el resto por Swiss).
   IntColumn get finalPosition => integer().nullable()();
 
+  /// Inscripción tardía (v6): rondas Swiss que se perdió por entrar tarde.
+  /// Cada una cuenta como derrota 0-2 sin rival (0 puntos).
+  IntColumn get lateRounds => integer().withDefault(const Constant(0))();
+
   @override
   List<Set<Column<Object>>> get uniqueKeys => [
         {tournamentId, playerId},
@@ -205,6 +209,23 @@ class Matches extends Table with SyncColumns {
   IntColumn get games1 => integer().nullable()();
   IntColumn get gamesDraw => integer().nullable()();
   IntColumn get games2 => integer().nullable()();
+}
+
+/// Penalización de un jugador en un torneo (v6). Solo registro.
+@DataClassName('Penalty')
+@TableIndex(name: 'idx_penalty_tournament', columns: {#tournamentId})
+@TableIndex(name: 'idx_penalty_player', columns: {#playerId})
+class Penalties extends Table with SyncColumns {
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  TextColumn get tournamentId => text().references(Tournaments, #id)();
+  TextColumn get playerId => text().references(Players, #id)();
+
+  /// Ronda en la que se puso (0 = antes de empezar).
+  IntColumn get round => integer().withDefault(const Constant(0))();
+  TextColumn get kind => textEnum<PenaltyKind>()();
+  TextColumn get reason => text().nullable()();
 }
 
 // ───────────────────────────── Ranking ─────────────────────────────

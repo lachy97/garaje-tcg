@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/app_database.dart';
@@ -35,8 +36,12 @@ class TournamentService {
   }
 
   /// Se recalcula cada vez que cambia un match del torneo.
-  Stream<List<Standing>> watchStandings(String tournamentId) => _dao
-      .watchMatchesOfTournament(tournamentId)
+  /// También con las inscripciones (drops, inscripción tardía).
+  Stream<List<Standing>> watchStandings(String tournamentId) => _db
+      .customSelect('SELECT COUNT(*) AS c FROM matches WHERE tournament_id = ?',
+          variables: [Variable.withString(tournamentId)],
+          readsFrom: {_db.matches, _db.tournamentPlayers})
+      .watch()
       .asyncMap((_) => standings(tournamentId));
 
   /// La ronda actual está completa (todos los resultados reportados).
@@ -248,6 +253,81 @@ class TournamentService {
     return outcome;
   }
 
+  /// Emparejamiento manual: intercambia dos jugadores de la ronda Swiss
+  /// actual, en mesas aún sin resultado (el BYE se puede intercambiar).
+  /// Devuelve avisos (cruces repetidos, segundo BYE) para mostrarlos.
+  Future<List<String>> swapPlayers({
+    required String matchIdA,
+    required int slotA,
+    required String matchIdB,
+    required int slotB,
+    Map<String, String> names = const {},
+  }) async {
+    final a = await _dao.matchById(matchIdA);
+    final b = await _dao.matchById(matchIdB);
+    if (a == null || b == null) throw const TournamentException('Match no encontrado.');
+    final ctx = await _load(a.tournamentId);
+    await _dao.ensureEditable(a.tournamentId);
+    final current = ctx.currentRound;
+    if (ctx.tournament.status != TournamentStatus.swiss ||
+        current == null ||
+        current.phase != RoundPhase.swiss) {
+      throw const TournamentException('Solo se pueden cambiar cruces en una ronda Swiss en juego.');
+    }
+    if (a.roundId != current.id || b.roundId != current.id) {
+      throw const TournamentException('Solo se pueden cambiar cruces de la ronda actual.');
+    }
+    if (a.id == b.id) {
+      throw const TournamentException('Elige jugadores de mesas distintas.');
+    }
+    for (final (m, slot) in [(a, slotA), (b, slotB)]) {
+      if (!m.isBye && m.result.isReported) {
+        throw TournamentException(
+            'La mesa ${m.tableNumber ?? ''} ya tiene resultado: bórralo antes de cambiar el cruce.');
+      }
+      if (m.isBye && slot != 1) throw const TournamentException('El BYE no tiene rival.');
+    }
+
+    String playerAt(Match m, int slot) => slot == 1 ? m.player1Id : m.player2Id!;
+    final pa = playerAt(a, slotA), pb = playerAt(b, slotB);
+    // Cómo quedan las dos mesas.
+    String? other(Match m, int slot) => m.isBye ? null : (slot == 1 ? m.player2Id : m.player1Id);
+    final newA = (pb, other(a, slotA));
+    final newB = (pa, other(b, slotB));
+
+    final previous = ctx.swissRecords.where((r) => r.round < current.number);
+    bool played(String x, String y) => previous.any((r) =>
+        (r.player1Id == x && r.player2Id == y) || (r.player1Id == y && r.player2Id == x));
+    bool hadBye(String x) => previous.any((r) => r.isBye && r.player1Id == x);
+    String n(String id) => names[id] ?? '?';
+    final warnings = <String>[
+      for (final (p, q) in [newA, newB])
+        if (q == null && hadBye(p))
+          '${n(p)} ya tuvo BYE'
+        else if (q != null && played(p, q))
+          '${n(p)} y ${n(q)} ya jugaron',
+    ];
+    await _dao.swapPlayers(a: a, slotA: slotA, b: b, slotB: slotB);
+    return warnings;
+  }
+
+  /// Inscripción tardía con el Swiss empezado: cada ronda ya creada cuenta como
+  /// derrota 0-2 sin rival. Entran a emparejarse desde la siguiente ronda.
+  Future<void> registerLate(String tournamentId, Iterable<String> playerIds) async {
+    final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
+    if (ctx.tournament.status != TournamentStatus.swiss) {
+      throw const TournamentException('La inscripción tardía es solo durante el Swiss.');
+    }
+    final missed = ctx.tournament.currentRound;
+    if (missed >= ctx.tournament.swissRounds) {
+      throw const TournamentException('Ya no quedan rondas Swiss por jugar.');
+    }
+    for (final id in playerIds) {
+      await _dao.registerPlayer(tournamentId, id, lateRounds: missed);
+    }
+  }
+
   /// Deshace la ronda actual: borra sus cruces y resultados y vuelve a abrir
   /// la anterior. Si era la 1ª del Top Cut, el torneo vuelve al Swiss; si era
   /// la ronda 1, vuelve a la inscripción. No se puede en un torneo terminado.
@@ -414,7 +494,10 @@ class _Ctx {
 
   late final List<SwissPlayer> swissPlayers = [
     for (final r in registered)
-      SwissPlayer(r.player.id, dropped: r.entry.dropped, dropRound: r.entry.dropRound),
+      SwissPlayer(r.player.id,
+          dropped: r.entry.dropped,
+          dropRound: r.entry.dropRound,
+          lateLosses: r.entry.lateRounds),
   ];
 
   List<Round> get swissRounds =>

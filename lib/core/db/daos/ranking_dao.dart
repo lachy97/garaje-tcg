@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../../../features/decks/domain/deck_matchups.dart';
 import '../../../features/decks/domain/deck_stats.dart';
 import '../../../features/ranking/domain/points_scale.dart';
 import '../../../features/ranking/domain/ranking_row.dart';
@@ -177,7 +178,7 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
   /// Puntos obtenidos en un torneo (para la pantalla de resultado final).
   Stream<List<SeasonResult>> watchTournamentResults(String tournamentId) {
     return (select(seasonResults)
-          ..where((r) => r.tournamentId.equals(tournamentId))
+          ..where((r) => r.tournamentId.equals(tournamentId) & r.deletedAt.isNull())
           ..orderBy([(r) => OrderingTerm.asc(r.position)]))
         .watch();
   }
@@ -230,14 +231,7 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
       variables: [sid],
     ).get();
 
-    final matches = await customSelect(
-      'SELECT m.deck1_id AS d1, m.deck2_id AS d2, m.result AS r, rd.phase AS phase '
-      'FROM matches m '
-      'JOIN tournaments t ON t.id = m.tournament_id '
-      'JOIN rounds rd ON rd.id = m.round_id '
-      "WHERE $finished AND m.deleted_at IS NULL AND m.is_bye = 0 AND m.result != 'pending'",
-      variables: [sid],
-    ).get();
+    final matches = await seasonDeckMatches(seasonId);
 
     return DeckStats.compute(
       entries: [
@@ -251,16 +245,70 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
             imagePath: e.read<String?>('img'),
           ),
       ],
-      matches: [
-        for (final m in matches)
-          DeckMatchRow(
-            deck1Id: m.read<String?>('d1'),
-            deck2Id: m.read<String?>('d2'),
-            result: MatchResult.values.byName(m.read<String>('r')),
-            isTopCut: m.read<String>('phase') == RoundPhase.topCut.name,
-          ),
-      ],
+      matches: matches,
     );
+  }
+
+  /// Partidas (sin BYE, reportadas) de los torneos terminados de la temporada,
+  /// con el mazo de cada lado.
+  Future<List<DeckMatchRow>> seasonDeckMatches(String seasonId) async {
+    const finished = "t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished'";
+    final rows = await customSelect(
+      'SELECT m.deck1_id AS d1, m.deck2_id AS d2, m.result AS r, rd.phase AS phase '
+      'FROM matches m '
+      'JOIN tournaments t ON t.id = m.tournament_id '
+      'JOIN rounds rd ON rd.id = m.round_id '
+      "WHERE $finished AND m.deleted_at IS NULL AND m.is_bye = 0 AND m.result != 'pending'",
+      variables: [Variable.withString(seasonId)],
+    ).get();
+    return [
+      for (final m in rows)
+        DeckMatchRow(
+          deck1Id: m.read<String?>('d1'),
+          deck2Id: m.read<String?>('d2'),
+          result: MatchResult.values.byName(m.read<String>('r')),
+          isTopCut: m.read<String>('phase') == RoundPhase.topCut.name,
+        ),
+    ];
+  }
+
+  /// Matriz de enfrentamientos de la temporada (se recalcula con los torneos).
+  Stream<DeckMatchups> watchSeasonMatchups(String seasonId) {
+    final db = attachedDatabase;
+    return customSelect(
+      'SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?',
+      variables: [Variable.withString(seasonId)],
+      readsFrom: {db.tournaments, db.matches, db.decks},
+    ).watch().asyncMap((_) async => DeckMatchups.compute(await seasonDeckMatches(seasonId)));
+  }
+
+  /// Inscripciones con [deckId] en los torneos terminados de la temporada
+  /// (ficha del mazo), del torneo más reciente al más antiguo.
+  Stream<List<DeckTournamentEntry>> watchDeckEntries(String seasonId, String deckId) {
+    final db = attachedDatabase;
+    return customSelect(
+      'SELECT t.id AS tid, t.name AS tname, t.date AS tdate, t.top_cut_size AS top, '
+      'p.id AS pid, p.nickname AS nick, tp.final_position AS pos '
+      'FROM tournament_players tp '
+      'JOIN tournaments t ON t.id = tp.tournament_id '
+      'JOIN players p ON p.id = tp.player_id '
+      "WHERE t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished' "
+      'AND tp.deleted_at IS NULL AND tp.deck_id = ? '
+      'ORDER BY t.date DESC, tp.final_position ASC',
+      variables: [Variable.withString(seasonId), Variable.withString(deckId)],
+      readsFrom: {db.tournaments, db.tournamentPlayers, db.players},
+    ).watch().map((rows) => [
+          for (final r in rows)
+            DeckTournamentEntry(
+              tournamentId: r.read<String>('tid'),
+              tournamentName: r.read<String>('tname'),
+              date: r.read<DateTime>('tdate'),
+              playerId: r.read<String>('pid'),
+              playerName: r.read<String>('nick'),
+              topCutSize: r.read<int>('top'),
+              finalPosition: r.read<int?>('pos'),
+            ),
+        ]);
   }
 
   // ───────────────────────── Cierre de temporada ─────────────────────────
@@ -290,8 +338,13 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
       final ranking = await liveSeasonRanking(seasonId);
       final decks = await liveSeasonDecks(seasonId);
       final now = DateTime.now();
-      await (delete(db.rankingSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
-      await (delete(db.deckSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
+      // Borrado lógico de la foto anterior (listo para sincronizar).
+      await (update(db.rankingSnapshots)
+            ..where((r) => r.seasonId.equals(seasonId) & r.deletedAt.isNull()))
+          .write(RankingSnapshotsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
+      await (update(db.deckSnapshots)
+            ..where((r) => r.seasonId.equals(seasonId) & r.deletedAt.isNull()))
+          .write(DeckSnapshotsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
       await batch((b) {
         b.insertAll(db.rankingSnapshots, [
           for (final r in ranking)
@@ -351,8 +404,13 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
     final db = attachedDatabase;
     return transaction(() async {
       final now = DateTime.now();
-      await (delete(db.rankingSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
-      await (delete(db.deckSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
+      // Borrado lógico de la foto anterior (listo para sincronizar).
+      await (update(db.rankingSnapshots)
+            ..where((r) => r.seasonId.equals(seasonId) & r.deletedAt.isNull()))
+          .write(RankingSnapshotsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
+      await (update(db.deckSnapshots)
+            ..where((r) => r.seasonId.equals(seasonId) & r.deletedAt.isNull()))
+          .write(DeckSnapshotsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
       await (update(db.seasons)..where((s) => s.id.equals(seasonId))).write(
         SeasonsCompanion(
           status: const Value(SeasonStatus.active),

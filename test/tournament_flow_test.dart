@@ -196,4 +196,97 @@ void main() {
     expect((await db.rankingDao.seasonDecks(season)).single.name, 'Mazo Renombrado');
     await db.close();
   });
+
+  test('Inscripción tardía, cambiar cruces y penalizaciones', () async {
+    final db = await open();
+    if (db == null) return;
+    final s = TournamentService(db);
+    final t = await create(db, 4, swissRounds: 3);
+    await s.generateNextSwissRound(t.id);
+    await reportAll(db, s, t.id);
+
+    // Entra uno tarde: la ronda 1 cuenta como derrota.
+    final late = await db.playersDao.create(nickname: 'Tarde');
+    await s.registerLate(t.id, [late.id]);
+    var table = await s.standings(t.id);
+    final row = table.firstWhere((x) => x.playerId == late.id);
+    expect(row.losses, 1);
+    expect(row.points, 0);
+
+    // Ronda 2 con 5 jugadores: hay BYE y el tardío entra a jugar.
+    await s.generateNextSwissRound(t.id);
+    final rounds = await db.tournamentsDao.roundsOf(t.id);
+    final r2 = (await db.tournamentsDao.matchesOfTournament(t.id))
+        .where((m) => m.roundId == rounds.last.id)
+        .toList();
+    expect(r2.length, 3);
+    expect(r2.any((m) => m.player1Id == late.id || m.player2Id == late.id), isTrue);
+
+    // Intercambiar el jugador del BYE con uno de otra mesa.
+    final bye = r2.firstWhere((m) => m.isBye);
+    final other = r2.firstWhere((m) => !m.isBye);
+    final fromBye = bye.player1Id, fromOther = other.player2Id!;
+    await s.swapPlayers(matchIdA: bye.id, slotA: 1, matchIdB: other.id, slotB: 2);
+    final bye2 = (await db.tournamentsDao.matchById(bye.id))!;
+    final other2 = (await db.tournamentsDao.matchById(other.id))!;
+    expect(bye2.player1Id, fromOther);
+    expect(bye2.isBye, isTrue);
+    expect(other2.player2Id, fromBye);
+
+    // Con resultado ya no se puede.
+    await s.reportScore(other.id, const GameScore(2, 0, 0));
+    await expectLater(
+      s.swapPlayers(matchIdA: bye.id, slotA: 1, matchIdB: other.id, slotB: 1),
+      throwsA(isA<TournamentException>()),
+    );
+
+    // Penalización (solo registro) y borrado lógico.
+    await db.tournamentsDao.addPenalty(
+        tournamentId: t.id, playerId: late.id, round: 2, kind: PenaltyKind.warning, reason: ' Tarde ');
+    var pens = await db.tournamentsDao.watchPenalties(t.id).first;
+    expect(pens.single.reason, 'Tarde');
+    await db.tournamentsDao.deletePenalty(pens.single);
+    pens = await db.tournamentsDao.watchPenalties(t.id).first;
+    expect(pens, isEmpty);
+
+    // Deshacer hasta la ronda 1 recorta las rondas perdidas del tardío.
+    await s.undoLastRound(t.id);
+    final reg = (await db.tournamentsDao.registeredPlayers(t.id))
+        .firstWhere((r) => r.player.id == late.id);
+    expect(reg.entry.lateRounds, 1);
+    table = await s.standings(t.id);
+    expect(table.length, 5);
+    await db.close();
+  });
+
+  test('Al borrar un torneo sus puntos dejan de contar en el ranking', () async {
+    final db = await open();
+    if (db == null) return;
+    final s = TournamentService(db);
+    final keep = await create(db, 4, swissRounds: 1, topCut: 0);
+    await s.generateNextSwissRound(keep.id);
+    await reportAll(db, s, keep.id);
+    await s.startTopCut(keep.id); // termina
+    final gone = await db.tournamentsDao.createTournament(
+        name: 'Se borra', date: DateTime(2026, 10, 19), swissRounds: 1);
+    final regs = await db.tournamentsDao.registeredPlayers(keep.id);
+    for (final r in regs) {
+      await db.tournamentsDao.registerPlayer(gone.id, r.player.id);
+    }
+    await s.generateNextSwissRound(gone.id);
+    await reportAll(db, s, gone.id);
+    await s.startTopCut(gone.id);
+
+    final season = keep.seasonId;
+    final before = await db.rankingDao.seasonRanking(season);
+    expect(before.every((r) => r.tournaments == 2), isTrue);
+
+    await db.tournamentsDao.softDelete(gone.id);
+    final after = await db.rankingDao.seasonRanking(season);
+    expect(after.length, before.length);
+    expect(after.every((r) => r.tournaments == 1), isTrue);
+    expect(after.fold<int>(0, (a, r) => a + r.played), 2 * 2); // solo las partidas del que queda
+    expect(await db.rankingDao.watchTournamentResults(gone.id).first, isEmpty);
+    await db.close();
+  });
 }

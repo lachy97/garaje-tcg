@@ -12,6 +12,7 @@ import '../../domain/tournament_rules.dart';
 import '../providers.dart';
 import '../share_tournament.dart';
 import 'match_score_card.dart';
+import 'pairing_editor.dart';
 import 'round_timer.dart';
 
 /// Rondas: configuración (rondas Swiss / Top Cut), pairings, reporte de
@@ -340,6 +341,16 @@ class _MatchesSliver extends ConsumerWidget {
               label: const Text('Compartir ronda'),
             ),
           ),
+          if (isCurrent &&
+              round.phase == RoundPhase.swiss &&
+              tournament.status == TournamentStatus.swiss)
+            Center(
+              child: TextButton.icon(
+                onPressed: () => openPairingEditor(context, round: round, names: names),
+                icon: const Icon(Icons.swap_horiz, size: 20),
+                label: const Text('Cambiar cruces'),
+              ),
+            ),
           if (isCurrent) RoundTimer(round: round, minutes: roundMinutes),
           const SizedBox(height: 8),
           if (!isCurrent && editable)

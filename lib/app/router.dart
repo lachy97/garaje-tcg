@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/decks/presentation/deck_detail_page.dart';
 import '../features/decks/presentation/deck_manage_page.dart';
 import '../features/decks/presentation/decks_page.dart';
 import '../features/players/presentation/player_profile_page.dart';
@@ -66,6 +67,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                   path: 'gestionar',
                   parentNavigatorKey: _rootKey,
                   builder: (_, _) => const DeckManagePage(),
+                ),
+                GoRoute(
+                  path: 'ficha/:id',
+                  parentNavigatorKey: _rootKey,
+                  builder: (_, state) => DeckDetailPage(
+                    deckId: state.pathParameters['id']!,
+                    seasonId: state.uri.queryParameters['t'] ?? '',
+                  ),
                 ),
               ],
             ),

@@ -461,6 +461,10 @@ class BackupMerger {
           'player_id': player(sr['player_id']),
         });
       }
+      for (final pe in await _rows(
+          'SELECT * FROM imp.penalties WHERE tournament_id = ? AND deleted_at IS NULL', [impId])) {
+        await _insert('penalties', {...pe, 'player_id': player(pe['player_id'])});
+      }
     }
   }
 
@@ -472,7 +476,7 @@ class BackupMerger {
   }) async {
     for (final MapEntry(key: impSeason, value: season) in seasons.entries) {
       final hasRanking = await _rows(
-          'SELECT 1 FROM main.ranking_snapshots WHERE season_id = ? LIMIT 1', [season]);
+          'SELECT 1 FROM main.ranking_snapshots WHERE season_id = ? AND deleted_at IS NULL LIMIT 1', [season]);
       if (hasRanking.isEmpty) {
         for (final s in await _rows(
             'SELECT * FROM imp.ranking_snapshots WHERE season_id = ? AND deleted_at IS NULL',
@@ -483,7 +487,7 @@ class BackupMerger {
         }
       }
       final hasDecks = await _rows(
-          'SELECT 1 FROM main.deck_snapshots WHERE season_id = ? LIMIT 1', [season]);
+          'SELECT 1 FROM main.deck_snapshots WHERE season_id = ? AND deleted_at IS NULL LIMIT 1', [season]);
       if (hasDecks.isEmpty) {
         for (final s in await _rows(
             'SELECT * FROM imp.deck_snapshots WHERE season_id = ? AND deleted_at IS NULL',
@@ -498,7 +502,7 @@ class BackupMerger {
 
   /// Borra del teléfono un torneo con todo lo que cuelga de él.
   Future<void> _deleteTournament(String id) async {
-    for (final table in ['matches', 'rounds', 'tournament_players', 'season_results']) {
+    for (final table in ['penalties', 'matches', 'rounds', 'tournament_players', 'season_results']) {
       await _exec('DELETE FROM main.$table WHERE tournament_id = ?', [id]);
     }
     await _exec('DELETE FROM main.tournaments WHERE id = ?', [id]);

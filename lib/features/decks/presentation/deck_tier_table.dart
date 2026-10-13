@@ -59,9 +59,18 @@ class TierBadge extends ConsumerWidget {
 
 /// Tabla de mazos de la temporada (pantalla e imágenes exportadas).
 class DeckTierTable extends StatelessWidget {
-  const DeckTierTable({super.key, required this.decks, this.fixedWidth, this.forExport = false});
+  const DeckTierTable({
+    super.key,
+    required this.decks,
+    this.fixedWidth,
+    this.forExport = false,
+    this.onTapDeck,
+  });
 
   final List<DeckSeasonStats> decks;
+
+  /// Al tocar un mazo (abre su ficha). Solo en pantalla.
+  final void Function(DeckSeasonStats deck)? onTapDeck;
   final double? fixedWidth;
   final bool forExport;
 
@@ -120,6 +129,7 @@ class DeckTierTable extends StatelessWidget {
         for (final d in decks)
           NeonTableRow(
             highlight: d.tier == DeckTier.s,
+            onTap: onTapDeck == null ? null : () => onTapDeck!(d),
             cells: [
               Text('${d.rank}',
                   style: TextStyle(fontWeight: FontWeight.w900, color: secondary)),

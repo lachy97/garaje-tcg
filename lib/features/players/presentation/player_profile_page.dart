@@ -7,6 +7,7 @@ import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../app/widgets/neon_table.dart';
 import '../../../core/db/app_database.dart';
+import '../../../core/db/database_provider.dart';
 import '../data/player_profile_repository.dart';
 import '../domain/player_profile.dart';
 import 'players_page.dart' show showPlayerForm;
@@ -55,6 +56,7 @@ class PlayerProfilePage extends ConsumerWidget {
                   const _Empty('Todavía no ha jugado con ningún mazo.')
                 else
                   _DecksTable(decks: data.decks),
+                _PlayerPenalties(playerId: playerId),
                 const SectionLabel('Historial de partidas'),
                 if (data.tournaments.isEmpty)
                   const _Empty('Aún no ha participado en torneos.')
@@ -398,6 +400,45 @@ class _Empty extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Text(text, style: const TextStyle(color: AppColors.textSecondary)),
+    );
+  }
+}
+
+// ───────────────────────── Penalizaciones ─────────────────────────
+
+final _playerPenaltiesProvider =
+    StreamProvider.autoDispose.family<List<(Penalty, Tournament)>, String>((ref, id) {
+  return ref.watch(tournamentsDaoProvider).watchPlayerPenalties(id);
+});
+
+/// Penalizaciones del jugador en todos los torneos (solo si tiene alguna).
+class _PlayerPenalties extends ConsumerWidget {
+  const _PlayerPenalties({required this.playerId});
+
+  final String playerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final list = ref.watch(_playerPenaltiesProvider(playerId)).value ?? const [];
+    if (list.isEmpty) return const SizedBox.shrink();
+    final day = DateFormat('dd/MM/yyyy');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionLabel('Penalizaciones (${list.length})'),
+        for (final (p, t) in list)
+          ListTile(
+            dense: true,
+            leading: Icon(Icons.gavel,
+                color: p.kind == PenaltyKind.warning ? AppColors.draw : AppColors.loss),
+            title: Text('${p.kind.label} · ${t.name}'),
+            subtitle: Text([
+              day.format(t.date),
+              p.round == 0 ? 'antes de empezar' : 'ronda ${p.round}',
+              if (p.reason != null) p.reason!,
+            ].join(' · ')),
+          ),
+      ],
     );
   }
 }

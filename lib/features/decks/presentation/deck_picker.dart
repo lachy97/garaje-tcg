@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/utils/app_paths.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
@@ -184,9 +185,11 @@ Future<void> saveDeckPhoto(DecksDao dao, String deckId, XFile photo) async {
   final dot = photo.path.lastIndexOf('.');
   final ext = dot > 0 ? photo.path.substring(dot) : '.jpg';
   // Nombre nuevo cada vez: así la imagen se refresca aunque Flutter la tenga en caché.
-  final file = File('${dir.path}/${deckId}_${DateTime.now().millisecondsSinceEpoch}$ext');
+  final name = '${deckId}_${DateTime.now().millisecondsSinceEpoch}$ext';
+  final file = File('${dir.path}/$name');
   await file.writeAsBytes(await photo.readAsBytes(), flush: true);
-  await dao.setImage(deckId, file.path);
+  // Se guarda la ruta relativa (ver AppPaths).
+  await dao.setImage(deckId, AppPaths.relative('deck_images/$name'));
 }
 
 /// Diálogo para añadir un mazo que no está en el catálogo, con foto opcional.
