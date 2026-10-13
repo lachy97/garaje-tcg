@@ -9,10 +9,14 @@ import 'package:share_plus/share_plus.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
+import '../../core/db/app_database.dart';
+import '../../core/db/database_provider.dart';
 import '../../core/license/admin_vault.dart';
 import '../../core/license/license_codec.dart';
 import '../../core/license/license_service.dart';
 import '../../core/security/screen_protection.dart';
+import '../../core/utils/season_utils.dart';
+import '../ranking/presentation/season_picker.dart';
 import 'license_widgets.dart';
 
 /// Modo administrador: claves de licencias y generador de licencias.
@@ -351,6 +355,8 @@ class _AdminPageState extends ConsumerState<AdminPage> {
                   NeonCard(child: _generator()),
                   const SectionLabel('Seguridad'),
                   NeonCard(child: _screenProtectionTile()),
+                  const SectionLabel('Temporadas cerradas'),
+                  const NeonCard(child: _ClosedSeasons()),
                 ],
               ],
             ),
@@ -634,6 +640,48 @@ class _AdminPageState extends ConsumerState<AdminPage> {
             ],
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Temporadas cerradas, con opción de reabrirlas (sus torneos vuelven a ser
+/// editables y el ranking deja de ser la foto guardada).
+class _ClosedSeasons extends ConsumerWidget {
+  const _ClosedSeasons();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final seasons = ref.watch(seasonListProvider).value ?? const <Season>[];
+    final closed = seasons.where((s) => s.status == SeasonStatus.closed).toList();
+    if (closed.isEmpty) {
+      return const Text('No hay temporadas cerradas. Se cierran desde la pantalla de Ranking.',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary));
+    }
+    return Column(
+      children: [
+        for (final s in closed)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.lock_outline),
+            title: Text('Temporada ${seasonLabel(s.year, s.quarter)}'),
+            trailing: TextButton(
+              onPressed: () => runGuarded(context, () async {
+                final label = seasonLabel(s.year, s.quarter);
+                final ok = await confirmDialog(
+                  context,
+                  title: 'Reabrir temporada $label',
+                  message: 'Se borra el ranking definitivo guardado y sus torneos '
+                      'vuelven a poder editarse. Ciérrala otra vez cuando termines.',
+                  confirm: 'Reabrir',
+                  danger: true,
+                );
+                if (!ok) throw const ActionCancelled();
+                await ref.read(rankingDaoProvider).reopenSeason(s.id);
+              }, success: 'Temporada reabierta'),
+              child: const Text('Reabrir'),
+            ),
+          ),
       ],
     );
   }

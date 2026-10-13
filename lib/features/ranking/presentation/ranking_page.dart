@@ -5,6 +5,7 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
+import '../../../core/utils/season_utils.dart';
 import '../domain/ranking_row.dart';
 import 'ranking_export.dart';
 import 'ranking_table.dart';
@@ -77,6 +78,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                   selected: season,
                   onChanged: (v) => setState(() => _seasonId = v.id),
                 ),
+                _SeasonStatusBar(season: season, hasRanking: list.isNotEmpty),
                 if (list.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 48),
@@ -119,6 +121,63 @@ class _RankingPageState extends ConsumerState<RankingPage> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Estado de la temporada: cerrada (ranking definitivo) o botón para cerrarla.
+class _SeasonStatusBar extends ConsumerWidget {
+  const _SeasonStatusBar({required this.season, required this.hasRanking});
+
+  final Season season;
+  final bool hasRanking;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = seasonLabel(season.year, season.quarter);
+    if (season.status == SeasonStatus.closed) {
+      final when = season.closedAt == null
+          ? ''
+          : ' el ${season.closedAt!.day.toString().padLeft(2, '0')}/'
+              '${season.closedAt!.month.toString().padLeft(2, '0')}/${season.closedAt!.year}';
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text('Temporada cerrada$when · ranking definitivo',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!hasRanking) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Center(
+        child: TextButton.icon(
+          icon: const Icon(Icons.lock_outline, size: 18),
+          label: Text('Cerrar temporada $label'),
+          onPressed: () => runGuarded(context, () async {
+            final ok = await confirmDialog(
+              context,
+              title: 'Cerrar temporada $label',
+              message: 'Se guarda el ranking definitivo de la temporada y sus torneos '
+                  'quedan bloqueados: no se podrán editar, borrar ni crear torneos con '
+                  'fechas de este trimestre.\n\nSolo se puede reabrir desde el Modo '
+                  'administrador.',
+              confirm: 'Cerrar temporada',
+              danger: true,
+            );
+            if (!ok) throw const ActionCancelled();
+            await ref.read(rankingDaoProvider).closeSeason(season.id);
+          }, success: 'Temporada $label cerrada'),
+        ),
       ),
     );
   }

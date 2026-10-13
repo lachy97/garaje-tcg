@@ -128,13 +128,16 @@ class BackupService {
     return BackupPreview(header, sqlite);
   }
 
-  /// INTEGRA la copia en los datos del teléfono sin borrar nada: los torneos
-  /// con el mismo nombre se actualizan con los de la copia y los demás se
-  /// añaden (ver [BackupMerger]). Antes guarda una copia automática.
-  Future<MergeReport> merge(BackupPreview preview) async {
+  /// Qué pasaría con cada torneo de la copia (no cambia nada).
+  Future<MergePlan> planMerge(BackupPreview preview) => BackupMerger(_db).plan(preview.sqlite);
+
+  /// INTEGRA la copia en los datos del teléfono sin borrar nada más que lo
+  /// elegido en [decisions] (ver [BackupMerger]). Antes guarda una copia
+  /// automática.
+  Future<MergeReport> merge(BackupPreview preview, {Map<String, MergeAction>? decisions}) async {
     final current = await createBackup();
     await _saveAuto(current);
-    return BackupMerger(_db).merge(preview.sqlite);
+    return BackupMerger(_db).merge(preview.sqlite, decisions: decisions);
   }
 
   /// Reemplaza TODOS los datos por los de la copia (se usa para "Deshacer una

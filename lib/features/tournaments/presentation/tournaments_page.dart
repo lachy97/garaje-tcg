@@ -124,7 +124,7 @@ class _TournamentTile extends ConsumerWidget {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-            onSelected: (_) async {
+            onSelected: (_) => runGuarded(context, () async {
               final ok = await confirmDialog(
                 context,
                 title: 'Eliminar torneo',
@@ -133,7 +133,7 @@ class _TournamentTile extends ConsumerWidget {
                 danger: true,
               );
               if (ok) await ref.read(tournamentsDaoProvider).softDelete(t.id);
-            },
+            }),
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'delete', child: Text('Eliminar')),
             ],

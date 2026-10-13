@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../../../features/decks/domain/deck_stats.dart';
@@ -75,13 +77,30 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
   ///
   /// Solo cuentan los torneos **terminados** de la temporada (los mismos que dan
   /// puntos). Se recalcula cada vez que cambian los resultados de la temporada.
+  ///
+  /// Si la temporada está CERRADA se devuelve la foto guardada al cerrarla.
   Stream<List<RankingRow>> watchSeasonRanking(String seasonId) {
-    return (select(seasonResults)..where((r) => r.seasonId.equals(seasonId)))
-        .watch()
-        .asyncMap((_) => seasonRanking(seasonId));
+    final db = attachedDatabase;
+    return customSelect(
+      'SELECT COUNT(*) AS c FROM season_results WHERE season_id = ?',
+      variables: [Variable.withString(seasonId)],
+      readsFrom: {seasonResults, db.seasons, db.rankingSnapshots, db.players, db.tournaments},
+    ).watch().asyncMap((_) => seasonRanking(seasonId));
   }
 
   Future<List<RankingRow>> seasonRanking(String seasonId) async {
+    final season = await (attachedDatabase.select(attachedDatabase.seasons)
+          ..where((s) => s.id.equals(seasonId)))
+        .getSingleOrNull();
+    if (season != null && season.status == SeasonStatus.closed) {
+      final frozen = await _snapshotRanking(seasonId);
+      if (frozen != null) return frozen;
+    }
+    return liveSeasonRanking(seasonId);
+  }
+
+  /// Ranking calculado con los torneos actuales (sin mirar la foto).
+  Future<List<RankingRow>> liveSeasonRanking(String seasonId) async {
     final sid = Variable.withString(seasonId);
     const finished = "t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished'";
 
@@ -221,5 +240,133 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
           ),
       ],
     );
+  }
+
+  // ───────────────────────── Cierre de temporada ─────────────────────────
+
+  /// Torneos sin terminar de la temporada (impiden cerrarla).
+  Future<List<Tournament>> unfinishedTournaments(String seasonId) {
+    final t = attachedDatabase.tournaments;
+    return (attachedDatabase.select(t)
+          ..where((x) =>
+              x.seasonId.equals(seasonId) &
+              x.deletedAt.isNull() &
+              x.status.equalsValue(TournamentStatus.finished).not()))
+        .get();
+  }
+
+  /// Cierra la temporada: guarda la foto del ranking de jugadores y de la
+  /// tabla de mazos y marca la temporada como cerrada. A partir de ahí sus
+  /// torneos no se pueden cambiar (ver TournamentsDao.ensureEditable).
+  Future<void> closeSeason(String seasonId) {
+    final db = attachedDatabase;
+    return transaction(() async {
+      final pending = await unfinishedTournaments(seasonId);
+      if (pending.isNotEmpty) {
+        throw StateError('Termina o borra antes estos torneos: '
+            '${pending.map((t) => t.name).join(', ')}.');
+      }
+      final ranking = await liveSeasonRanking(seasonId);
+      final decks = await seasonDecks(seasonId);
+      final now = DateTime.now();
+      await (delete(db.rankingSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
+      await (delete(db.deckSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
+      await batch((b) {
+        b.insertAll(db.rankingSnapshots, [
+          for (final r in ranking)
+            RankingSnapshotsCompanion.insert(
+              seasonId: seasonId,
+              playerId: r.playerId,
+              rank: r.rank,
+              points: r.points,
+              statsJson: jsonEncode({
+                'nickname': r.nickname,
+                'tournaments': r.tournaments,
+                'best': r.bestPosition,
+                'w': r.wins,
+                'l': r.losses,
+                'd': r.draws,
+                'deck': r.lastDeck,
+              }),
+            ),
+        ]);
+        b.insertAll(db.deckSnapshots, [
+          for (final d in decks)
+            DeckSnapshotsCompanion.insert(
+              seasonId: seasonId,
+              deckId: d.deckId,
+              rank: d.rank,
+              score: d.power.toDouble(),
+              statsJson: jsonEncode({
+                'name': d.name,
+                'tier': d.tier.name,
+                'power': d.power,
+                'presence': d.presence,
+                'conversion': d.conversion,
+                'entries': d.entries,
+                'pilots': d.pilots.length,
+                'topEntries': d.topEntries,
+                'titles': d.titles,
+                'best': d.bestPosition,
+                'swiss': [d.swissWins, d.swissLosses, d.swissDraws],
+                'top': [d.topWins, d.topLosses],
+              }),
+            ),
+        ]);
+      });
+      await (update(db.seasons)..where((s) => s.id.equals(seasonId))).write(
+        SeasonsCompanion(
+          status: const Value(SeasonStatus.closed),
+          closedAt: Value(now),
+          updatedAt: Value(now),
+        ),
+      );
+    });
+  }
+
+  /// Reabre una temporada cerrada (Modo administrador): borra la foto y sus
+  /// torneos vuelven a ser editables; el ranking vuelve a calcularse en vivo.
+  Future<void> reopenSeason(String seasonId) {
+    final db = attachedDatabase;
+    return transaction(() async {
+      final now = DateTime.now();
+      await (delete(db.rankingSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
+      await (delete(db.deckSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
+      await (update(db.seasons)..where((s) => s.id.equals(seasonId))).write(
+        SeasonsCompanion(
+          status: const Value(SeasonStatus.active),
+          closedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+      );
+    });
+  }
+
+  /// Ranking guardado al cerrar la temporada (null = no hay foto).
+  Future<List<RankingRow>?> _snapshotRanking(String seasonId) async {
+    final db = attachedDatabase;
+    final rows = await (select(db.rankingSnapshots)
+          ..where((r) => r.seasonId.equals(seasonId) & r.deletedAt.isNull())
+          ..orderBy([(r) => OrderingTerm.asc(r.rank)]))
+        .get();
+    if (rows.isEmpty) return null;
+    return [
+      for (final r in rows)
+        () {
+          final j = jsonDecode(r.statsJson) as Map<String, dynamic>;
+          return RankingRow(
+            playerId: r.playerId,
+            nickname: j['nickname'] as String? ?? '?',
+            points: r.points,
+            tournaments: j['tournaments'] as int? ?? 0,
+            bestPosition: j['best'] as int? ?? 0,
+            wins: j['w'] as int? ?? 0,
+            losses: j['l'] as int? ?? 0,
+            draws: j['d'] as int? ?? 0,
+            lastDeck: j['deck'] as String?,
+            rank: r.rank,
+          );
+        }(),
+    ];
   }
 }

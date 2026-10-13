@@ -296,6 +296,7 @@ class _MatchesSliver extends ConsumerWidget {
     final title = round.phase == RoundPhase.swiss
         ? 'Ronda ${round.number}'
         : roundLabel(round);
+    final editable = TournamentService.canEditResults(tournament, round, isCurrent: isCurrent);
     return matches.when(
       loading: () => const SliverToBoxAdapter(
           child: Padding(
@@ -341,6 +342,16 @@ class _MatchesSliver extends ConsumerWidget {
           ),
           if (isCurrent) RoundTimer(round: round, minutes: roundMinutes),
           const SizedBox(height: 8),
+          if (!isCurrent && editable)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 4, 24, 4),
+              child: Text(
+                'Ronda cerrada: puedes corregir resultados mientras dure el Swiss. '
+                'La clasificación se recalcula; los cruces ya hechos no cambian.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
           for (final m in list)
             MatchScoreCard(
               key: ValueKey(m.id),
@@ -348,11 +359,43 @@ class _MatchesSliver extends ConsumerWidget {
               phase: round.phase,
               names: names,
               deckNames: deckNames,
-              editable: isCurrent && !m.isBye,
+              editable: editable && !m.isBye,
+              canClear: isCurrent,
+            ),
+          if (isCurrent)
+            Center(
+              child: TextButton.icon(
+                onPressed: () => _undoRound(context, ref),
+                icon: const Icon(Icons.undo, size: 20, color: AppColors.loss),
+                label: Text('Deshacer ${title.toLowerCase()}',
+                    style: const TextStyle(color: AppColors.loss)),
+              ),
             ),
         ]);
       },
     );
+  }
+
+  Future<void> _undoRound(BuildContext context, WidgetRef ref) async {
+    final isFirstTop = round.phase == RoundPhase.topCut &&
+        tournament.status == TournamentStatus.topCut &&
+        round.bracketSize == tournament.topCutSize;
+    final back = round.number == 1
+        ? 'El torneo vuelve a la inscripción (se puede cambiar la configuración).'
+        : isFirstTop
+            ? 'El torneo vuelve al Swiss: la última ronda Swiss se reabre.'
+            : 'Se reabre la ronda anterior para corregirla.';
+    await runGuarded(context, () async {
+      final ok = await confirmDialog(
+        context,
+        title: 'Deshacer ${roundLabel(round).toLowerCase()}',
+        message: 'Se borran los cruces y todos los resultados de esta ronda.\n\n$back',
+        confirm: 'Deshacer',
+        danger: true,
+      );
+      if (!ok) throw const ActionCancelled();
+      await ref.read(tournamentServiceProvider).undoLastRound(tournament.id);
+    }, success: 'Ronda deshecha');
   }
 }
 

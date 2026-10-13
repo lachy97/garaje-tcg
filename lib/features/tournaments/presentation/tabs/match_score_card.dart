@@ -14,8 +14,8 @@ import '../../domain/game_score.dart';
 ///        [ID]   [Doble derrota]
 ///
 /// Los marcadores se leen desde el Jugador 1 (izquierda): "2-1" = gana J1 2-1,
-/// "1-2" = gana J2 2-1. Cada botón guarda el resultado al instante y aparece
-/// un aviso con "Deshacer" para volver al resultado anterior.
+/// "1-2" = gana J2 2-1. Cada botón guarda el resultado al instante (sin aviso);
+/// para corregir basta tocar otro botón o "Borrar resultado".
 class MatchScoreCard extends ConsumerStatefulWidget {
   const MatchScoreCard({
     super.key,
@@ -24,6 +24,7 @@ class MatchScoreCard extends ConsumerStatefulWidget {
     required this.names,
     required this.deckNames,
     required this.editable,
+    this.canClear = true,
   });
 
   final Match match;
@@ -31,6 +32,9 @@ class MatchScoreCard extends ConsumerStatefulWidget {
   final Map<String, String> names;
   final Map<String, String> deckNames;
   final bool editable;
+
+  /// "Borrar resultado" (dejar pendiente): solo en la ronda actual.
+  final bool canClear;
 
   @override
   ConsumerState<MatchScoreCard> createState() => _MatchScoreCardState();
@@ -88,15 +92,12 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
         _Pick.doubleLoss => 'Doble derrota (pierden los dos)',
       };
 
-  Future<void> _pick(_Pick pick, String p1, String p2) async {
+  Future<void> _pick(_Pick pick) async {
     if (_saving || pick == _saved) return;
-    // Resultado anterior, para "Deshacer".
     final matchId = m.id;
-    final prev = (result: m.result, g1: m.games1, gd: m.gamesDraw, g2: m.games2);
     final service = ref.read(tournamentServiceProvider);
-    final messenger = ScaffoldMessenger.of(context);
     setState(() => _saving = true);
-    final ok = await runGuarded(context, () async {
+    await runGuarded(context, () async {
       switch (pick) {
         case _Pick.doubleLoss:
           await service.reportDoubleLoss(matchId);
@@ -107,27 +108,6 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
       }
     });
     if (mounted) setState(() => _saving = false);
-    if (!ok) return;
-    final table = m.tableNumber == null ? '' : 'Mesa ${m.tableNumber}: ';
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        duration: const Duration(seconds: 5),
-        content: Text('$table${_describe(pick, p1, p2)}'),
-        action: SnackBarAction(
-          label: 'Deshacer',
-          onPressed: () async {
-            try {
-              await service.restoreResult(matchId,
-                  result: prev.result, games1: prev.g1, gamesDraw: prev.gd, games2: prev.g2);
-            } on Exception catch (e) {
-              messenger.showSnackBar(SnackBar(
-                  content: Text('No se pudo deshacer: $e',
-                      style: const TextStyle(color: AppColors.loss))));
-            }
-          },
-        ),
-      ));
   }
 
   Future<void> _clear() async {
@@ -185,7 +165,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
           label: p.label,
           selected: saved == p,
           danger: p == _Pick.doubleLoss,
-          onTap: enabled ? () => _pick(p, p1, p2!) : null,
+          onTap: enabled ? () => _pick(p) : null,
         );
 
     return Container(
@@ -275,7 +255,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.w700, color: status.$2),
           ),
-          if (widget.editable && reported)
+          if (widget.editable && widget.canClear && reported)
             TextButton.icon(
               onPressed: enabled ? _clear : null,
               icon: const Icon(Icons.undo, size: 18, color: AppColors.loss),

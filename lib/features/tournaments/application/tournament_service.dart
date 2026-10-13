@@ -49,19 +49,37 @@ class TournamentService {
 
   // ───────────────────────── Resultados ─────────────────────────
 
+  /// true si los resultados de [round] se pueden poner o corregir:
+  /// - la ronda actual, mientras el torneo no haya terminado;
+  /// - una ronda Swiss anterior, mientras el torneo siga en el Swiss (la
+  ///   clasificación se recalcula; los cruces ya hechos no cambian).
+  static bool canEditResults(Tournament t, Round round, {required bool isCurrent}) {
+    if (t.status == TournamentStatus.finished) return false;
+    if (isCurrent) return true;
+    return round.phase == RoundPhase.swiss && t.status == TournamentStatus.swiss;
+  }
+
+  void _ensureResultEditable(_Ctx ctx, Round round) {
+    if (ctx.tournament.status == TournamentStatus.finished) {
+      throw const TournamentException('El torneo ya terminó: no se pueden cambiar resultados.');
+    }
+    if (!canEditResults(ctx.tournament, round, isCurrent: round.id == ctx.currentRound?.id)) {
+      throw const TournamentException(
+          'Esa ronda ya no se puede corregir: el Swiss terminó o es una ronda anterior del Top Cut.');
+    }
+  }
+
   /// Reporta un match al mejor de 3 (`J1 - Empates - J2`).
   /// Solo acepta los marcadores de [GameScore.allowed]; en Top Cut no hay 1-1-1.
-  /// Se puede corregir mientras la ronda siga siendo la actual.
+  /// Ver [canEditResults] para saber qué rondas se pueden corregir.
   Future<void> reportScore(String matchId, GameScore score) async {
     final m = await _dao.matchById(matchId);
     if (m == null) throw const TournamentException('Match no encontrado.');
     if (m.isBye) throw const TournamentException('El BYE no se reporta.');
     final ctx = await _load(m.tournamentId);
+    await _dao.ensureEditable(m.tournamentId);
     final round = ctx.roundById[m.roundId]!;
-    if (round.id != ctx.currentRound?.id) {
-      throw const TournamentException(
-          'Solo se pueden reportar o corregir resultados de la ronda actual.');
-    }
+    _ensureResultEditable(ctx, round);
     if (!score.isValid) {
       throw TournamentException(
           'Marcador $score no válido. Opciones: ${GameScore.allowed.join(', ')}.');
@@ -78,11 +96,9 @@ class TournamentService {
     if (m == null) throw const TournamentException('Match no encontrado.');
     if (m.isBye) throw const TournamentException('El BYE no se reporta.');
     final ctx = await _load(m.tournamentId);
+    await _dao.ensureEditable(m.tournamentId);
     final round = ctx.roundById[m.roundId]!;
-    if (round.id != ctx.currentRound?.id) {
-      throw const TournamentException(
-          'Solo se pueden reportar o corregir resultados de la ronda actual.');
-    }
+    _ensureResultEditable(ctx, round);
     if (round.phase == RoundPhase.topCut) {
       throw const TournamentException(
           'En el Top Cut no puede haber doble derrota: debe haber un ganador.');
@@ -96,11 +112,9 @@ class TournamentService {
     if (m == null) throw const TournamentException('Match no encontrado.');
     if (m.isBye) throw const TournamentException('El BYE no se reporta.');
     final ctx = await _load(m.tournamentId);
+    await _dao.ensureEditable(m.tournamentId);
     final round = ctx.roundById[m.roundId]!;
-    if (round.id != ctx.currentRound?.id) {
-      throw const TournamentException(
-          'Solo se pueden reportar o corregir resultados de la ronda actual.');
-    }
+    _ensureResultEditable(ctx, round);
     if (round.phase == RoundPhase.topCut) {
       throw const TournamentException(
           'En el Top Cut no puede haber empate intencional: debe haber un ganador.');
@@ -108,35 +122,23 @@ class TournamentService {
     await _dao.reportIntentionalDraw(matchId);
   }
 
-  /// Vuelve un match al resultado que tenía (para "Deshacer").
-  Future<void> restoreResult(
-    String matchId, {
-    required MatchResult result,
-    int? games1,
-    int? gamesDraw,
-    int? games2,
-  }) async {
-    switch (result) {
-      case MatchResult.pending:
-        await clearResult(matchId);
-      case MatchResult.doubleLoss:
-        await reportDoubleLoss(matchId);
-      case MatchResult.draw when (games1 ?? 0) + (gamesDraw ?? 0) + (games2 ?? 0) == 0:
-        await reportIntentionalDraw(matchId);
-      default:
-        await reportScore(matchId, GameScore(games1 ?? 0, gamesDraw ?? 0, games2 ?? 0));
-    }
-  }
-
+  /// Vuelve un match a pendiente. Solo en la ronda actual (una ronda cerrada
+  /// no puede quedar con resultados pendientes).
   Future<void> clearResult(String matchId) async {
     final m = await _dao.matchById(matchId);
     if (m == null || m.isBye) return;
     final ctx = await _load(m.tournamentId);
+    await _dao.ensureEditable(m.tournamentId);
+    if (ctx.tournament.status == TournamentStatus.finished) {
+      throw const TournamentException('El torneo ya terminó: no se pueden cambiar resultados.');
+    }
     if (m.roundId != ctx.currentRound?.id) {
-      throw const TournamentException('Solo se pueden corregir resultados de la ronda actual.');
+      throw const TournamentException(
+          'En una ronda cerrada se puede cambiar el resultado, pero no dejarlo pendiente.');
     }
     await _dao.clearResult(matchId);
   }
+
 
   // ───────────────────────── Configuración ─────────────────────────
 
@@ -144,6 +146,7 @@ class TournamentService {
   /// Solo durante la inscripción: al generar la ronda 1 la configuración queda fija.
   Future<void> setSwissRounds(String tournamentId, int rounds) async {
     final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
     _ensureNotStarted(ctx.tournament);
     if (rounds < TournamentRules.minSwissRounds || rounds > TournamentRules.maxSwissRounds) {
       throw const TournamentException('Las rondas deben estar entre '
@@ -155,6 +158,7 @@ class TournamentService {
   /// Cambia el tamaño del Top Cut (0 = sin Top). Solo durante la inscripción.
   Future<void> setTopCutSize(String tournamentId, int size) async {
     final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
     _ensureNotStarted(ctx.tournament);
     if (size != 0 && !TournamentRules.topCutSizes.contains(size)) {
       throw TournamentException('Top Cut no válido: $size');
@@ -165,6 +169,7 @@ class TournamentService {
   /// Cambia el tiempo por ronda. Solo durante la inscripción.
   Future<void> setRoundMinutes(String tournamentId, int minutes) async {
     final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
     _ensureNotStarted(ctx.tournament);
     if (minutes < TournamentRules.minRoundMinutes ||
         minutes > TournamentRules.maxRoundMinutes) {
@@ -192,6 +197,7 @@ class TournamentService {
 
   Future<PairingOutcome> generateNextSwissRound(String tournamentId) async {
     final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
     final t = ctx.tournament;
     if (t.status == TournamentStatus.topCut || t.status == TournamentStatus.finished) {
       throw const TournamentException('El Swiss ya terminó.');
@@ -242,12 +248,35 @@ class TournamentService {
     return outcome;
   }
 
+  /// Deshace la ronda actual: borra sus cruces y resultados y vuelve a abrir
+  /// la anterior. Si era la 1ª del Top Cut, el torneo vuelve al Swiss; si era
+  /// la ronda 1, vuelve a la inscripción. No se puede en un torneo terminado.
+  Future<void> undoLastRound(String tournamentId) async {
+    final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
+    final t = ctx.tournament;
+    if (t.status == TournamentStatus.finished) {
+      throw const TournamentException('El torneo ya terminó: no se puede deshacer.');
+    }
+    final current = ctx.currentRound;
+    if (current == null) throw const TournamentException('Aún no hay rondas.');
+    final previous = ctx.rounds.length > 1 ? ctx.rounds[ctx.rounds.length - 2] : null;
+    await _dao.undoRound(
+      tournamentId: tournamentId,
+      roundId: current.id,
+      previous: previous,
+      leavingTopCut:
+          current.phase == RoundPhase.topCut && previous?.phase != RoundPhase.topCut,
+    );
+  }
+
   // ───────────────────────── Top Cut ─────────────────────────
 
   /// Cierra el Swiss: guarda posiciones Swiss y crea la primera ronda del Top Cut.
   /// Si el torneo no tiene Top Cut, lo finaliza directamente.
   Future<void> startTopCut(String tournamentId) async {
     final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
     final t = ctx.tournament;
     if (t.status != TournamentStatus.swiss) {
       throw const TournamentException('El torneo no está en fase Swiss.');
@@ -292,6 +321,7 @@ class TournamentService {
   /// Devuelve true si el torneo quedó terminado.
   Future<bool> advanceTopCut(String tournamentId) async {
     final ctx = await _load(tournamentId);
+    await _dao.ensureEditable(tournamentId);
     final t = ctx.tournament;
     if (t.status != TournamentStatus.topCut) {
       throw const TournamentException('El torneo no está en Top Cut.');

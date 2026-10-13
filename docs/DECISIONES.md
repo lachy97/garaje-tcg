@@ -67,7 +67,7 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 
 ## Copias de seguridad
 - Exportar/importar toda la BD en un archivo `.gtcg` (importar = **integrar**, ver abajo): cabecera + SQLite (VACUUM INTO) comprimido + sello HMAC-SHA256 con clave interna. Solo se aceptan archivos exportados por la app (de cualquier teléfono); se detectan archivos dañados.
-- Importar reemplaza todos los datos, previa confirmación. Antes se guarda una copia automática (las 5 últimas) para poder deshacer. Una copia de una versión anterior de la BD se actualiza sola; una de una versión más nueva se rechaza.
+- Importar INTEGRA los datos (ver "Importar = integrar"). Antes se guarda una copia automática (las 5 últimas) para poder deshacer. Una copia de una versión anterior de la BD se actualiza sola; una de una versión más nueva se rechaza.
 - La licencia NO va en la copia (está fuera de la BD).
 
 ## Pendiente de confirmar
@@ -89,9 +89,20 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 
 ## Mejoras Fase 1 (análisis de octubre 2026)
 - **Top Cut con drops**: si al terminar el Swiss quedan menos jugadores activos que el Top elegido, el cuadro se reduce al mayor que se pueda llenar (Top 8 con 7 activos → Top 4; con 3 → final directa; con 1 → sin Top) y se guarda ese tamaño en el torneo. El botón de avanzar avisa antes. La línea de corte de la clasificación cuenta solo jugadores activos.
-- **Resultado de un toque**: botones 2-0 · 2-1 · Empate · 1-2 · 0-2 (leídos desde el jugador de la izquierda) y, en Swiss, ID y Doble derrota. Cada toque guarda al instante y muestra "Deshacer" (vuelve al resultado anterior, también a pendiente).
+- **Resultado de un toque**: botones 2-0 · 2-1 · Empate · 1-2 · 0-2 (leídos desde el jugador de la izquierda) y, en Swiss, ID y Doble derrota. Cada toque guarda al instante, sin aviso (se quitó el "Deshacer": el aviso tapaba la pantalla demasiado tiempo). Para corregir: tocar otro botón o "Borrar resultado".
 - **ID (empate intencional)**: se guarda como empate 0-0-0: 1 punto cada uno y no cuenta juegos (no altera el GW%). Solo en Swiss.
 - **Compartir**: "Compartir ronda" (pestaña Rondas) y "Compartir" (Clasificación), como texto para WhatsApp (ganador en negrita) o como imagen.
 - **Licencia**: no se puede activar con la fecha anterior a la emisión. Volver a pegar la misma licencia (o una más vieja) ya no quita el bloqueo de fecha atrasada; solo una licencia nueva y recién emitida lo quita. La última fecha vista nunca retrocede. Limitación: borrar los datos de la app borra también esa fecha (sin servidor no se puede evitar del todo).
 - **Firma**: en el servidor de compilación (CI=true) la compilación falla si faltan los secretos de firma, en vez de firmar con la clave de debug (cambiaría el código de todos los teléfonos y las licencias dejarían de valer). En la PC sigue el respaldo con la clave de debug.
 - **Copia de Android desactivada** (`allowBackup=false` y reglas de extracción): los datos y la licencia no viajan solos a la nube de Google ni a otro teléfono; las copias se hacen con `.gtcg`.
+
+## Mejoras Fase 2
+- **Corregir rondas cerradas**: mientras el torneo esté en el Swiss se pueden cambiar los resultados de rondas Swiss anteriores (la clasificación se recalcula; los cruces ya hechos no cambian). En una ronda cerrada no se puede dejar un resultado pendiente. Al iniciar el Top Cut el Swiss queda fijo. Con el torneo terminado no se cambia nada.
+- **Deshacer ronda** (botón al final de la ronda actual): borra cruces y resultados de la ronda actual y reabre la anterior. Desde la 1ª ronda del Top Cut vuelve al Swiss (se borran las posiciones Swiss guardadas); desde la ronda 1 vuelve a la inscripción. No se puede en un torneo terminado. Si el Top se había reducido por drops, queda el tamaño reducido.
+- **Importar con vista previa**: antes de integrar se muestra cada torneo de la copia y qué se hará (Añadir / Reemplazar / No importar), editable:
+  - Mismo torneo (mismo id) o mismo nombre y misma fecha → Reemplazar, salvo que el del teléfono tenga cambios más recientes (se mira la última modificación del torneo, sus rondas, partidas e inscripciones) → No importar, con aviso.
+  - Mismo nombre y otra fecha → Añadir como otro torneo (se puede elegir reemplazar).
+  - Borrado en este teléfono → No importar (se puede restaurar). Temporada cerrada en el teléfono → No se importa.
+  - Jugadores y mazos borrados en la copia también se traen (si tienen partidas), sin reactivar nada borrado o fusionado en el teléfono. Una temporada nueva entra activa.
+- **Cerrar temporada** (pantalla Ranking): exige que todos sus torneos estén terminados; guarda la foto del ranking de jugadores y de la tabla de mazos. El ranking de una temporada cerrada sale de la foto (no cambia aunque se renombre un jugador). Sus torneos quedan bloqueados (no se editan, borran ni se crean torneos en esas fechas). Se reabre desde **Modo administrador → Temporadas cerradas** (borra la foto). La tier list sigue calculándose con los torneos (no cambian al estar bloqueados).
+- **Pruebas** con SQLite real (`backup_merge_test`, `tournament_flow_test`); si el equipo no tiene SQLite nativo se omiten sin fallar.

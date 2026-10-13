@@ -60,7 +60,8 @@ class SeasonPicker extends StatelessWidget {
           for (final s in seasons)
             PopupMenuItem(
               value: s,
-              child: Text('Temporada ${seasonLabel(s.year, s.quarter)}'),
+              child: Text('Temporada ${seasonLabel(s.year, s.quarter)}'
+                  '${s.status == SeasonStatus.closed ? ' · cerrada' : ''}'),
             ),
         ],
         child: Padding(

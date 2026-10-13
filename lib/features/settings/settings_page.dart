@@ -13,6 +13,7 @@ import '../../core/backup/backup_codec.dart';
 import '../../core/backup/backup_service.dart';
 import '../../core/license/license_service.dart';
 import '../license/license_widgets.dart';
+import 'merge_preview_page.dart';
 
 final _packageInfoProvider = FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
 
@@ -133,22 +134,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
   }
 
-  /// Importar: integra la copia con los datos del teléfono.
+  /// Importar: muestra qué pasará con cada torneo de la copia y la integra
+  /// con los datos del teléfono según lo elegido.
   Future<void> _confirmAndMerge(BackupPreview preview) async {
-    final h = preview.header;
-    final ok = await confirmDialog(
-      context,
-      title: 'Importar base de datos',
-      message: 'Copia del ${DateFormat('dd/MM/yyyy HH:mm').format(h.exportedAt)}\n'
-          '${h.players} jugadores · ${h.tournaments} torneos · ${h.decks} mazos\n\n'
-          'Se INTEGRA con los datos de este teléfono: los torneos con el mismo '
-          'nombre se actualizan con los de la copia y los demás se añaden. No se '
-          'borra nada más. Antes se guarda una copia automática por si necesitas '
-          'volver atrás.',
-      confirm: 'Importar',
-    );
+    final service = ref.read(backupServiceProvider);
+    final plan = await service.planMerge(preview);
+    if (!mounted) return;
+    final ok = await showMergePreview(context, header: preview.header, plan: plan);
     if (!ok || !mounted) return;
-    final report = await ref.read(backupServiceProvider).merge(preview);
+    final report = await service.merge(preview, decisions: plan.decisions);
     if (mounted) showMessage(context, 'Datos importados: $report');
   }
 

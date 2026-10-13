@@ -27,6 +27,11 @@ final roundMatchesProvider =
   return ref.watch(tournamentsDaoProvider).watchMatchesOfRound(roundId);
 });
 
+/// true si el torneo es de una temporada cerrada (solo lectura).
+final tournamentLockedProvider = StreamProvider.autoDispose.family<bool, String>((ref, id) {
+  return ref.watch(tournamentsDaoProvider).watchIsLocked(id);
+});
+
 final tournamentResultsProvider =
     StreamProvider.autoDispose.family<List<SeasonResult>, String>((ref, id) {
   return ref.watch(rankingDaoProvider).watchTournamentResults(id);

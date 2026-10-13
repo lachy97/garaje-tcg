@@ -73,13 +73,14 @@ class TournamentDetailPage extends ConsumerWidget {
   }
 }
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   const _Header({required this.t});
 
   final Tournament t;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locked = ref.watch(tournamentLockedProvider(t.id)).value ?? false;
     final parts = [
       DateFormat.yMMMd('es').format(t.date),
       '${t.swissRounds} rondas',
@@ -100,6 +101,13 @@ class _Header extends StatelessWidget {
                 style: const TextStyle(
                     color: AppColors.neon, fontWeight: FontWeight.w700, fontSize: 12)),
           ),
+          if (locked) ...[
+            const SizedBox(width: 6),
+            const Tooltip(
+              message: 'Temporada cerrada: solo lectura',
+              child: Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
+            ),
+          ],
           const SizedBox(width: 10),
           Expanded(
             child: Text(parts.join(' · '),

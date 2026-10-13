@@ -61,6 +61,10 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     }
     return transaction(() async {
       final season = await attachedDatabase.seasonsDao.seasonFor(date, game: game);
+      if (season.status == SeasonStatus.closed) {
+        throw StateError('La temporada T${season.quarter} ${season.year} está cerrada: '
+            'no se pueden crear torneos en esa fecha.');
+      }
       return into(tournaments).insertReturning(TournamentsCompanion.insert(
         seasonId: season.id,
         game: Value(game),
@@ -87,6 +91,31 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
 
   Future<Tournament?> getById(String id) =>
       (select(tournaments)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// Lanza [StateError] si el torneo es de una temporada CERRADA: sus torneos
+  /// quedan de solo lectura (se reabre desde Modo administrador).
+  Future<void> ensureEditable(String tournamentId) async {
+    final row = await customSelect(
+      'SELECT s.status AS st, s.year AS y, s.quarter AS q FROM tournaments t '
+      'JOIN seasons s ON s.id = t.season_id WHERE t.id = ?',
+      variables: [Variable.withString(tournamentId)],
+      readsFrom: {tournaments, attachedDatabase.seasons},
+    ).getSingleOrNull();
+    if (row != null && row.read<String>('st') == SeasonStatus.closed.name) {
+      throw StateError('La temporada T${row.read<int>('q')} ${row.read<int>('y')} está cerrada: '
+          'sus torneos no se pueden cambiar. Se reabre desde Modo administrador.');
+    }
+  }
+
+  /// true si el torneo es de una temporada cerrada (solo lectura).
+  Stream<bool> watchIsLocked(String tournamentId) {
+    return customSelect(
+      'SELECT s.status AS st FROM tournaments t '
+      'JOIN seasons s ON s.id = t.season_id WHERE t.id = ?',
+      variables: [Variable.withString(tournamentId)],
+      readsFrom: {tournaments, attachedDatabase.seasons},
+    ).watchSingleOrNull().map((r) => r?.read<String>('st') == SeasonStatus.closed.name);
+  }
 
   Future<void> updateSettings(
     String id, {
@@ -122,6 +151,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
   Future<void> softDelete(String id) {
     final now = DateTime.now();
     return transaction(() async {
+      await ensureEditable(id);
       await (delete(attachedDatabase.seasonResults)
             ..where((r) => r.tournamentId.equals(id)))
           .go();
@@ -171,6 +201,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     String? deckName,
   }) {
     return transaction(() async {
+      await ensureEditable(tournamentId);
       final deckId = (deckName == null || deckName.trim().isEmpty)
           ? null
           : (await attachedDatabase.decksDao.findOrCreate(deckName)).id;
@@ -195,9 +226,10 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
-  Future<void> unregisterPlayer(String tournamentId, String playerId) {
+  Future<void> unregisterPlayer(String tournamentId, String playerId) async {
+    await ensureEditable(tournamentId);
     final now = DateTime.now();
-    return (update(tournamentPlayers)
+    await (update(tournamentPlayers)
           ..where((t) =>
               t.tournamentId.equals(tournamentId) & t.playerId.equals(playerId)))
         .write(TournamentPlayersCompanion(
@@ -207,6 +239,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
   Future<void> setPlayerDeck(
       String tournamentId, String playerId, String deckName) {
     return transaction(() async {
+      await ensureEditable(tournamentId);
       final deck = await attachedDatabase.decksDao.findOrCreate(deckName);
       await (update(tournamentPlayers)
             ..where((t) =>
@@ -218,8 +251,9 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Retira a un jugador a partir de la ronda [afterRound] (no se empareja más).
-  Future<void> dropPlayer(String tournamentId, String playerId, int afterRound) {
-    return (update(tournamentPlayers)
+  Future<void> dropPlayer(String tournamentId, String playerId, int afterRound) async {
+    await ensureEditable(tournamentId);
+    await (update(tournamentPlayers)
           ..where((t) =>
               t.tournamentId.equals(tournamentId) & t.playerId.equals(playerId)))
         .write(TournamentPlayersCompanion(
@@ -390,18 +424,42 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  /// Borra la última ronda (p. ej. pairings generados por error).
-  Future<void> deleteRound(String tournamentId, String roundId) {
+  /// Deshace la última ronda: borra sus matches y la ronda, y reabre
+  /// [previous] (null = no quedan rondas → vuelve a la inscripción).
+  /// [leavingTopCut] = se deshace la 1ª ronda del Top Cut: se borran las
+  /// posiciones Swiss guardadas al cerrarlo.
+  Future<void> undoRound({
+    required String tournamentId,
+    required String roundId,
+    required Round? previous,
+    required bool leavingTopCut,
+  }) {
     return transaction(() async {
+      final now = DateTime.now();
       await (delete(matches)..where((m) => m.roundId.equals(roundId))).go();
-      final round = await (select(rounds)..where((r) => r.id.equals(roundId)))
-          .getSingle();
       await (delete(rounds)..where((r) => r.id.equals(roundId))).go();
-      await (update(tournaments)..where((t) => t.id.equals(tournamentId)))
-          .write(TournamentsCompanion(
-        currentRound: Value(round.number - 1),
-        updatedAt: Value(DateTime.now()),
-      ));
+      if (previous != null) {
+        await (update(rounds)..where((r) => r.id.equals(previous.id))).write(
+          RoundsCompanion(status: const Value(RoundStatus.open), updatedAt: Value(now)),
+        );
+      }
+      if (leavingTopCut) {
+        await (update(tournamentPlayers)
+              ..where((tp) => tp.tournamentId.equals(tournamentId)))
+            .write(TournamentPlayersCompanion(
+                swissPosition: const Value(null), updatedAt: Value(now)));
+      }
+      await (update(tournaments)..where((t) => t.id.equals(tournamentId))).write(
+        TournamentsCompanion(
+          currentRound: Value(previous?.number ?? 0),
+          status: Value(previous == null
+              ? TournamentStatus.draft
+              : previous.phase == RoundPhase.swiss
+                  ? TournamentStatus.swiss
+                  : TournamentStatus.topCut),
+          updatedAt: Value(now),
+        ),
+      );
     });
   }
 
