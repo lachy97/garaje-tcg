@@ -10,7 +10,6 @@ import '../../../core/utils/season_utils.dart';
 import '../domain/deck_stats.dart';
 import '../domain/tier_style.dart';
 import 'deck_image.dart';
-import 'deck_tier_table.dart' show deckPdfTable;
 
 /// Colores del diseño (fondo oscuro como la tier list de referencia).
 const _kBoardBg = Color(0xFF111111);
@@ -543,7 +542,6 @@ Future<void> exportDeckTierImages(
       page: TierListPoster(decks: decks, styles: styles, season: label, date: date),
       contentWidth: TierListPoster.width,
       summaryHeightEstimate: _kPosterChrome + TierBoardMetrics.exported.height(decks),
-      pdfTable: () => deckPdfTable(decks),
       legend: '',
       fileBase: 'tierlist_garage_tcg_${season.year}_T${season.quarter}',
       shareText: 'Tier list de mazos Garage TCG · Temporada $label',

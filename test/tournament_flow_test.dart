@@ -26,13 +26,13 @@ void main() {
   }
 
   Future<Tournament> create(AppDatabase db, int players,
-      {int swissRounds = 3, int topCut = 0, DateTime? date}) async {
+      {int swissRounds = 3, int topCut = 0, DateTime? date, String? deckName}) async {
     final t = await db.tournamentsDao.createTournament(
         name: 'Prueba', date: date ?? DateTime(2026, 10, 18), swissRounds: swissRounds,
         topCutSize: topCut);
     for (var i = 1; i <= players; i++) {
       final p = await db.playersDao.create(nickname: 'Jugador $i');
-      await db.tournamentsDao.registerPlayer(t.id, p.id);
+      await db.tournamentsDao.registerPlayer(t.id, p.id, deckName: deckName);
     }
     return t;
   }
@@ -166,6 +166,34 @@ void main() {
     if (db == null) return;
     final t = await create(db, 4);
     await expectLater(db.rankingDao.closeSeason(t.seasonId), throwsA(isA<StateError>()));
+    await db.close();
+  });
+
+  test('Temporada cerrada: la tier list también queda congelada', () async {
+    final db = await open();
+    if (db == null) return;
+    final s = TournamentService(db);
+    final t = await create(db, 4,
+        swissRounds: 1, date: DateTime(2026, 8, 2), deckName: 'Mazo Prueba Uno');
+    await s.generateNextSwissRound(t.id);
+    await reportAll(db, s, t.id);
+    await s.startTopCut(t.id);
+
+    final season = (await reload(db, t.id)).seasonId;
+    final before = await db.rankingDao.seasonDecks(season);
+    expect(before.single.name, 'Mazo Prueba Uno');
+    await db.rankingDao.closeSeason(season);
+
+    await db.decksDao.rename(before.single.deckId, 'Mazo Renombrado');
+    final frozen = await db.rankingDao.seasonDecks(season);
+    expect(frozen.single.name, 'Mazo Prueba Uno');
+    expect(frozen.single.power, before.single.power);
+    expect(frozen.single.tier, before.single.tier);
+    expect(frozen.single.entries, 4);
+    expect(frozen.single.pilots.length, 4);
+
+    await db.rankingDao.reopenSeason(season);
+    expect((await db.rankingDao.seasonDecks(season)).single.name, 'Mazo Renombrado');
     await db.close();
   });
 }

@@ -186,16 +186,37 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
 
   /// Tabla de mazos de la temporada. Se recalcula al terminar torneos o al
   /// renombrar/fusionar mazos.
+  ///
+  /// Si la temporada está CERRADA se devuelve la foto guardada al cerrarla.
   Stream<List<DeckSeasonStats>> watchSeasonDecks(String seasonId) {
     final db = attachedDatabase;
     return customSelect(
       'SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?',
       variables: [Variable.withString(seasonId)],
-      readsFrom: {db.tournaments, db.tournamentPlayers, db.decks, db.matches},
+      readsFrom: {
+        db.tournaments,
+        db.tournamentPlayers,
+        db.decks,
+        db.matches,
+        db.seasons,
+        db.deckSnapshots,
+      },
     ).watch().asyncMap((_) => seasonDecks(seasonId));
   }
 
   Future<List<DeckSeasonStats>> seasonDecks(String seasonId) async {
+    final season = await (attachedDatabase.select(attachedDatabase.seasons)
+          ..where((s) => s.id.equals(seasonId)))
+        .getSingleOrNull();
+    if (season != null && season.status == SeasonStatus.closed) {
+      final frozen = await _snapshotDecks(seasonId);
+      if (frozen != null) return frozen;
+    }
+    return liveSeasonDecks(seasonId);
+  }
+
+  /// Tabla de mazos calculada con los torneos actuales (sin mirar la foto).
+  Future<List<DeckSeasonStats>> liveSeasonDecks(String seasonId) async {
     final sid = Variable.withString(seasonId);
     const finished = "t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished'";
 
@@ -267,7 +288,7 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
             '${pending.map((t) => t.name).join(', ')}.');
       }
       final ranking = await liveSeasonRanking(seasonId);
-      final decks = await seasonDecks(seasonId);
+      final decks = await liveSeasonDecks(seasonId);
       final now = DateTime.now();
       await (delete(db.rankingSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
       await (delete(db.deckSnapshots)..where((r) => r.seasonId.equals(seasonId))).go();
@@ -304,7 +325,7 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
                 'presence': d.presence,
                 'conversion': d.conversion,
                 'entries': d.entries,
-                'pilots': d.pilots.length,
+                'pilots': d.pilots.toList(),
                 'topEntries': d.topEntries,
                 'titles': d.titles,
                 'best': d.bestPosition,
@@ -366,6 +387,47 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
             lastDeck: j['deck'] as String?,
             rank: r.rank,
           );
+        }(),
+    ];
+  }
+
+  /// Tabla de mazos guardada al cerrar la temporada (null = no hay foto).
+  /// El nombre es el de ese momento; la imagen, la actual del mazo.
+  Future<List<DeckSeasonStats>?> _snapshotDecks(String seasonId) async {
+    final db = attachedDatabase;
+    final rows = await (select(db.deckSnapshots)
+          ..where((r) => r.seasonId.equals(seasonId) & r.deletedAt.isNull())
+          ..orderBy([(r) => OrderingTerm.asc(r.rank)]))
+        .get();
+    if (rows.isEmpty) return null;
+    final images = {
+      for (final d in await select(db.decks).get()) d.id: d.imagePath,
+    };
+    int n(Object? v) => v is num ? v.toInt() : 0;
+    return [
+      for (final r in rows)
+        () {
+          final j = jsonDecode(r.statsJson) as Map<String, dynamic>;
+          final swiss = (j['swiss'] as List?) ?? const [0, 0, 0];
+          final top = (j['top'] as List?) ?? const [0, 0];
+          final s = DeckSeasonStats(r.deckId, j['name'] as String? ?? '?',
+              imagePath: images[r.deckId])
+            ..entries = n(j['entries'])
+            ..swissWins = n(swiss.elementAtOrNull(0))
+            ..swissLosses = n(swiss.elementAtOrNull(1))
+            ..swissDraws = n(swiss.elementAtOrNull(2))
+            ..topWins = n(top.elementAtOrNull(0))
+            ..topLosses = n(top.elementAtOrNull(1))
+            ..topEntries = n(j['topEntries'])
+            ..titles = n(j['titles'])
+            ..bestPosition = j['best'] as int?
+            ..power = n(j['power'])
+            ..presence = (j['presence'] as num?)?.toDouble() ?? 0
+            ..rank = r.rank
+            ..tier = DeckTier.values.asNameMap()[j['tier']] ?? DeckTier.rogue;
+          final pilots = j['pilots'];
+          if (pilots is List) s.pilots.addAll(pilots.whereType<String>());
+          return s;
         }(),
     ];
   }

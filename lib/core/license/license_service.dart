@@ -72,8 +72,18 @@ class LicenseService {
   static const _keyAdminSealed = 'admin.sealedSeed';
   static const _keyPinFails = 'admin.pinFails';
   static const _keyPinLockedUntil = 'admin.pinLockedUntil';
+  static const _keyPinLocks = 'admin.pinLocks';
   static const maxPinFails = 5;
-  static const pinLockMinutes = 15;
+
+  /// Bloqueo progresivo tras [maxPinFails] fallos seguidos: 15 min, 30, 1 h,
+  /// 2 h… hasta 24 h. Se reinicia al acertar el PIN.
+  static int pinLockMinutesFor(int previousLocks) {
+    var m = 15;
+    for (var i = 0; i < previousLocks && m < 1440; i++) {
+      m *= 2;
+    }
+    return m > 1440 ? 1440 : m;
+  }
 
   /// Margen para cambios de hora/zona horaria antes de considerar que se
   /// atrasó la fecha.
@@ -241,6 +251,7 @@ class LicenseService {
     await _prefs.remove(_keyAdminSeed);
     await _prefs.remove(_keyPinFails);
     await _prefs.remove(_keyPinLockedUntil);
+    await _prefs.remove(_keyPinLocks);
   }
 
   /// Descifra la clave con el PIN. Lanza [AdminPinException] si el PIN es
@@ -257,15 +268,19 @@ class LicenseService {
     if (seed == null) {
       final fails = (_prefs.getInt(_keyPinFails) ?? 0) + 1;
       if (fails >= maxPinFails) {
-        await _prefs.setInt(_keyPinLockedUntil, now + pinLockMinutes * 60000);
+        final locks = _prefs.getInt(_keyPinLocks) ?? 0;
+        final minutes = pinLockMinutesFor(locks);
+        await _prefs.setInt(_keyPinLockedUntil, now + minutes * 60000);
+        await _prefs.setInt(_keyPinLocks, locks + 1);
         await _prefs.setInt(_keyPinFails, 0);
-        throw AdminPinException(
-            'PIN incorrecto. Bloqueado $pinLockMinutes min por demasiados intentos.');
+        final wait = minutes >= 60 ? '${minutes ~/ 60} h' : '$minutes min';
+        throw AdminPinException('PIN incorrecto. Bloqueado $wait por demasiados intentos.');
       }
       await _prefs.setInt(_keyPinFails, fails);
       throw AdminPinException('PIN incorrecto (${maxPinFails - fails} intento(s) más).');
     }
     await _prefs.remove(_keyPinFails);
+    await _prefs.remove(_keyPinLocks);
     return seed;
   }
 

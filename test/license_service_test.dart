@@ -76,4 +76,14 @@ void main() {
     await s.activate(await _license(DateTime(2026, 10, 2), 6), now: DateTime(2026, 10, 20, 13));
     expect((await s.check(now: DateTime(2026, 10, 3, 12))).state, LicenseState.clockBack);
   });
+
+  test('Bloqueo progresivo del PIN', () {
+    expect(LicenseService.pinLockMinutesFor(0), 15);
+    expect(LicenseService.pinLockMinutesFor(1), 30);
+    expect(LicenseService.pinLockMinutesFor(2), 60);
+    expect(LicenseService.pinLockMinutesFor(3), 120);
+    expect(LicenseService.pinLockMinutesFor(6), 960);
+    expect(LicenseService.pinLockMinutesFor(7), 1440);
+    expect(LicenseService.pinLockMinutesFor(20), 1440);
+  });
 }

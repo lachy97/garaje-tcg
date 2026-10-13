@@ -69,8 +69,6 @@ Future<void> _shareText(BuildContext context, String text) async {
 String _fileSafe(String s) =>
     s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').replaceAll(RegExp(r'^_|_$'), '');
 
-const _emptyPdf = ExportTableData(columns: [], rows: []);
-
 // ───────────────────────── Ronda ─────────────────────────
 
 Future<void> shareRound(
@@ -113,7 +111,6 @@ Future<void> shareRound(
       heading: '${tournament.name.toUpperCase()} · ${roundTitle.toUpperCase()}',
       items: lines,
       tableBuilder: (rows, width) => _RoundTable(lines: rows, width: width, isTopCut: isTopCut),
-      pdfTable: () => _emptyPdf,
       legend: 'Marcador visto desde el jugador de la izquierda · en verde, el ganador',
       fileBase: 'ronda_${_fileSafe(tournament.name)}_${_fileSafe(roundTitle)}',
       shareText: '${tournament.name} · $roundTitle',
@@ -220,7 +217,6 @@ Future<void> shareStandings(
       items: standings,
       tableBuilder: (rows, width) => _StandingsTable(
           rows: rows, width: width, names: names, decks: decks, qualified: qualified),
-      pdfTable: () => _emptyPdf,
       legend: '${cut > 0 ? 'En verde, los que entran al Top $cut · ' : ''}'
           'Desempates: Puntos → OMW% → OOMW% → GW%',
       fileBase: 'clasificacion_${_fileSafe(tournament.name)}',

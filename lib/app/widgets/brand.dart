@@ -6,7 +6,6 @@ import '../theme.dart';
 class BrandAssets {
   const BrandAssets._();
   static const logo = 'assets/logo/logo.png'; // transparente, con glow
-  static const logoDark = 'assets/logo/logo_dark.png'; // fondo negro
 }
 
 /// Logo con halo verde.

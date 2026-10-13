@@ -211,6 +211,16 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   // ───────────────────── Claves ─────────────────────
 
   Future<void> _createKeys() async {
+    if (LicenseService.appPublicKey != null) {
+      if (mounted) {
+        showMessage(
+            context,
+            'Esta app ya tiene su clave pública: importa tu clave privada de respaldo '
+            'en vez de crear otra.',
+            error: true);
+      }
+      return;
+    }
     final ok = await confirmDialog(
       context,
       title: 'Crear claves nuevas',
@@ -237,6 +247,23 @@ class _AdminPageState extends ConsumerState<AdminPage> {
     if (seed == null) {
       if (mounted) showMessage(context, 'Clave privada no válida.', error: true);
       return;
+    }
+    // Solo se acepta la clave que corresponde a la clave pública de esta app:
+    // con otra no se podrían crear licencias válidas y abriría el Modo
+    // administrador sin ser el administrador.
+    final app = LicenseService.appPublicKey;
+    if (app != null) {
+      final pub = await LicenseCodec.publicKeyOf(await LicenseCodec.keyPairFromSeed(seed));
+      var same = pub.length == app.length;
+      for (var i = 0; same && i < app.length; i++) {
+        same = pub[i] == app[i];
+      }
+      if (!same) {
+        if (mounted) {
+          showMessage(context, 'Esa clave privada no es la de esta app.', error: true);
+        }
+        return;
+      }
     }
     if (await _protectAndUnlock(seed) && mounted) {
       showMessage(context, 'Clave privada importada.');

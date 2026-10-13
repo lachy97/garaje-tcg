@@ -79,6 +79,21 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                   selected: season,
                   onChanged: (v) => setState(() => _seasonId = v.id),
                 ),
+                if (season.status == SeasonStatus.closed)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text('Temporada cerrada · tier list definitiva',
+                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (decks.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 48),

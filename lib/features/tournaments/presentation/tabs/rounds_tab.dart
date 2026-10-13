@@ -401,8 +401,8 @@ class _MatchesSliver extends ConsumerWidget {
 
 // ───────────────────────── Botón de avanzar ─────────────────────────
 
-/// Botón flotante redondo (">") que hace avanzar el torneo:
-/// generar ronda → iniciar Top → siguiente ronda del Top → finalizar.
+/// Botón flotante con el texto de lo que hará ("Generar ronda 4", "Iniciar
+/// Top 8", "Siguiente ronda del Top", "Finalizar torneo").
 /// Siempre pide confirmación diciendo qué va a pasar.
 class _AdvanceFab extends ConsumerWidget {
   const _AdvanceFab({
@@ -486,10 +486,9 @@ class _AdvanceFab extends ConsumerWidget {
         return const SizedBox.shrink();
     }
 
-    return FloatingActionButton.large(
+    return FloatingActionButton.extended(
       heroTag: 'advance-${t.id}',
       tooltip: title,
-      shape: const CircleBorder(),
       onPressed: busy
           ? null
           : () => onRun(() async {
@@ -498,12 +497,14 @@ class _AdvanceFab extends ConsumerWidget {
                 if (!ok) throw const ActionCancelled();
                 await step();
               }, success: success),
-      child: busy
+      icon: busy
           ? const SizedBox(
-              width: 26,
-              height: 26,
+              width: 22,
+              height: 22,
               child: CircularProgressIndicator(strokeWidth: 3, color: Colors.black))
-          : Icon(icon, size: 40),
+          : Icon(icon, size: 28),
+      label: Text(title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
     );
   }
 }
