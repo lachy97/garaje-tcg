@@ -61,7 +61,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -96,6 +96,10 @@ class AppDatabase extends _$AppDatabase {
                 'ON penalties (tournament_id)');
             await customStatement('CREATE INDEX IF NOT EXISTS idx_penalty_player '
                 'ON penalties (player_id)');
+          }
+          if (from < 7) {
+            // v7: cover pagado en cada inscripción
+            await m.addColumn(tournamentPlayers, tournamentPlayers.paid);
           }
         },
         beforeOpen: (details) async {

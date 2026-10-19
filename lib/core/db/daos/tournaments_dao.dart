@@ -254,6 +254,47 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
+  /// Marca si el jugador pagó el cover del torneo.
+  Future<void> setPaid(String tournamentId, String playerId, bool paid) async {
+    await ensureEditable(tournamentId);
+    await (update(tournamentPlayers)
+          ..where((t) =>
+              t.tournamentId.equals(tournamentId) & t.playerId.equals(playerId)))
+        .write(TournamentPlayersCompanion(
+      paid: Value(paid),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Último mazo con el que jugó cada jugador: el de su inscripción en el
+  /// torneo empezado más reciente (por fecha), sin contar [excludeTournamentId]
+  /// ni torneos, inscripciones o mazos borrados.
+  Future<Map<String, Deck>> lastDecks({String? excludeTournamentId}) async {
+    final q = select(tournamentPlayers).join([
+      innerJoin(tournaments, tournaments.id.equalsExp(tournamentPlayers.tournamentId)),
+      innerJoin(decks, decks.id.equalsExp(tournamentPlayers.deckId)),
+    ])
+      ..where(tournamentPlayers.deletedAt.isNull() &
+          tournaments.deletedAt.isNull() &
+          decks.deletedAt.isNull() &
+          tournaments.status.equalsValue(TournamentStatus.draft).not());
+    if (excludeTournamentId != null) {
+      q.where(tournaments.id.equals(excludeTournamentId).not());
+    }
+    final rows = [
+      for (final r in await q.get())
+        (r.readTable(tournamentPlayers), r.readTable(tournaments), r.readTable(decks)),
+    ]..sort((a, b) {
+        final byDate = b.$2.date.compareTo(a.$2.date);
+        return byDate != 0 ? byDate : b.$2.createdAt.compareTo(a.$2.createdAt);
+      });
+    final out = <String, Deck>{};
+    for (final (tp, _, deck) in rows) {
+      out.putIfAbsent(tp.playerId, () => deck);
+    }
+    return out;
+  }
+
   /// Retira a un jugador a partir de la ronda [afterRound] (no se empareja más).
   Future<void> dropPlayer(String tournamentId, String playerId, int afterRound) async {
     await ensureEditable(tournamentId);

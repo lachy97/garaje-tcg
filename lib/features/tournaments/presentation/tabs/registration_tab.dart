@@ -14,9 +14,15 @@ import '../../application/tournament_service.dart';
 import '../providers.dart';
 import 'penalties.dart';
 
-/// Inscripción: jugadores + mazo. Antes de la ronda 1 se inscribe normal;
-/// durante el Swiss se puede inscribir tarde (las rondas perdidas cuentan como
-/// derrotas) y retirar (drop) jugadores. Penalizaciones: menú de cada jugador.
+/// Último mazo de cada jugador (para proponerlo al inscribirlo).
+final _lastDecksProvider = FutureProvider.autoDispose.family<Map<String, Deck>, String>(
+    (ref, tournamentId) =>
+        ref.read(tournamentsDaoProvider).lastDecks(excludeTournamentId: tournamentId));
+
+/// Inscripción: jugadores + mazo + cover pagado. Antes de la ronda 1 se
+/// inscribe normal (con el último mazo de cada jugador, cambiable); durante el
+/// Swiss se puede inscribir tarde (las rondas perdidas cuentan como derrotas)
+/// y retirar (drop) jugadores. Penalizaciones: menú de cada jugador.
 class RegistrationTab extends ConsumerWidget {
   const RegistrationTab({super.key, required this.tournament});
 
@@ -36,6 +42,7 @@ class RegistrationTab extends ConsumerWidget {
       value: registered,
       builder: (list) {
         final noDeck = list.where((r) => r.deck == null).length;
+        final unpaid = list.where((r) => !r.entry.dropped && !r.entry.paid).length;
         return Column(
           children: [
             Padding(
@@ -50,6 +57,9 @@ class RegistrationTab extends ConsumerWidget {
                             style: Theme.of(context).textTheme.titleMedium),
                         if (noDeck > 0)
                           Text('$noDeck sin mazo asignado',
+                              style: const TextStyle(color: AppColors.draw, fontSize: 12)),
+                        if (unpaid > 0)
+                          Text('$unpaid sin pagar el cover',
                               style: const TextStyle(color: AppColors.draw, fontSize: 12)),
                       ],
                     ),
@@ -170,6 +180,11 @@ class _RegisteredTile extends ConsumerWidget {
               ],
             ),
           ),
+          _PaidCheck(
+            paid: item.entry.paid,
+            onChanged: (v) => runGuarded(
+                context, () => dao.setPaid(tournament.id, item.player.id, v)),
+          ),
           if (draft)
             IconButton(
               tooltip: 'Quitar',
@@ -229,7 +244,51 @@ class _RegisteredTile extends ConsumerWidget {
   }
 }
 
-/// Hoja para inscribir varios jugadores de una vez (o crear uno nuevo).
+/// Casilla "pagó el cover" de cada inscrito.
+class _PaidCheck extends StatelessWidget {
+  const _PaidCheck({required this.paid, required this.onChanged});
+
+  final bool paid;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: paid ? 'Pagó el cover' : 'No ha pagado el cover',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => onChanged(!paid),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: Checkbox(
+                  value: paid,
+                  onChanged: (v) => onChanged(v ?? false),
+                  activeColor: AppColors.neon,
+                  checkColor: Colors.black,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              Text('Cover',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: paid ? AppColors.neon : AppColors.textSecondary)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Hoja para inscribir varios jugadores de una vez (o crear uno nuevo). Cada
+/// jugador elegido entra con su último mazo; se puede cambiar antes.
 class _RegisterSheet extends ConsumerStatefulWidget {
   const _RegisterSheet({required this.tournament, required this.alreadyIn, this.late = false});
 
@@ -245,6 +304,9 @@ class _RegisterSheet extends ConsumerStatefulWidget {
 
 class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
   final _selected = <String>{};
+
+  /// Mazo elegido a mano en esta hoja (manda sobre el último mazo).
+  final _deckOverride = <String, String>{};
   String _query = '';
   bool _saving = false;
 
@@ -263,13 +325,20 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
     }
     setState(() => _saving = true);
     final ids = _selected.toList();
+    final last = ref.read(_lastDecksProvider(t.id)).value ?? const <String, Deck>{};
+    final deckNames = <String, String>{
+      for (final id in ids)
+        if (_deckFor(id, last) case final name?) id: name,
+    };
     final ok = await runGuarded(context, () async {
       if (widget.late) {
-        await ref.read(tournamentServiceProvider).registerLate(t.id, ids);
+        await ref
+            .read(tournamentServiceProvider)
+            .registerLate(t.id, ids, deckNames: deckNames);
       } else {
         final dao = ref.read(tournamentsDaoProvider);
         for (final id in ids) {
-          await dao.registerPlayer(t.id, id);
+          await dao.registerPlayer(t.id, id, deckName: deckNames[id]);
         }
       }
     });
@@ -281,6 +350,18 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
     }
   }
 
+  String? _deckFor(String playerId, Map<String, Deck> last) =>
+      _deckOverride[playerId] ?? last[playerId]?.name;
+
+  Future<void> _changeDeck(String playerId, String? current) async {
+    final name = await showDeckPicker(context, current: current);
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    setState(() {
+      _deckOverride[playerId] = name;
+      _selected.add(playerId);
+    });
+  }
+
   Future<void> _newPlayer() async {
     final created = await showPlayerForm(context, ref);
     if (created != null) setState(() => _selected.add(created.id));
@@ -289,6 +370,8 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
   @override
   Widget build(BuildContext context) {
     final players = ref.watch(playersProvider(_query));
+    final last = ref.watch(_lastDecksProvider(widget.tournament.id)).value ??
+        const <String, Deck>{};
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.85,
       child: Padding(
@@ -337,12 +420,32 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
                     itemCount: list.length,
                     itemBuilder: (_, i) {
                       final p = list[i];
+                      final deck = _deckFor(p.id, last);
+                      final chosen = _deckOverride.containsKey(p.id);
                       return CheckboxListTile(
                         value: _selected.contains(p.id),
                         activeColor: AppColors.neon,
                         checkColor: Colors.black,
+                        controlAffinity: ListTileControlAffinity.leading,
                         title: Text(p.nickname),
-                        subtitle: p.fullName == null ? null : Text(p.fullName!),
+                        subtitle: Text(
+                          [
+                            if (p.fullName != null) p.fullName!,
+                            deck == null
+                                ? 'Sin mazo anterior'
+                                : chosen
+                                    ? 'Mazo: $deck'
+                                    : 'Último mazo: $deck',
+                          ].join('\n'),
+                          style: const TextStyle(color: AppColors.textSecondary),
+                        ),
+                        isThreeLine: p.fullName != null,
+                        secondary: IconButton(
+                          tooltip: deck == null ? 'Elegir mazo' : 'Cambiar mazo',
+                          icon: Icon(Icons.style_outlined,
+                              color: deck == null ? AppColors.textSecondary : AppColors.neon),
+                          onPressed: () => _changeDeck(p.id, deck),
+                        ),
                         onChanged: (v) => setState(() {
                           if (v ?? false) {
                             _selected.add(p.id);

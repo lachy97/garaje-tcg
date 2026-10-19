@@ -146,6 +146,9 @@ class TournamentPlayers extends Table with SyncColumns {
   /// Cada una cuenta como derrota 0-2 sin rival (0 puntos).
   IntColumn get lateRounds => integer().withDefault(const Constant(0))();
 
+  /// Pagó el cover (la entrada) del torneo (v7). Solo registro.
+  BoolColumn get paid => boolean().withDefault(const Constant(false))();
+
   @override
   List<Set<Column<Object>>> get uniqueKeys => [
         {tournamentId, playerId},

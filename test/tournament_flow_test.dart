@@ -289,4 +289,52 @@ void main() {
     expect(await db.rankingDao.watchTournamentResults(gone.id).first, isEmpty);
     await db.close();
   });
+
+  test('Último mazo de cada jugador y cover pagado', () async {
+    final db = await open();
+    if (db == null) return;
+    final s = TournamentService(db);
+    final dao = db.tournamentsDao;
+    final a = await db.playersDao.create(nickname: 'Ana');
+    final b = await db.playersDao.create(nickname: 'Beto');
+    final c = await db.playersDao.create(nickname: 'Caro');
+
+    // Torneo viejo: Ana con Zombie, Beto con Gladiator.
+    final old = await dao.createTournament(
+        name: 'Viejo', date: DateTime(2026, 10, 4), swissRounds: 1);
+    await dao.registerPlayer(old.id, a.id, deckName: 'Zombie');
+    await dao.registerPlayer(old.id, b.id, deckName: 'Gladiator Beast');
+    await s.generateNextSwissRound(old.id);
+    // Torneo más nuevo: Ana cambia a Plant Synchro; Beto sin mazo.
+    final newer = await dao.createTournament(
+        name: 'Nuevo', date: DateTime(2026, 10, 11), swissRounds: 1);
+    await dao.registerPlayer(newer.id, a.id, deckName: 'Plant Synchro');
+    await dao.registerPlayer(newer.id, b.id);
+    await s.generateNextSwissRound(newer.id);
+    // Un torneo aún en inscripción no cuenta como "jugado".
+    final draft = await dao.createTournament(
+        name: 'Borrador', date: DateTime(2026, 10, 25), swissRounds: 1);
+    await dao.registerPlayer(draft.id, a.id, deckName: 'Blackwing');
+
+    final next = await dao.createTournament(
+        name: 'Siguiente', date: DateTime(2026, 10, 18), swissRounds: 1);
+    final last = await dao.lastDecks(excludeTournamentId: next.id);
+    expect(last[a.id]!.name, 'Plant Synchro');
+    expect(last[b.id]!.name, 'Gladiator Beast', reason: 'sin mazo en el nuevo: vale el anterior');
+    expect(last.containsKey(c.id), isFalse);
+
+    await dao.registerPlayer(next.id, a.id, deckName: last[a.id]!.name);
+    var reg = (await dao.registeredPlayers(next.id)).single;
+    expect(reg.deck!.name, 'Plant Synchro');
+    expect(reg.entry.paid, isFalse);
+
+    await dao.setPaid(next.id, a.id, true);
+    reg = (await dao.registeredPlayers(next.id)).single;
+    expect(reg.entry.paid, isTrue);
+    // Reinscribir no borra el pago.
+    await dao.registerPlayer(next.id, a.id, deckName: 'Zombie');
+    reg = (await dao.registeredPlayers(next.id)).single;
+    expect((reg.entry.paid, reg.deck!.name), (true, 'Zombie'));
+    await db.close();
+  });
 }

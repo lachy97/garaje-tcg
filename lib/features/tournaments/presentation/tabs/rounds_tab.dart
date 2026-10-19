@@ -434,6 +434,7 @@ class _AdvanceFab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = tournament;
     final service = ref.read(tournamentServiceProvider);
+    final registered = ref.watch(registeredProvider(t.id)).value ?? const <RegisteredPlayer>[];
 
     late final String title;
     late final String message;
@@ -447,10 +448,18 @@ class _AdvanceFab extends ConsumerWidget {
         if (t.currentRound < t.swissRounds) {
           final n = t.currentRound + 1;
           title = 'Generar ronda $n';
+          // Avisos antes de cerrar inscripciones (no impiden empezar).
+          final noDeck = registered.where((r) => r.deck == null).length;
+          final unpaid = registered.where((r) => !r.entry.paid).length;
+          final warnings = [
+            if (noDeck > 0) '⚠ $noDeck jugador(es) sin mazo.',
+            if (unpaid > 0) '⚠ $unpaid jugador(es) sin pagar el cover.',
+          ];
           message = n == 1
               ? 'Se cierran las inscripciones y se generan los cruces de la ronda 1.\n\n'
                   'La configuración queda fija: ${t.swissRounds} rondas Swiss · '
                   '${t.topCutSize == 0 ? 'sin Top Cut' : 'Top ${t.topCutSize}'}.'
+                  '${warnings.isEmpty ? '' : '\n\n${warnings.join('\n')}'}'
               : 'Se generan los cruces de la ronda $n de ${t.swissRounds}.';
           success = 'Ronda $n generada';
           step = () async {

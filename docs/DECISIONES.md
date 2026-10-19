@@ -127,3 +127,8 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - **Imágenes**: el mismo workflow las baja una vez de YGOPRODeck (≈10 por segundo, sin enlazarlas directo) y las publica: Cloudflare Pages `garaje-tcg-cartas.pages.dev` (principal) o GitHub Pages `lachy97.github.io/garaje-tcg` (plan B, repo público). `s/{código}.jpg` carta pequeña, `a/{código}.jpg` ilustración recortada. La app prueba los servidores en orden, comprueba que la respuesta sea un JPEG y guarda cada imagen en el teléfono la primera vez.
 - **Permiso INTERNET** en Android: solo para estas imágenes; el resto de la app sigue sin conexión.
 - **Ajustes → Cartas**: cuántas cartas hay, "Probar descarga de imágenes" (tiempo de cada servidor, para probar desde Cuba) y borrar las imágenes guardadas.
+
+## Inscripción: último mazo y cover
+- Al inscribir (normal o tardía), cada jugador aparece con su **último mazo**: el de su inscripción en el torneo empezado más reciente por fecha (sin contar el actual, los torneos en inscripción ni los borrados; si en el último no tenía mazo, vale el anterior). Se cambia con el icono de mazo antes de inscribir, o tocando al jugador ya inscrito mientras el torneo esté en inscripción.
+- **Cover pagado** (esquema v7, `tournament_players.paid`): casilla "Cover" en cada inscrito, se puede marcar en cualquier momento (no con la temporada cerrada). Arriba se cuenta cuántos faltan por pagar. Al generar la ronda 1 se avisa de los que no tienen mazo o no han pagado, pero no impide empezar. Reinscribir a alguien no borra su pago. Viaja en las copias .gtcg.
+- Las listas de mazos usarán el esquema v8.

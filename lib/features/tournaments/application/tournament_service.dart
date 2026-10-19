@@ -313,7 +313,9 @@ class TournamentService {
 
   /// Inscripción tardía con el Swiss empezado: cada ronda ya creada cuenta como
   /// derrota 0-2 sin rival. Entran a emparejarse desde la siguiente ronda.
-  Future<void> registerLate(String tournamentId, Iterable<String> playerIds) async {
+  /// [deckNames]: mazo de cada jugador (opcional).
+  Future<void> registerLate(String tournamentId, Iterable<String> playerIds,
+      {Map<String, String> deckNames = const {}}) async {
     final ctx = await _load(tournamentId);
     await _dao.ensureEditable(tournamentId);
     if (ctx.tournament.status != TournamentStatus.swiss) {
@@ -324,7 +326,8 @@ class TournamentService {
       throw const TournamentException('Ya no quedan rondas Swiss por jugar.');
     }
     for (final id in playerIds) {
-      await _dao.registerPlayer(tournamentId, id, lateRounds: missed);
+      await _dao.registerPlayer(tournamentId, id,
+          deckName: deckNames[id], lateRounds: missed);
     }
   }
 
