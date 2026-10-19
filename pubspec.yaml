@@ -57,6 +57,8 @@ flutter:
     - assets/decks/
     # Fondo con textura del póster de la tier list exportada
     - assets/export/
+    # Base de cartas de Edison Format (tools/cards/build_card_db.py)
+    - assets/cards/
   # Fuente única de toda la app (Inter, licencia OFL, recortada a caracteres latinos)
   fonts:
     - family: Inter

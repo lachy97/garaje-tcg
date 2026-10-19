@@ -1,0 +1,9 @@
+# Correcciones a la banlist de Edison Format (lista de marzo de 2010).
+# Normalmente se deja vacío: la banlist viene del API de YGOPRODeck.
+# Si el API no la trae o alguna carta está mal, añade una línea por carta:
+#   0 Nombre en inglés   -> prohibida
+#   1 Nombre en inglés   -> limitada
+#   2 Nombre en inglés   -> semilimitada
+#   3 Nombre en inglés   -> sin límite
+# Ejemplo:
+# 0 Card of Safe Return

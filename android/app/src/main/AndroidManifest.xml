@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Solo para descargar las imágenes de las cartas (listas de mazos). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="GARAGE TCG"
         android:name="${applicationName}"
