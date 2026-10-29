@@ -9,6 +9,7 @@ import 'providers.dart';
 import 'tabs/registration_tab.dart';
 import 'tabs/rounds_tab.dart';
 import 'tabs/standings_tab.dart';
+import 'tabs/summary_tab.dart';
 
 class TournamentDetailPage extends ConsumerWidget {
   const TournamentDetailPage({super.key, required this.tournamentId});
@@ -33,8 +34,11 @@ class TournamentDetailPage extends ConsumerWidget {
           TournamentStatus.swiss || TournamentStatus.topCut => 1,
           TournamentStatus.finished => 2,
         };
+        // Con el torneo terminado se añade la pestaña Resumen (metagame y participantes).
+        final finished = t.status == TournamentStatus.finished;
         return DefaultTabController(
-          length: 3,
+          key: ValueKey(finished),
+          length: finished ? 4 : 3,
           initialIndex: initial,
           child: Scaffold(
             appBar: AppBar(
@@ -44,15 +48,18 @@ class TournamentDetailPage extends ConsumerWidget {
                 child: Column(
                   children: [
                     _Header(t: t),
-                    const TabBar(
+                    TabBar(
                       labelColor: AppColors.neon,
                       unselectedLabelColor: AppColors.textSecondary,
                       indicatorColor: AppColors.neon,
                       dividerColor: Colors.transparent,
+                      isScrollable: finished,
+                      tabAlignment: finished ? TabAlignment.center : null,
                       tabs: [
-                        Tab(text: 'Jugadores'),
-                        Tab(text: 'Rondas'),
-                        Tab(text: 'Clasificación'),
+                        const Tab(text: 'Jugadores'),
+                        const Tab(text: 'Rondas'),
+                        const Tab(text: 'Clasificación'),
+                        if (finished) const Tab(text: 'Resumen'),
                       ],
                     ),
                   ],
@@ -64,6 +71,7 @@ class TournamentDetailPage extends ConsumerWidget {
                 RegistrationTab(tournament: t),
                 RoundsTab(tournament: t),
                 StandingsTab(tournament: t),
+                if (finished) SummaryTab(tournament: t),
               ],
             ),
           ),

@@ -56,3 +56,9 @@ String roundLabel(Round r) {
     null => 'Top Cut',
   };
 }
+
+/// Todos los matches del torneo (Swiss y Top Cut), para el resumen.
+final tournamentMatchesProvider =
+    StreamProvider.autoDispose.family<List<Match>, String>((ref, id) {
+  return ref.watch(tournamentsDaoProvider).watchMatchesOfTournament(id);
+});

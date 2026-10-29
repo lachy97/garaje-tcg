@@ -132,3 +132,9 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - Al inscribir (normal o tardía), cada jugador aparece con su **último mazo**: el de su inscripción en el torneo empezado más reciente por fecha (sin contar el actual, los torneos en inscripción ni los borrados; si en el último no tenía mazo, vale el anterior). Se cambia con el icono de mazo antes de inscribir, o tocando al jugador ya inscrito mientras el torneo esté en inscripción.
 - **Cover pagado** (esquema v7, `tournament_players.paid`): casilla "Cover" en cada inscrito, se puede marcar en cualquier momento (no con la temporada cerrada). Arriba se cuenta cuántos faltan por pagar. Al generar la ronda 1 se avisa de los que no tienen mazo o no han pagado, pero no impide empezar. Reinscribir a alguien no borra su pago. Viaja en las copias .gtcg.
 - Las listas de mazos usarán el esquema v8.
+
+## Resumen del torneo (pestaña Resumen)
+- Con el torneo **terminado** aparece la pestaña **Resumen**:
+  - **Metagame**: dona con un sector por mazo (jugadores que lo usaron, % del total; los inscritos sin mazo cuentan como "Sin mazo") y la leyenda completa. Colores fijos por orden de uso (16 colores; desde el 17º, gris). Arriba, la línea "Metagame" con los 3 más jugados y "+N".
+  - **Participantes**: puesto final, jugador, récord de todo el torneo (Swiss y Top Cut; BYE = victoria; doble derrota = derrota; cada ronda perdida por inscripción tardía = derrota), % de victorias y mazo. Franja verde para el Top Cut. Tocar un jugador abre su ficha.
+- **Exportar** (imagen para WhatsApp HD): "Participantes" con el diseño de tabla de la app y la línea de metagame; "Metagame" como póster (fondo con textura, título METAGAME, dona y leyenda en dos columnas).
