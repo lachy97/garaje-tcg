@@ -130,7 +130,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
                 )
               else
                 const Text(
-                  'Comprueba que tienes datos o wifi. Si ninguno de los dos servidores '
+                  'Comprueba que tienes datos o wifi. Si el servidor de imágenes no '
                   'responde, avisa al administrador.',
                   style: TextStyle(fontSize: 13),
                 ),

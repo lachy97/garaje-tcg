@@ -8,12 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/app_paths.dart';
 import '../domain/card_db.dart';
 
-/// Dónde están publicadas las imágenes de las cartas (las genera y publica
-/// el workflow tools/cards/cartas.yml). Se prueban en orden: si el primero
-/// no responde (p. ej. bloqueado desde Cuba) se usa el siguiente.
+/// Dónde están publicadas las imágenes de las cartas: GitHub Pages del
+/// repositorio público garaje-tcg-cartas (ver tools/cards/LEEME.md). Si se
+/// añade otro servidor, se prueban en orden.
 const cardImageHosts = <String>[
-  'https://garaje-tcg-cartas.pages.dev', // Cloudflare Pages (principal)
-  'https://lachy97.github.io/garaje-tcg', // GitHub Pages (plan B)
+  'https://lachy97.github.io/garaje-tcg-cartas',
 ];
 
 /// Carta usada para probar la descarga (Dark Magician).

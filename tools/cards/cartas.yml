@@ -1,37 +1,24 @@
-# Genera la base de cartas de Edison Format y publica las imágenes.
+# Workflow del repositorio PÚBLICO de imágenes de cartas (garaje-tcg-cartas).
 #
-# INSTALACIÓN (una vez): copia este archivo a .github/workflows/cartas.yml,
-# haz commit y push. Después, en GitHub: pestaña Actions → "Cartas Edison"
-# → Run workflow → elige el destino de las imágenes.
+# Va en ese repositorio como .github/workflows/cartas.yml, junto con
+# build_card_db.py y banlist_edison.txt en la raíz (ver tools/cards/LEEME.md).
 #
-# Qué hace:
-#   1. Ejecuta tools/cards/build_card_db.py en los servidores de GitHub
-#      (desde ahí YGOPRODeck responde sin problema).
-#   2. Sube al repositorio assets/cards/edison_cards.json (después haz
-#      "git pull" en tu PC para tenerlo y compila la APK como siempre).
-#   3. Publica las imágenes (≈ 8000 archivos, se bajan solo la primera vez;
-#      las siguientes ejecuciones reutilizan la caché):
-#      - cloudflare: en https://garaje-tcg-cartas.pages.dev
-#        Necesita dos secretos del repositorio (Settings → Secrets → Actions):
-#        CLOUDFLARE_API_TOKEN (token con permiso "Cloudflare Pages: Edit")
-#        y CLOUDFLARE_ACCOUNT_ID (lo ves en el panel de Cloudflare).
-#      - github: en https://lachy97.github.io/garaje-tcg
-#        Necesita Settings → Pages → Source: "GitHub Actions".
-#        Solo funciona gratis si el repositorio es público.
-#      - ninguno: solo genera el JSON.
+# Qué hace (pestaña Actions → "Cartas Edison" → Run workflow):
+#   1. Baja de YGOPRODeck las cartas de Edison Format y sus imágenes
+#      (solo la primera vez; las siguientes usa la caché).
+#   2. Publica todo en GitHub Pages:
+#        https://lachy97.github.io/garaje-tcg-cartas/edison_cards.json
+#        https://lachy97.github.io/garaje-tcg-cartas/s/<código>.jpg  (carta pequeña)
+#        https://lachy97.github.io/garaje-tcg-cartas/a/<código>.jpg  (ilustración)
 name: Cartas Edison
 
 on:
   workflow_dispatch:
-    inputs:
-      destino:
-        description: 'Dónde publicar las imágenes'
-        type: choice
-        options: [cloudflare, github, ninguno]
-        default: cloudflare
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: cartas-edison
@@ -48,62 +35,25 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Las imágenes ya bajadas se guardan entre ejecuciones (no se vuelven
-      # a pedir a YGOPRODeck).
+      # Las imágenes ya bajadas se guardan entre ejecuciones.
       - name: Caché de imágenes
-        if: inputs.destino != 'ninguno'
         uses: actions/cache@v4
         with:
           path: build/card_site
           key: card-site-${{ github.run_id }}
           restore-keys: card-site-
 
-      - name: Generar base de cartas
-        run: |
-          if [ "${{ inputs.destino }}" = "ninguno" ]; then
-            python tools/cards/build_card_db.py
-          else
-            python tools/cards/build_card_db.py --site build/card_site
-          fi
-
-      - name: Subir el JSON al repositorio
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/cards/edison_cards.json
-          if git diff --cached --quiet; then
-            echo "La base de cartas no cambió"
-          else
-            git commit -m "Base de cartas Edison ($(date +%F))"
-            git push
-          fi
-
-      - name: Publicar en Cloudflare Pages
-        if: inputs.destino == 'cloudflare'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::Faltan los secretos CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID"
-            exit 1
-          fi
-          npx --yes wrangler@3 pages project create garaje-tcg-cartas --production-branch=main || true
-          npx --yes wrangler@3 pages deploy build/card_site --project-name=garaje-tcg-cartas --branch=main --commit-dirty=true
+      - name: Generar base de cartas e imágenes
+        run: python build_card_db.py --json build/card_site/edison_cards.json --site build/card_site
 
       - name: Preparar GitHub Pages
-        if: inputs.destino == 'github'
         uses: actions/upload-pages-artifact@v3
         with:
           path: build/card_site
 
-  github-pages:
+  publicar:
     needs: generar
-    if: inputs.destino == 'github'
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

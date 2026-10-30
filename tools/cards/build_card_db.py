@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Genera la base de cartas de Edison Format para Garage TCG.
 
-Se ejecuta UNA vez (o cuando se quiera refrescar) en GitHub Actions con el
-workflow tools/cards/cartas.yml. Solo usa la biblioteca estándar de Python.
+Se ejecuta UNA vez (o cuando se quiera refrescar) en GitHub Actions, en el
+repositorio público garaje-tcg-cartas (ver LEEME.md). Solo usa la biblioteca
+estándar de Python.
 
 Qué hace:
   1. Descarga del API de YGOPRODeck las cartas legales en Edison Format
@@ -12,7 +13,7 @@ Qué hace:
      las ilustraciones alternativas.
   3. (Opcional) Descarga UNA vez las imágenes de cada carta (pequeña para la
      cuadrícula y la ilustración recortada para la carta principal) a una
-     carpeta lista para publicar en Cloudflare Pages / GitHub Pages. YGOPRODeck
+     carpeta lista para publicar en GitHub Pages. YGOPRODeck
      pide no enlazar sus imágenes directamente: se bajan una vez y se alojan
      aparte. Descarga a ~10 peticiones/s (su límite es 20/s; pasarse = 1 h de
      bloqueo) y se salta las que ya existen, así repetir es barato.
