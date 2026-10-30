@@ -71,4 +71,32 @@ void main() {
     expect(yubel.lastUsed, DateTime(2026, 10, 8));
     expect(data.historyByTournament.keys.toList(), ['a', 'b']);
   });
+
+  test('Cara a cara contra cada rival', () {
+    HistoryEntry vs(String? id, Outcome o, {int day = 1}) => HistoryEntry(
+          tournamentId: 't$day',
+          tournamentName: 'T',
+          date: DateTime(2026, 10, day),
+          phase: RoundPhase.swiss,
+          phaseLabel: 'Ronda 1',
+          outcome: o,
+          opponentId: id,
+          opponentName: id == null ? null : 'Jugador $id',
+        );
+    final data = PlayerProfileData(history: [
+      vs('a', Outcome.win),
+      vs('a', Outcome.loss, day: 8),
+      vs('a', Outcome.draw, day: 15),
+      vs('b', Outcome.win, day: 20),
+      vs('c', Outcome.win, day: 2),
+      vs('c', Outcome.pending, day: 22), // sin resultado: no cuenta
+      vs(null, Outcome.bye, day: 9), // BYE: no es un rival
+    ], tournaments: const []);
+    final r = data.rivals;
+    expect(r.map((x) => x.opponentId), ['a', 'b', 'c']);
+    expect((r[0].wins, r[0].losses, r[0].draws, r[0].played), (1, 1, 1, 3));
+    expect(r[0].last, DateTime(2026, 10, 15));
+    expect(r[1].winrate, 1.0);
+    expect(r[2].played, 1);
+  });
 }

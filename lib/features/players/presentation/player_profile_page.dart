@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
@@ -56,6 +57,11 @@ class PlayerProfilePage extends ConsumerWidget {
                   const _Empty('Todavía no ha jugado con ningún mazo.')
                 else
                   _DecksTable(decks: data.decks),
+                SectionLabel('Enfrentamientos por rival (${data.rivals.length})'),
+                if (data.rivals.isEmpty)
+                  const _Empty('Todavía no ha jugado contra nadie.')
+                else
+                  _RivalsTable(rivals: data.rivals),
                 _PlayerPenalties(playerId: playerId),
                 const SectionLabel('Historial de partidas'),
                 if (data.tournaments.isEmpty)
@@ -251,6 +257,79 @@ class _DecksTable extends StatelessWidget {
             Text(d.lastUsed == null ? '—' : fmt.format(d.lastUsed!),
                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ]),
+      ],
+    );
+  }
+}
+
+// ───────────────────────── Cara a cara ─────────────────────────
+
+/// Récord contra cada rival (todas las partidas, Swiss y Top Cut). Muestra
+/// los 10 con más partidas; "Ver todos" despliega el resto. Tocar un rival
+/// abre su ficha.
+class _RivalsTable extends StatefulWidget {
+  const _RivalsTable({required this.rivals});
+
+  final List<HeadToHead> rivals;
+
+  @override
+  State<_RivalsTable> createState() => _RivalsTableState();
+}
+
+class _RivalsTableState extends State<_RivalsTable> {
+  static const _initial = 10;
+  bool _all = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _all ? widget.rivals : widget.rivals.take(_initial).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        NeonTable(
+          columns: const [
+            NeonColumn('Rival', width: 120, align: TextAlign.start, flex: true),
+            NeonColumn('PJ', width: 36),
+            NeonColumn('V', width: 30),
+            NeonColumn('D', width: 30),
+            NeonColumn('E', width: 30),
+            NeonColumn('WR%', width: 50),
+          ],
+          rows: [
+            for (final r in list)
+              NeonTableRow(
+                onTap: () => context.push('/jugadores/${r.opponentId}'),
+                accent: r.wins > r.losses
+                    ? AppColors.win
+                    : r.losses > r.wins
+                        ? AppColors.loss
+                        : null,
+                cells: [
+                  Text(r.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text('${r.played}'),
+                  Text('${r.wins}', style: const TextStyle(color: AppColors.win)),
+                  Text('${r.losses}', style: const TextStyle(color: AppColors.loss)),
+                  Text('${r.draws}', style: const TextStyle(color: AppColors.draw)),
+                  Text('${(r.winrate * 100).toStringAsFixed(0)}%'),
+                ],
+              ),
+          ],
+        ),
+        if (widget.rivals.length > _initial)
+          TextButton(
+            onPressed: () => setState(() => _all = !_all),
+            child: Text(_all ? 'Ver menos' : 'Ver todos (${widget.rivals.length})'),
+          ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 2, 16, 0),
+          child: Text(
+            'Todas las partidas contra cada jugador (Swiss y Top Cut). Franja verde: '
+            'le gana más veces; roja: pierde más. Toca un rival para ver su ficha.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ),
       ],
     );
   }

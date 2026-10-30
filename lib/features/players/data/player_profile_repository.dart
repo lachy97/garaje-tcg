@@ -87,6 +87,7 @@ class PlayerProfileRepository {
         outcome: outcome,
         score: score,
         ownDeck: ownDeckId == null ? null : decks[ownDeckId],
+        opponentId: oppId,
         opponentName: oppId == null ? null : (names[oppId] ?? '?'),
         opponentDeck: oppDeckId == null ? null : decks[oppDeckId],
       ));

@@ -14,6 +14,7 @@ class HistoryEntry {
     required this.phaseLabel,
     required this.outcome,
     this.ownDeck,
+    this.opponentId,
     this.opponentName,
     this.opponentDeck,
     this.score,
@@ -28,6 +29,7 @@ class HistoryEntry {
   final String phaseLabel;
   final Outcome outcome;
   final String? ownDeck;
+  final String? opponentId; // null = BYE
   final String? opponentName; // null = BYE
   final String? opponentDeck;
 
@@ -73,6 +75,22 @@ class DeckUsage {
   double get winrate => played == 0 ? 0 : wins / played;
 }
 
+/// Cara a cara contra un rival: todas las partidas jugadas contra él
+/// (Swiss y Top Cut, en todos los torneos).
+class HeadToHead {
+  HeadToHead(this.opponentId, this.name);
+
+  final String opponentId;
+  final String name;
+  int wins = 0;
+  int losses = 0;
+  int draws = 0;
+  DateTime? last;
+
+  int get played => wins + losses + draws;
+  double get winrate => played == 0 ? 0 : wins / played;
+}
+
 class ProfileTotals {
   const ProfileTotals({
     required this.tournaments,
@@ -99,7 +117,8 @@ class ProfileTotals {
 class PlayerProfileData {
   PlayerProfileData({required this.history, required this.tournaments})
       : decks = _decks(history, tournaments),
-        totals = _totals(history, tournaments);
+        totals = _totals(history, tournaments),
+        rivals = _rivals(history);
 
   /// Más reciente primero.
   final List<HistoryEntry> history;
@@ -108,6 +127,38 @@ class PlayerProfileData {
   final List<TournamentEntry> tournaments;
   final List<DeckUsage> decks;
   final ProfileTotals totals;
+
+  /// Cara a cara con cada rival: más partidas primero (a igualdad, el más
+  /// reciente y luego alfabético). Sin BYEs ni partidas sin resultado.
+  final List<HeadToHead> rivals;
+
+  static List<HeadToHead> _rivals(List<HistoryEntry> history) {
+    final by = <String, HeadToHead>{};
+    for (final h in history) {
+      final id = h.opponentId;
+      if (id == null || !h.counts) continue;
+      final r = by[id] ??= HeadToHead(id, h.opponentName ?? '?');
+      switch (h.outcome) {
+        case Outcome.win:
+          r.wins++;
+        case Outcome.loss:
+          r.losses++;
+        case Outcome.draw:
+          r.draws++;
+        case Outcome.pending:
+        case Outcome.bye:
+          break;
+      }
+      if (r.last == null || h.date.isAfter(r.last!)) r.last = h.date;
+    }
+    return by.values.toList()
+      ..sort((a, b) {
+        final c = b.played.compareTo(a.played);
+        if (c != 0) return c;
+        final d = b.last!.compareTo(a.last!);
+        return d != 0 ? d : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+  }
 
   /// Historial agrupado por torneo, en el orden de [history].
   Map<String, List<HistoryEntry>> get historyByTournament {
