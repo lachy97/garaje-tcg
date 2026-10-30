@@ -240,17 +240,27 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
             deletedAt: Value(now), updatedAt: Value(now)));
   }
 
+  /// Cambia el mazo de un jugador en el torneo, en cualquier fase (también
+  /// terminado), salvo con la temporada cerrada.
   Future<void> setPlayerDeck(
       String tournamentId, String playerId, String deckName) {
     return transaction(() async {
       await ensureEditable(tournamentId);
       final deck = await attachedDatabase.decksDao.findOrCreate(deckName);
+      final now = DateTime.now();
       await (update(tournamentPlayers)
             ..where((t) =>
                 t.tournamentId.equals(tournamentId) &
                 t.playerId.equals(playerId)))
-          .write(TournamentPlayersCompanion(
-              deckId: Value(deck.id), updatedAt: Value(DateTime.now())));
+          .write(TournamentPlayersCompanion(deckId: Value(deck.id), updatedAt: Value(now)));
+      // Cada match guarda su copia del mazo (matriz de enfrentamientos,
+      // estadísticas): se corrige también en las rondas ya jugadas.
+      await (update(matches)
+            ..where((m) => m.tournamentId.equals(tournamentId) & m.player1Id.equals(playerId)))
+          .write(MatchesCompanion(deck1Id: Value(deck.id), updatedAt: Value(now)));
+      await (update(matches)
+            ..where((m) => m.tournamentId.equals(tournamentId) & m.player2Id.equals(playerId)))
+          .write(MatchesCompanion(deck2Id: Value(deck.id), updatedAt: Value(now)));
     });
   }
 

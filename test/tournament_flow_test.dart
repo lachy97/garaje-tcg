@@ -337,4 +337,31 @@ void main() {
     expect((reg.entry.paid, reg.deck!.name), (true, 'Zombie'));
     await db.close();
   });
+
+  test('Ronda 1 con cruces definidos y cambio de mazo con el torneo terminado', () async {
+    final db = await open();
+    if (db == null) return;
+    final s = TournamentService(db);
+    final dao = db.tournamentsDao;
+    final t = await create(db, 4, swissRounds: 1, deckName: 'Zombie');
+    final ids = [for (final r in await dao.registeredPlayers(t.id)) r.player.id];
+
+    await s.generateNextSwissRound(t.id, fixedPairs: [(ids[0], ids[3])]);
+    final r1 = (await dao.matchesOfTournament(t.id))
+      ..sort((a, b) => (a.tableNumber ?? 99).compareTo(b.tableNumber ?? 99));
+    expect((r1.first.player1Id, r1.first.player2Id), (ids[0], ids[3]));
+    expect({r1[1].player1Id, r1[1].player2Id}, {ids[1], ids[2]});
+
+    await reportAll(db, s, t.id);
+    await s.startTopCut(t.id); // sin Top: termina
+    expect((await reload(db, t.id)).status, TournamentStatus.finished);
+
+    await dao.setPlayerDeck(t.id, ids[3], 'Gladiator Beast');
+    final reg = (await dao.registeredPlayers(t.id)).firstWhere((r) => r.player.id == ids[3]);
+    expect(reg.deck!.name, 'Gladiator Beast');
+    final m = (await dao.matchesOfTournament(t.id)).firstWhere((m) => m.player2Id == ids[3]);
+    expect(m.deck2Id, reg.deck!.id, reason: 'el match también guarda el mazo nuevo');
+    expect(m.deck1Id, isNot(reg.deck!.id));
+    await db.close();
+  });
 }

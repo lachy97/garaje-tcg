@@ -50,7 +50,18 @@ void main() {
     expect(r.players, 5);
   });
 
-  test('colores: el más jugado primero, sin mazo en gris', () {
+  test('gráfico: los mazos de un solo jugador van juntos en OTROS', () {
+    final chart = r.chart;
+    expect(chart.length, 2);
+    expect((chart[0].name, chart[0].players, chart[0].isOthers), ('Blackwing', 2, false));
+    expect(chart[1].isOthers, isTrue);
+    expect(chart[1].players, 3);
+    expect(chart[1].fraction, 0.6);
+    expect(chart[1].members.map((d) => d.name), ['Hero Frog', 'Vayu Turbo', null]);
+    expect(chartImagePath(chart[1]), kOthersImage);
+  });
+
+  test('colores de respaldo: el más jugado primero, sin mazo en gris', () {
     final c = metaColors(r.metagame);
     expect(c['Blackwing'], kMetaPalette[0]);
     expect(c['Vayu Turbo'], kMetaPalette[2]);

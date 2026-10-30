@@ -129,14 +129,13 @@ class _RegisteredTile extends ConsumerWidget {
     final draft = tournament.status == TournamentStatus.draft;
     final running = tournament.status == TournamentStatus.swiss;
     final dropped = item.entry.dropped;
-    final finished = tournament.status == TournamentStatus.finished;
-    // El mazo se elige en la inscripción, o después si aún no tiene (p. ej. tardíos).
-    final canPickDeck = draft || (!finished && item.deck == null);
     final late = item.entry.lateRounds;
 
     return NeonCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      onTap: canPickDeck ? () => _pickDeck(context, ref) : null,
+      // El mazo se puede cambiar en cualquier momento, también con el torneo
+      // terminado (no con la temporada cerrada: lo impide el DAO).
+      onTap: () => _pickDeck(context, ref),
       child: Row(
         children: [
           if (item.deck != null)
@@ -166,8 +165,7 @@ class _RegisteredTile extends ConsumerWidget {
                 Text(
                   dropped
                       ? 'Retirado tras la ronda ${item.entry.dropRound ?? '-'}'
-                      : item.deck?.name ??
-                          (canPickDeck ? 'Sin mazo · toca para asignar' : 'Sin mazo'),
+                      : item.deck?.name ?? 'Sin mazo · toca para asignar',
                   style: TextStyle(
                     color: item.deck == null && !dropped
                         ? AppColors.draw

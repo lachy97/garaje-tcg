@@ -198,7 +198,8 @@ class Matches extends Table with SyncColumns {
   /// null = BYE (player1 gana automáticamente).
   TextColumn get player2Id => text().nullable().references(Players, #id)();
 
-  /// Mazo usado EN ESTE match (copia; no cambia si luego se edita la inscripción).
+  /// Mazo usado en este match (copia del de la inscripción; al cambiar el mazo
+  /// de un jugador en el torneo se actualiza en todos sus matches).
   TextColumn get deck1Id => text().nullable().references(Decks, #id)();
   TextColumn get deck2Id => text().nullable().references(Decks, #id)();
   TextColumn get result =>

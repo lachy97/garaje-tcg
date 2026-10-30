@@ -11,6 +11,7 @@ import '../../application/tournament_service.dart';
 import '../../domain/tournament_rules.dart';
 import '../providers.dart';
 import '../share_tournament.dart';
+import 'first_round_pairing_page.dart';
 import 'match_score_card.dart';
 import 'pairing_editor.dart';
 import 'round_timer.dart';
@@ -438,7 +439,9 @@ class _AdvanceFab extends ConsumerWidget {
 
     late final String title;
     late final String message;
-    late final Future<void> Function() step;
+    // [fixed]: enfrentamientos definidos a mano (solo ronda 1).
+    late final Future<void> Function(List<(String, String?)> fixed) step;
+    var firstRound = false;
     String? success;
     IconData icon = Icons.chevron_right;
 
@@ -462,8 +465,9 @@ class _AdvanceFab extends ConsumerWidget {
                   '${warnings.isEmpty ? '' : '\n\n${warnings.join('\n')}'}'
               : 'Se generan los cruces de la ronda $n de ${t.swissRounds}.';
           success = 'Ronda $n generada';
-          step = () async {
-            final out = await service.generateNextSwissRound(t.id);
+          firstRound = n == 1;
+          step = (fixed) async {
+            final out = await service.generateNextSwissRound(t.id, fixedPairs: fixed);
             if (out.rematches > 0 && context.mounted) {
               showMessage(context,
                   'Aviso: ${out.rematches} cruce(s) repetidos (no había otra opción).');
@@ -491,7 +495,7 @@ class _AdvanceFab extends ConsumerWidget {
             success = '¡Top $size generado!';
             icon = Icons.emoji_events;
           }
-          step = () => service.startTopCut(t.id);
+          step = (_) => service.startTopCut(t.id);
         }
       case TournamentStatus.topCut:
         final isFinal = currentRound?.bracketSize == 2;
@@ -501,7 +505,7 @@ class _AdvanceFab extends ConsumerWidget {
             : 'Los ganadores pasan a la siguiente ronda.';
         success = isFinal ? '¡Torneo terminado! Puntos sumados al ranking.' : null;
         icon = isFinal ? Icons.flag : Icons.chevron_right;
-        step = () => service.advanceTopCut(t.id);
+        step = (_) => service.advanceTopCut(t.id);
       case TournamentStatus.finished:
         return const SizedBox.shrink();
     }
@@ -512,10 +516,24 @@ class _AdvanceFab extends ConsumerWidget {
       onPressed: busy
           ? null
           : () => onRun(() async {
-                final ok = await confirmDialog(context,
-                    title: title, message: message, confirm: 'Continuar');
-                if (!ok) throw const ActionCancelled();
-                await step();
+                var fixed = const <(String, String?)>[];
+                if (firstRound) {
+                  // Ronda 1: al azar, o definiendo los enfrentamientos a mano.
+                  final define = await _askFirstRound(context, title, message);
+                  if (define == null || !context.mounted) throw const ActionCancelled();
+                  if (define) {
+                    final pairs = await Navigator.of(context).push<List<(String, String?)>>(
+                      MaterialPageRoute(builder: (_) => FirstRoundPairingPage(tournament: t)),
+                    );
+                    if (pairs == null) throw const ActionCancelled();
+                    fixed = pairs;
+                  }
+                } else {
+                  final ok = await confirmDialog(context,
+                      title: title, message: message, confirm: 'Continuar');
+                  if (!ok) throw const ActionCancelled();
+                }
+                await step(fixed);
               }, success: success),
       icon: busy
           ? const SizedBox(
@@ -527,4 +545,30 @@ class _AdvanceFab extends ConsumerWidget {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
     );
   }
+}
+
+/// Antes de la ronda 1: true = definir enfrentamientos, false = al azar,
+/// null = cancelar.
+Future<bool?> _askFirstRound(BuildContext context, String title, String message) {
+  return showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: SingleChildScrollView(
+        child: Text('$message\n\nPuedes definir algunos enfrentamientos a mano; '
+            'los demás se emparejan al azar.'),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        OutlinedButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Definir cruces'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Al azar'),
+        ),
+      ],
+    ),
+  );
 }

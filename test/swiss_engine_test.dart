@@ -203,4 +203,43 @@ void main() {
       expect(() => m.winner, throwsA(isA<TournamentException>()));
     });
   });
+
+  group('Ronda 1 con enfrentamientos definidos', () {
+    test('las parejas definidas van primero y el resto al azar', () {
+      final engine = SwissPairingEngine(random: Random(3));
+      final out = engine.pairFirstRoundWith(
+        players: _players(7),
+        fixed: const [('p01', 'p02'), ('p05', 'p07')],
+      );
+      final ps = out.pairings;
+      expect((ps[0].player1Id, ps[0].player2Id, ps[0].table), ('p01', 'p02', 1));
+      expect((ps[1].player1Id, ps[1].player2Id, ps[1].table), ('p05', 'p07', 2));
+      expect(ps.where((p) => p.isBye).length, 1, reason: '7 jugadores: un BYE al azar');
+      final all = [for (final p in ps) ...[p.player1Id, if (p.player2Id != null) p.player2Id!]];
+      expect(all.toSet().length, 7);
+      expect(all.length, 7);
+    });
+
+    test('BYE definido a mano', () {
+      final out = SwissPairingEngine(random: Random(1)).pairFirstRoundWith(
+        players: _players(5),
+        fixed: const [('p03', null)],
+      );
+      expect(out.pairings.last.isBye, isTrue);
+      expect(out.pairings.last.player1Id, 'p03');
+      expect(out.pairings.where((p) => p.isBye).length, 1);
+    });
+
+    test('errores: jugador repetido, BYE con número par', () {
+      final e = SwissPairingEngine();
+      expect(
+          () => e.pairFirstRoundWith(
+              players: _players(4), fixed: const [('p01', 'p02'), ('p02', 'p03')]),
+          throwsA(isA<TournamentException>()));
+      expect(() => e.pairFirstRoundWith(players: _players(4), fixed: const [('p01', null)]),
+          throwsA(isA<TournamentException>()));
+      expect(() => e.pairFirstRoundWith(players: _players(4), fixed: const [('p01', 'x')]),
+          throwsA(isA<TournamentException>()));
+    });
+  });
 }

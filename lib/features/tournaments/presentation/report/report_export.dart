@@ -7,6 +7,7 @@ import '../../../../app/theme.dart';
 import '../../../../app/widgets/brand.dart';
 import '../../../../app/widgets/table_export.dart';
 import '../../../../core/db/app_database.dart';
+import '../../../decks/presentation/deck_image.dart';
 import '../../domain/tournament_report.dart';
 import 'report_widgets.dart';
 
@@ -26,7 +27,6 @@ Future<void> exportParticipants(
   BuildContext context, {
   required Tournament tournament,
   required TournamentReport report,
-  required Map<String?, Color> colors,
 }) {
   return runExport<ParticipantLine>(
     context,
@@ -47,14 +47,13 @@ Future<void> exportParticipants(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.outline),
             ),
-            child: MetaHeadline(meta: report.metagame, colors: colors, fontSize: 17),
+            child: MetaHeadline(meta: report.metagame, fontSize: 17),
           ),
         ],
       ),
       summaryHeightEstimate: 110,
       tableBuilder: (rows, width) => ParticipantsTable(
         lines: rows,
-        colors: colors,
         width: width,
         fontSize: kExportFontSize,
         rowPadding: kExportRowPadding,
@@ -64,6 +63,7 @@ Future<void> exportParticipants(
       fileBase: 'participantes_${_fileSafe(tournament.name)}',
       shareText: '${tournament.name} · Participantes',
       rowHeightEstimate: 52,
+      preload: _deckImages(report),
     ),
   );
 }
@@ -75,29 +75,44 @@ const _kPad = 48.0;
 const _kDonut = 640.0;
 const _kLegendFont = 22.0;
 
+/// Imágenes de los mazos (y la de "Otros") para cargarlas antes de exportar.
+List<ImageProvider> _deckImages(TournamentReport report) => [
+      const AssetImage(kOthersImage),
+      for (final path in {for (final d in report.metagame) d.imagePath})
+        if (deckImageProvider(path) case final p?) p,
+    ];
+
 /// Exporta el gráfico de metagame (cuántos jugadores usaron cada mazo).
 Future<void> exportMetagame(
   BuildContext context, {
   required Tournament tournament,
   required TournamentReport report,
-  required Map<String?, Color> colors,
-}) {
-  final legendRows = (report.metagame.length / 2).ceil();
-  return runExport<DeckShare>(
-    context,
-    ExportSpec(
-      heading: 'METAGAME · ${tournament.name.toUpperCase()}',
-      items: report.metagame,
-      page: MetagamePoster(tournament: tournament, report: report, colors: colors),
-      contentWidth: MetagamePoster.width,
-      summaryHeightEstimate:
-          _kPad * 2 + 130 + 40 + _kDonut + 40 + legendRows * (_kLegendFont * 1.9) + 60,
-      legend: '',
-      fileBase: 'metagame_${_fileSafe(tournament.name)}',
-      shareText: '${tournament.name} · Metagame',
-      preload: const [AssetImage(_kBg)],
-    ),
-  );
+}) async {
+  final images = await loadChartImages(report.chart);
+  if (!context.mounted) {
+    disposeChartImages(images);
+    return;
+  }
+  final legendRows = (metaLegendRows(report).length / 2).ceil();
+  try {
+    await runExport<DeckShare>(
+      context,
+      ExportSpec(
+        heading: 'METAGAME · ${tournament.name.toUpperCase()}',
+        items: report.metagame,
+        page: MetagamePoster(tournament: tournament, report: report, images: images),
+        contentWidth: MetagamePoster.width,
+        summaryHeightEstimate:
+            _kPad * 2 + 130 + 40 + _kDonut + 40 + legendRows * (_kLegendFont * 2.4) + 60,
+        legend: '',
+        fileBase: 'metagame_${_fileSafe(tournament.name)}',
+        shareText: '${tournament.name} · Metagame',
+        preload: [const AssetImage(_kBg), ..._deckImages(report)],
+      ),
+    );
+  } finally {
+    disposeChartImages(images);
+  }
 }
 
 /// Póster "METAGAME": dona con el % de cada mazo y la leyenda completa.
@@ -106,12 +121,12 @@ class MetagamePoster extends StatelessWidget {
     super.key,
     required this.tournament,
     required this.report,
-    required this.colors,
+    required this.images,
   });
 
   final Tournament tournament;
   final TournamentReport report;
-  final Map<String?, Color> colors;
+  final ChartImages images;
 
   static const width = 1080.0;
 
@@ -119,17 +134,9 @@ class MetagamePoster extends StatelessWidget {
   Widget build(BuildContext context) {
     const title = Color(0xFFCFCFCF);
     const muted = Color(0xFF8E8E8E);
-    final meta = report.metagame;
-    final half = (meta.length / 2).ceil();
-    final left = meta.take(half).toList();
-    final right = meta.skip(half).toList();
-    Widget column(List<DeckShare> list) => Column(
-          children: [
-            for (final d in list)
-              MetaLegendRow(
-                  share: d, color: colors[d.name] ?? kMetaOther, fontSize: _kLegendFont),
-          ],
-        );
+    final rows = metaLegendRows(report, fontSize: _kLegendFont);
+    final half = (rows.length / 2).ceil();
+    Widget column(Iterable<Widget> list) => Column(children: [...list]);
     return Container(
       width: width,
       decoration: const BoxDecoration(
@@ -177,7 +184,7 @@ class MetagamePoster extends StatelessWidget {
           ),
           const SizedBox(height: 40),
           Center(
-            child: MetaDonut(meta: meta, colors: colors, size: _kDonut),
+            child: MetaDonut(chart: report.chart, images: images, size: _kDonut),
           ),
           const SizedBox(height: 40),
           Container(
@@ -190,9 +197,9 @@ class MetagamePoster extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: column(left)),
+                Expanded(child: column(rows.take(half))),
                 const SizedBox(width: 40),
-                Expanded(child: column(right)),
+                Expanded(child: column(rows.skip(half))),
               ],
             ),
           ),
@@ -201,7 +208,8 @@ class MetagamePoster extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${report.deckCount} mazos · jugadores por mazo y % del total',
+                  '${report.deckCount} mazos · jugadores por mazo y % del total · '
+                  'en OTROS, los mazos con un solo jugador',
                   style: const TextStyle(fontSize: 16, color: muted),
                 ),
               ),

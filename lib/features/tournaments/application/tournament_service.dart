@@ -200,7 +200,11 @@ class TournamentService {
 
   // ───────────────────────── Swiss ─────────────────────────
 
-  Future<PairingOutcome> generateNextSwissRound(String tournamentId) async {
+  /// Genera la siguiente ronda Swiss. En la ronda 1 se pueden dar
+  /// enfrentamientos definidos a mano ([fixedPairs], rival null = BYE); el
+  /// resto se empareja al azar.
+  Future<PairingOutcome> generateNextSwissRound(String tournamentId,
+      {List<(String, String?)> fixedPairs = const []}) async {
     final ctx = await _load(tournamentId);
     await _dao.ensureEditable(tournamentId);
     final t = ctx.tournament;
@@ -226,11 +230,17 @@ class TournamentService {
     }
 
     final roundNumber = t.currentRound + 1;
-    final outcome = _engine.pairRound(
-      round: roundNumber,
-      players: ctx.swissPlayers,
-      previous: ctx.swissRecords,
-    );
+    if (fixedPairs.isNotEmpty && roundNumber != 1) {
+      throw const TournamentException(
+          'Los enfrentamientos solo se definen a mano en la ronda 1.');
+    }
+    final outcome = fixedPairs.isNotEmpty
+        ? _engine.pairFirstRoundWith(players: ctx.swissPlayers, fixed: fixedPairs)
+        : _engine.pairRound(
+            round: roundNumber,
+            players: ctx.swissPlayers,
+            previous: ctx.swissRecords,
+          );
 
     await _db.transaction(() async {
       if (ctx.currentRound != null) await _dao.closeRound(ctx.currentRound!.id);

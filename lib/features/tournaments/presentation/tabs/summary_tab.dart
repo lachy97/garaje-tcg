@@ -35,6 +35,7 @@ class SummaryTab extends ConsumerWidget {
                   playerId: r.player.id,
                   name: r.player.nickname,
                   deck: r.deck?.name,
+                  deckImage: r.deck?.imagePath,
                   position: r.entry.finalPosition,
                   lateRounds: r.entry.lateRounds,
                   dropped: r.entry.dropped,
@@ -54,7 +55,6 @@ class SummaryTab extends ConsumerWidget {
           if (report.players == 0) {
             return const EmptyState(icon: Icons.pie_chart_outline, title: 'Sin participantes');
           }
-          final colors = metaColors(report.metagame);
           return ListView(
             padding: const EdgeInsets.only(bottom: 40),
             children: [
@@ -65,39 +65,42 @@ class SummaryTab extends ConsumerWidget {
                     Text(tournamentInfoLine(tournament, report),
                         style: const TextStyle(color: AppColors.textSecondary)),
                     const SizedBox(height: 10),
-                    MetaHeadline(meta: report.metagame, colors: colors),
+                    MetaHeadline(meta: report.metagame),
                   ],
                 ),
               ),
               _Header(
                 title: 'Metagame',
-                onExport: () => exportMetagame(context,
-                    tournament: tournament, report: report, colors: colors),
+                onExport: () =>
+                    exportMetagame(context, tournament: tournament, report: report),
               ),
               NeonCard(
                 child: Column(
                   children: [
                     LayoutBuilder(
-                      builder: (_, c) => MetaDonut(
-                        meta: report.metagame,
-                        colors: colors,
-                        size: c.maxWidth.clamp(160.0, 280.0),
+                      builder: (_, c) => MetaDonutView(
+                        chart: report.chart,
+                        size: c.maxWidth.clamp(160.0, 300.0),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    for (final d in report.metagame)
-                      MetaLegendRow(share: d, color: colors[d.name] ?? kMetaOther),
+                    ...metaLegendRows(report),
+                    if (report.chart.any((d) => d.isOthers))
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text('En OTROS, los mazos que jugó un solo jugador.',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      ),
                   ],
                 ),
               ),
               _Header(
                 title: 'Participantes',
-                onExport: () => exportParticipants(context,
-                    tournament: tournament, report: report, colors: colors),
+                onExport: () =>
+                    exportParticipants(context, tournament: tournament, report: report),
               ),
               ParticipantsTable(
                 lines: report.participants,
-                colors: colors,
                 onTapPlayer: (id) => context.push('/jugadores/$id'),
               ),
               Padding(

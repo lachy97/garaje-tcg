@@ -107,6 +107,49 @@ class SwissPairingEngine {
     return _build(pairs, byePlayer);
   }
 
+  /// Ronda 1 con enfrentamientos definidos a mano por el organizador.
+  /// [fixed]: parejas (jugador, rival); rival null = BYE (solo uno, y solo si
+  /// el número de jugadores es impar). El resto se empareja al azar; si
+  /// queda uno suelto recibe el BYE. Las mesas definidas van primero.
+  PairingOutcome pairFirstRoundWith({
+    required List<SwissPlayer> players,
+    required List<(String, String?)> fixed,
+  }) {
+    final active = players.where((p) => p.isActiveFor(1)).map((p) => p.id).toList();
+    if (active.length < 2) {
+      throw const TournamentException('Se necesitan al menos 2 jugadores activos');
+    }
+    final pool = active.toSet();
+    final used = <String>{};
+    String? fixedBye;
+    for (final (a, b) in fixed) {
+      for (final id in [a, if (b != null) b]) {
+        if (!pool.contains(id)) {
+          throw const TournamentException('Un jugador del enfrentamiento no está inscrito.');
+        }
+        if (!used.add(id)) {
+          throw const TournamentException('Un jugador aparece en dos enfrentamientos.');
+        }
+      }
+      if (b == null) {
+        if (fixedBye != null) throw const TournamentException('Solo puede haber un BYE.');
+        if (active.length.isEven) {
+          throw const TournamentException('Con un número par de jugadores no hay BYE.');
+        }
+        fixedBye = a;
+      }
+    }
+    final rest = active.where((id) => !used.contains(id)).toList()..shuffle(_random);
+    String? bye = fixedBye;
+    if (rest.length.isOdd) bye = rest.removeLast();
+    final pairs = <(String, String)>[
+      for (final (a, b) in fixed)
+        if (b != null) (a, b),
+      for (var i = 0; i + 1 < rest.length; i += 2) (rest[i], rest[i + 1]),
+    ];
+    return _build(pairs, bye);
+  }
+
   PairingOutcome _build(List<(String, String)> pairs, String? bye, {int rematches = 0}) {
     var table = 1;
     return PairingOutcome([
