@@ -37,7 +37,7 @@ class NewMatch {
 }
 
 @DriftAccessor(
-    tables: [Tournaments, TournamentPlayers, Rounds, Matches, Players, Decks])
+    tables: [Tournaments, TournamentPlayers, Rounds, Matches, Players, Decks, DeckLists])
 class TournamentsDao extends DatabaseAccessor<AppDatabase>
     with _$TournamentsDaoMixin {
   TournamentsDao(super.attachedDatabase);
@@ -303,6 +303,66 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
       out.putIfAbsent(tp.playerId, () => deck);
     }
     return out;
+  }
+
+  // ───────────────────────── Listas de mazos ─────────────────────────
+
+  /// Listas de mazos guardadas de un torneo.
+  Stream<List<DeckList>> watchDeckLists(String tournamentId) {
+    return (select(deckLists)
+          ..where((d) => d.tournamentId.equals(tournamentId) & d.deletedAt.isNull()))
+        .watch();
+  }
+
+  /// Listas de mazos de un jugador en todos sus torneos.
+  Future<List<DeckList>> deckListsOfPlayer(String playerId) {
+    return (select(deckLists)
+          ..where((d) => d.playerId.equals(playerId) & d.deletedAt.isNull()))
+        .get();
+  }
+
+  /// Guarda (o reemplaza) la lista de un jugador. Las cartas van como códigos
+  /// separados por comas, una entrada por copia.
+  Future<void> saveDeckList({
+    required String tournamentId,
+    required String playerId,
+    required String main,
+    required String extra,
+    required String side,
+    int? featuredCard,
+  }) async {
+    await ensureEditable(tournamentId);
+    final now = DateTime.now();
+    await into(deckLists).insert(
+      DeckListsCompanion.insert(
+        tournamentId: tournamentId,
+        playerId: playerId,
+        mainDeck: Value(main),
+        extraDeck: Value(extra),
+        sideDeck: Value(side),
+        featuredCard: Value(featuredCard),
+      ),
+      onConflict: DoUpdate(
+        (old) => DeckListsCompanion(
+          mainDeck: Value(main),
+          extraDeck: Value(extra),
+          sideDeck: Value(side),
+          featuredCard: Value(featuredCard),
+          deletedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+        target: [deckLists.tournamentId, deckLists.playerId],
+      ),
+    );
+  }
+
+  /// Borra (lógicamente) la lista de un jugador.
+  Future<void> deleteDeckList(String tournamentId, String playerId) async {
+    await ensureEditable(tournamentId);
+    final now = DateTime.now();
+    await (update(deckLists)
+          ..where((d) => d.tournamentId.equals(tournamentId) & d.playerId.equals(playerId)))
+        .write(DeckListsCompanion(deletedAt: Value(now), updatedAt: Value(now)));
   }
 
   /// Retira a un jugador a partir de la ronda [afterRound] (no se empareja más).

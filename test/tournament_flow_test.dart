@@ -364,4 +364,30 @@ void main() {
     expect(m.deck1Id, isNot(reg.deck!.id));
     await db.close();
   });
+
+  test('Listas de mazos: guardar, reemplazar y borrar', () async {
+    final db = await open();
+    if (db == null) return;
+    final dao = db.tournamentsDao;
+    final t = await create(db, 2, swissRounds: 1);
+    final p = (await dao.registeredPlayers(t.id)).first.player.id;
+
+    await dao.saveDeckList(
+        tournamentId: t.id, playerId: p, main: '1,1,2', extra: '4', side: '', featuredCard: 1);
+    var lists = await dao.watchDeckLists(t.id).first;
+    expect((lists.single.mainDeck, lists.single.featuredCard), ('1,1,2', 1));
+
+    await dao.saveDeckList(tournamentId: t.id, playerId: p, main: '2', extra: '', side: '3');
+    lists = await dao.watchDeckLists(t.id).first;
+    expect(lists.length, 1, reason: 'una lista por jugador y torneo');
+    expect((lists.single.mainDeck, lists.single.sideDeck, lists.single.featuredCard),
+        ('2', '3', null));
+
+    await dao.deleteDeckList(t.id, p);
+    expect(await dao.watchDeckLists(t.id).first, isEmpty);
+    await dao.saveDeckList(tournamentId: t.id, playerId: p, main: '5', extra: '', side: '');
+    expect((await dao.watchDeckLists(t.id).first).single.mainDeck, '5',
+        reason: 'volver a subir revive la borrada');
+    await db.close();
+  });
 }

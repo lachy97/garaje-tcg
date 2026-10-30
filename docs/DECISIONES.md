@@ -131,7 +131,6 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 ## Inscripción: último mazo y cover
 - Al inscribir (normal o tardía), cada jugador aparece con su **último mazo**: el de su inscripción en el torneo empezado más reciente por fecha (sin contar el actual, los torneos en inscripción ni los borrados; si en el último no tenía mazo, vale el anterior). Se cambia con el icono de mazo antes de inscribir, o tocando al jugador ya inscrito mientras el torneo esté en inscripción.
 - **Cover pagado** (esquema v7, `tournament_players.paid`): casilla "Cover" en cada inscrito, se puede marcar en cualquier momento (no con la temporada cerrada). Arriba se cuenta cuántos faltan por pagar. Al generar la ronda 1 se avisa de los que no tienen mazo o no han pagado, pero no impide empezar. Reinscribir a alguien no borra su pago. Viaja en las copias .gtcg.
-- Las listas de mazos usarán el esquema v8.
 
 ## Resumen del torneo (pestaña Resumen)
 - Con el torneo **terminado** aparece la pestaña **Resumen**:
@@ -147,3 +146,12 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 ## Ficha del jugador: enfrentamientos por rival
 - Nueva tabla **Enfrentamientos por rival** (debajo de "Mazos usados"): por cada jugador contra el que ha jugado, partidas, victorias, derrotas, empates y % de victorias, sumando todos los torneos (Swiss y Top Cut). No cuentan los BYE ni las partidas sin resultado; la doble derrota cuenta como derrota.
 - Orden: más partidas primero; a igualdad, el enfrentamiento más reciente. Se ven 10 y "Ver todos" despliega el resto. Franja verde si le gana más veces, roja si pierde más. Tocar un rival abre su ficha.
+
+## Listas de mazos del Top 4 (pasos 2–4)
+- **Dónde**: torneo terminado → pestaña **Resumen** → "Listas del Top 4". Cada jugador del 1º al 4º muestra "Ver lista" o "Subir lista". Sin roles todavía: lo hace quien usa la app (organizador o administrador).
+- **Cargar**: importar un **.ydk** (icono de subir; las ilustraciones alternativas se convierten al código principal y las cartas que no son de Edison se avisan y se quitan) o **a mano** con el buscador (nombre en inglés; cada toque añade una copia al Main o al Side; las del Extra Deck van solas al Extra). En cada carta: + / −, mantener pulsado para moverla de sección, y la **estrella** para elegir la carta principal.
+- **Avisos** (no impiden guardar): Main 40–60, Extra y Side ≤15, más de 3 copias, prohibidas/limitadas/semilimitadas de Edison, cartas del Extra en el Main y al revés, falta elegir la carta principal.
+- **Datos** (esquema **v8**, tabla `deck_lists`): una lista por jugador y torneo; Main/Extra/Side como códigos separados por comas (una entrada por copia) y la carta principal. Viajan en las copias .gtcg (se integran con su torneo).
+- **Ver**: cuadrícula por sección con ×N, carta principal y avisos. Menú: editar, **compartir .ydk**, borrar.
+- **Imagen exportada** (una por jugador, 1600 px de ancho): logo, puesto, torneo, jugador, mazo y fecha; Main/Extra/Side con una imagen por copia (10 por fila); a la derecha la ilustración de la carta principal sobre un fondo del **tono opuesto** a su color medio (oscuro si la ilustración es clara, claro si es oscura) con borde verde neón. Las cartas sin imagen (sin conexión) salen con su nombre.
+- Pendiente (paso 5): mostrar las listas en la ficha del mazo y del jugador.

@@ -232,6 +232,30 @@ class Penalties extends Table with SyncColumns {
   TextColumn get reason => text().nullable()();
 }
 
+/// Lista de mazo (decklist) de un jugador del Top 4 de un torneo terminado
+/// (v8). Las cartas van como códigos (passcodes) separados por comas, con una
+/// entrada por copia, en el mismo orden que un .ydk.
+@DataClassName('DeckList')
+@TableIndex(name: 'idx_decklist_tournament', columns: {#tournamentId})
+class DeckLists extends Table with SyncColumns {
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  TextColumn get tournamentId => text().references(Tournaments, #id)();
+  TextColumn get playerId => text().references(Players, #id)();
+  TextColumn get mainDeck => text().withDefault(const Constant(''))();
+  TextColumn get extraDeck => text().withDefault(const Constant(''))();
+  TextColumn get sideDeck => text().withDefault(const Constant(''))();
+
+  /// Carta que sale en grande en la imagen exportada.
+  IntColumn get featuredCard => integer().nullable()();
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+        {tournamentId, playerId},
+      ];
+}
+
 // ───────────────────────────── Ranking ─────────────────────────────
 
 /// Puntos de ranking que un jugador obtuvo en un torneo terminado.

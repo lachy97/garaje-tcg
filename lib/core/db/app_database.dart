@@ -33,6 +33,7 @@ const kDatabaseName = 'garaje_tcg';
     RankingSnapshots,
     DeckSnapshots,
     Penalties,
+    DeckLists,
   ],
   daos: [PlayersDao, DecksDao, SeasonsDao, TournamentsDao, RankingDao],
 )
@@ -61,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -100,6 +101,12 @@ class AppDatabase extends _$AppDatabase {
           if (from < 7) {
             // v7: cover pagado en cada inscripción
             await m.addColumn(tournamentPlayers, tournamentPlayers.paid);
+          }
+          if (from < 8) {
+            // v8: listas de mazos del Top 4
+            await m.createTable(deckLists);
+            await customStatement('CREATE INDEX IF NOT EXISTS idx_decklist_tournament '
+                'ON deck_lists (tournament_id)');
           }
         },
         beforeOpen: (details) async {

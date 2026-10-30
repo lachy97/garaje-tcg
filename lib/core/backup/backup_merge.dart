@@ -255,15 +255,16 @@ class BackupMerger {
     return MergePlan(items);
   }
 
-  /// Último cambio de un torneo: el más reciente de él, sus rondas, partidas
-  /// e inscripciones (los resultados no tocan la fila del torneo).
+  /// Último cambio de un torneo: el más reciente de él, sus rondas, partidas,
+  /// inscripciones y listas de mazos (los resultados no tocan la fila del torneo).
   Future<DateTime?> _lastChange(String schema, String id) async {
     final rows = await _rows(
       'SELECT updated_at AS u FROM $schema.tournaments WHERE id = ? '
       'UNION ALL SELECT updated_at FROM $schema.rounds WHERE tournament_id = ? '
       'UNION ALL SELECT updated_at FROM $schema.matches WHERE tournament_id = ? '
-      'UNION ALL SELECT updated_at FROM $schema.tournament_players WHERE tournament_id = ?',
-      [id, id, id, id],
+      'UNION ALL SELECT updated_at FROM $schema.tournament_players WHERE tournament_id = ? '
+      'UNION ALL SELECT updated_at FROM $schema.deck_lists WHERE tournament_id = ?',
+      [id, id, id, id, id],
     );
     DateTime? last;
     for (final r in rows) {
@@ -465,6 +466,14 @@ class BackupMerger {
           'SELECT * FROM imp.penalties WHERE tournament_id = ? AND deleted_at IS NULL', [impId])) {
         await _insert('penalties', {...pe, 'player_id': player(pe['player_id'])});
       }
+      // Listas de mazos (v8): las copias anteriores no tienen la tabla.
+      if (await _importHas('deck_lists')) {
+        for (final dl in await _rows(
+            'SELECT * FROM imp.deck_lists WHERE tournament_id = ? AND deleted_at IS NULL',
+            [impId])) {
+          await _insert('deck_lists', {...dl, 'player_id': player(dl['player_id'])});
+        }
+      }
     }
   }
 
@@ -502,7 +511,14 @@ class BackupMerger {
 
   /// Borra del teléfono un torneo con todo lo que cuelga de él.
   Future<void> _deleteTournament(String id) async {
-    for (final table in ['penalties', 'matches', 'rounds', 'tournament_players', 'season_results']) {
+    for (final table in [
+      'deck_lists',
+      'penalties',
+      'matches',
+      'rounds',
+      'tournament_players',
+      'season_results',
+    ]) {
       await _exec('DELETE FROM main.$table WHERE tournament_id = ?', [id]);
     }
     await _exec('DELETE FROM main.tournaments WHERE id = ?', [id]);
@@ -536,6 +552,11 @@ class BackupMerger {
   }
 
   Future<void> _exec(String sql, List<Object?> args) => _db.customStatement(sql, args);
+
+  /// true si la copia importada tiene esa tabla (las antiguas no tienen todas).
+  Future<bool> _importHas(String table) async => (await _rows(
+          "SELECT name FROM imp.sqlite_master WHERE type = 'table' AND name = ?", [table]))
+      .isNotEmpty;
 
   /// Inserta una fila con las mismas columnas que trae la copia (mismo esquema).
   /// Si ya existe una fila con ese id (datos de una importación anterior), se

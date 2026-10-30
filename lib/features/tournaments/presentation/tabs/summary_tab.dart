@@ -6,6 +6,8 @@ import '../../../../app/theme.dart';
 import '../../../../app/widgets/brand.dart';
 import '../../../../app/widgets/common.dart';
 import '../../../../core/db/app_database.dart';
+import '../../../decklists/presentation/deck_list_editor_page.dart' show DeckListTarget;
+import '../../../decklists/presentation/top_deck_lists_section.dart';
 import '../../domain/tournament_report.dart';
 import '../providers.dart';
 import '../report/report_export.dart';
@@ -68,6 +70,22 @@ class SummaryTab extends ConsumerWidget {
                     MetaHeadline(meta: report.metagame),
                   ],
                 ),
+              ),
+              TopDeckListsSection(
+                tournamentId: tournament.id,
+                targets: [
+                  for (final p in report.participants)
+                    if (p.position != null && p.position! <= 4)
+                      DeckListTarget(
+                        tournamentId: tournament.id,
+                        tournamentName: tournament.name,
+                        date: tournament.date,
+                        playerId: p.playerId,
+                        playerName: p.name,
+                        position: p.position,
+                        deckName: p.deck,
+                      ),
+                ],
               ),
               _Header(
                 title: 'Metagame',
