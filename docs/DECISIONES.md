@@ -155,3 +155,10 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - **Ver**: cuadrícula por sección con ×N, carta principal y avisos. Menú: editar, **compartir .ydk**, borrar.
 - **Imagen exportada** (una por jugador, 1600 px de ancho): logo, puesto, torneo, jugador, mazo y fecha; Main/Extra/Side con una imagen por copia (10 por fila); a la derecha la ilustración de la carta principal sobre un fondo del **tono opuesto** a su color medio (oscuro si la ilustración es clara, claro si es oscura) con borde verde neón. Las cartas sin imagen (sin conexión) salen con su nombre.
 - Pendiente (paso 5): mostrar las listas en la ficha del mazo y del jugador.
+
+## Imagen de la lista: dos modelos (v9)
+- Al exportar se elige el modelo:
+  - **Clásico** (vertical, 1080 px, como los carteles de torneos de Edison): ilustración de **fondo** desenfocada; la **principal** arriba a la izquierda y la **secundaria** abajo a la izquierda, fundiéndose con el fondo; título GARAGE TCG, torneo y fecha; puesto en dorado ("CAMPEÓN" / "Nº LUGAR"), jugador y mazo; MAIN en panel morado (una imagen por carta con el número de copias), SIDE en panel turquesa y EXTRA en panel naranja (una imagen por copia); al pie "LUGAR · Garage TCG" y el logo.
+  - **Contraste** (horizontal, 1600 px): fondo en degradado del color que contrasta con la principal (ya no negro) y la ilustración principal grande a la derecha, sin marco, fundiéndose con el fondo; la lista a la izquierda.
+- Las 3 imágenes (principal, secundaria, fondo) las elige quien sube la lista entre las cartas de la lista ("Imágenes para exportar" en el editor). Sin elegir: secundaria = primer monstruo del Extra/Main distinto de la principal; fondo = la principal.
+- Esquema **v9**: `deck_lists.background_card` y `secondary_card`.

@@ -62,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -107,6 +107,12 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(deckLists);
             await customStatement('CREATE INDEX IF NOT EXISTS idx_decklist_tournament '
                 'ON deck_lists (tournament_id)');
+          }
+          if (from < 9 && from >= 8) {
+            // v9: imágenes del modelo "Clásico" de la lista exportada
+            // (si viene de antes de la v8, createTable ya las crea).
+            await m.addColumn(deckLists, deckLists.backgroundCard);
+            await m.addColumn(deckLists, deckLists.secondaryCard);
           }
         },
         beforeOpen: (details) async {

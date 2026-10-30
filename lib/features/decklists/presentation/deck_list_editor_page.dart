@@ -43,11 +43,15 @@ class DeckListEditorPage extends ConsumerStatefulWidget {
     required this.target,
     this.initial,
     this.initialFeatured,
+    this.initialBackground,
+    this.initialSecondary,
   });
 
   final DeckListTarget target;
   final DeckCards? initial;
   final int? initialFeatured;
+  final int? initialBackground;
+  final int? initialSecondary;
 
   @override
   ConsumerState<DeckListEditorPage> createState() => _DeckListEditorPageState();
@@ -56,6 +60,8 @@ class DeckListEditorPage extends ConsumerStatefulWidget {
 class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
   late DeckCards _cards = widget.initial?.copy() ?? DeckCards();
   late int? _featured = widget.initialFeatured;
+  late int? _background = widget.initialBackground;
+  late int? _secondary = widget.initialSecondary;
   bool _saving = false;
 
   @override
@@ -95,6 +101,42 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                   padding: const EdgeInsets.only(bottom: 24),
                   children: [
                     _Header(target: t),
+                    if (!_cards.isEmpty) ...[
+                      const SectionLabel('Imágenes para exportar'),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            _ArtSlot(
+                              label: 'Principal',
+                              card: _featured == null ? null : cardDb.byId(_featured!),
+                              onTap: () => _pickArt(cardDb, 'Imagen principal', _featured,
+                                  (id) => _featured = id),
+                            ),
+                            _ArtSlot(
+                              label: 'Secundaria',
+                              card: _secondary == null ? null : cardDb.byId(_secondary!),
+                              onTap: () => _pickArt(cardDb, 'Imagen secundaria', _secondary,
+                                  (id) => _secondary = id),
+                            ),
+                            _ArtSlot(
+                              label: 'Fondo',
+                              card: _background == null ? null : cardDb.byId(_background!),
+                              onTap: () => _pickArt(cardDb, 'Imagen de fondo', _background,
+                                  (id) => _background = id),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 6, 16, 0),
+                        child: Text(
+                          'La principal sale en grande en los dos modelos. La secundaria y '
+                          'el fondo, en el modelo Clásico.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
                     if (_cards.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(16),
@@ -174,6 +216,76 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
           onMove: () => _move(card, s),
         ),
     ];
+  }
+
+  /// Elige una carta de la lista para una de las imágenes de la exportación.
+  Future<void> _pickArt(
+      CardDb db, String title, int? current, void Function(int? id) assign) async {
+    final ids = {..._cards.main, ..._cards.extra, ..._cards.side};
+    final cards = [for (final id in ids) if (db.byId(id) case final c?) c]
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                      child: Text(title,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+                  if (current != null)
+                    TextButton(onPressed: () => Navigator.pop(ctx, -1), child: const Text('Quitar')),
+                ],
+              ),
+            ),
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 120, mainAxisSpacing: 10, crossAxisSpacing: 10),
+                itemCount: cards.length,
+                itemBuilder: (_, i) {
+                  final c = cards[i];
+                  return InkWell(
+                    onTap: () => Navigator.pop(ctx, c.id),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: c.id == current ? AppColors.neon : Colors.transparent,
+                                    width: 3),
+                              ),
+                              child: CardImage(
+                                  id: c.id, name: c.name, size: CardImageSize.art, width: 90),
+                            ),
+                          ),
+                        ),
+                        Text(c.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    setState(() => assign(picked == -1 ? null : picked));
   }
 
   /// Pasa una copia a otra sección (p. ej. del Main al Side).
@@ -263,7 +375,8 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
   Future<void> _save() async {
     setState(() => _saving = true);
     final t = widget.target;
-    final featured = _featured != null && _cards.total(_featured!) > 0 ? _featured : null;
+    int? inDeck(int? id) => id != null && _cards.total(id) > 0 ? id : null;
+    final featured = inDeck(_featured);
     final ok = await runGuarded(
       context,
       () => ref.read(tournamentsDaoProvider).saveDeckList(
@@ -273,6 +386,8 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
             extra: DeckCards.joinCodes(_cards.extra),
             side: DeckCards.joinCodes(_cards.side),
             featuredCard: featured,
+            backgroundCard: inDeck(_background),
+            secondaryCard: inDeck(_secondary),
           ),
       success: 'Lista guardada',
     );
@@ -313,6 +428,61 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Hueco de una imagen de la exportación (ilustración de la carta elegida).
+class _ArtSlot extends StatelessWidget {
+  const _ArtSlot({required this.label, required this.card, required this.onTap});
+
+  final String label;
+  final YgoCard? card;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Column(
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: card == null
+                      ? Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceHigh,
+                            border: Border.all(color: AppColors.outline),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.add_photo_alternate_outlined,
+                              color: AppColors.textSecondary),
+                        )
+                      : LayoutBuilder(
+                          builder: (_, c) => CardImage(
+                              id: card!.id,
+                              name: card!.name,
+                              size: CardImageSize.art,
+                              width: c.maxWidth),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              Text(card?.name ?? 'Elegir',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
       ),
     );
   }

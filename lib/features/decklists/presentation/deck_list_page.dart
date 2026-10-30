@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
+import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../data/card_images.dart';
 import '../data/deck_lists_provider.dart';
@@ -41,18 +42,25 @@ class DeckListPage extends ConsumerWidget {
             IconButton(
               tooltip: 'Exportar imagen',
               icon: const Icon(Icons.ios_share),
-              onPressed: () => exportDeckListImage(
-                context,
-                target: target,
-                cards: cards!,
-                featured: saved.featuredCard,
-                db: cardDb,
-                store: ref.read(cardImageStoreProvider),
-              ),
+              onPressed: () async {
+                final style = await askDeckListStyle(context);
+                if (style == null || !context.mounted) return;
+                await exportDeckListImage(
+                  context,
+                  style: style,
+                  target: target,
+                  cards: cards!,
+                  featured: saved.featuredCard,
+                  secondary: saved.secondaryCard,
+                  background: saved.backgroundCard,
+                  db: cardDb,
+                  store: ref.read(cardImageStoreProvider),
+                );
+              },
             ),
             PopupMenuButton<String>(
               onSelected: (v) => switch (v) {
-                'edit' => _edit(context, cards, saved.featuredCard),
+                'edit' => _edit(context, cards, saved),
                 'ydk' => _shareYdk(context, cards!),
                 'delete' => _delete(context, ref),
                 _ => null,
@@ -146,10 +154,15 @@ class DeckListPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _edit(BuildContext context, DeckCards? cards, int? featured) {
+  Future<void> _edit(BuildContext context, DeckCards? cards, DeckList? saved) {
     return Navigator.of(context).push(MaterialPageRoute<bool>(
-      builder: (_) =>
-          DeckListEditorPage(target: target, initial: cards, initialFeatured: featured),
+      builder: (_) => DeckListEditorPage(
+        target: target,
+        initial: cards,
+        initialFeatured: saved?.featuredCard,
+        initialSecondary: saved?.secondaryCard,
+        initialBackground: saved?.backgroundCard,
+      ),
     ));
   }
 

@@ -330,6 +330,8 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     required String extra,
     required String side,
     int? featuredCard,
+    int? backgroundCard,
+    int? secondaryCard,
   }) async {
     await ensureEditable(tournamentId);
     final now = DateTime.now();
@@ -341,6 +343,8 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
         extraDeck: Value(extra),
         sideDeck: Value(side),
         featuredCard: Value(featuredCard),
+        backgroundCard: Value(backgroundCard),
+        secondaryCard: Value(secondaryCard),
       ),
       onConflict: DoUpdate(
         (old) => DeckListsCompanion(
@@ -348,6 +352,8 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
           extraDeck: Value(extra),
           sideDeck: Value(side),
           featuredCard: Value(featuredCard),
+          backgroundCard: Value(backgroundCard),
+          secondaryCard: Value(secondaryCard),
           deletedAt: const Value(null),
           updatedAt: Value(now),
         ),

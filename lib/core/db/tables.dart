@@ -250,6 +250,11 @@ class DeckLists extends Table with SyncColumns {
   /// Carta que sale en grande en la imagen exportada.
   IntColumn get featuredCard => integer().nullable()();
 
+  /// Modelo "Clásico" (v9): carta de la ilustración de fondo y de la
+  /// segunda imagen (abajo a la izquierda). La primera es [featuredCard].
+  IntColumn get backgroundCard => integer().nullable()();
+  IntColumn get secondaryCard => integer().nullable()();
+
   @override
   List<Set<Column<Object>>> get uniqueKeys => [
         {tournamentId, playerId},
