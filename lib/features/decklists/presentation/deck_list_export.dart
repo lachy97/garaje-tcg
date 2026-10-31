@@ -54,6 +54,18 @@ Color contrastBackground(Color dominant) {
   ).toColor();
 }
 
+/// Fondo acorde con la ilustración: su mismo tono, oscuro y algo saturado
+/// (el texto va en blanco encima).
+Color harmonyBackground(Color dominant) {
+  final hsl = HSLColor.fromColor(dominant);
+  return HSLColor.fromAHSL(
+    1,
+    hsl.hue,
+    math.min(math.max(hsl.saturation, 0.3), 0.65),
+    0.17,
+  ).toColor();
+}
+
 /// Texto legible sobre [bg].
 Color textOn(Color bg) => bg.computeLuminance() > 0.4 ? const Color(0xFF0B0B0D) : Colors.white;
 
@@ -110,6 +122,7 @@ class DeckListArt {
     this.secondaryArt,
     this.backgroundArt,
     required this.contrast,
+    required this.tone,
   });
 
   final DeckListTarget target;
@@ -123,6 +136,9 @@ class DeckListArt {
 
   /// Color que contrasta con la ilustración principal.
   final Color contrast;
+
+  /// Color acorde con la ilustración principal (mismo tono, oscuro).
+  final Color tone;
 
   String get positionLabel => switch (target.position) {
         null => '',
@@ -190,6 +206,7 @@ Future<void> exportDeckListImage(
       secondaryArt: secondaryArt,
       backgroundArt: backgroundArt,
       contrast: contrastBackground(dominant ?? AppColors.forest),
+      tone: harmonyBackground(dominant ?? AppColors.forest),
     );
     final (Widget page, double width, double height) = switch (style) {
       DeckListStyle.classic =>
@@ -248,109 +265,79 @@ String _fileSafe(String s) =>
 
 const _cardRatio = 246 / 168;
 
-/// Ilustración que se funde con el fondo por los bordes (sin marco).
-class FadedArt extends StatelessWidget {
-  const FadedArt({super.key, required this.file, required this.size, this.radial = true});
+/// Desvanece [child] hacia transparente por los lados indicados (fracción
+/// del ancho o alto que ocupa el degradado), para que una ilustración se funda
+/// con el fondo sin marco.
+class EdgeFade extends StatelessWidget {
+  const EdgeFade({
+    super.key,
+    required this.child,
+    this.left = 0,
+    this.right = 0,
+    this.top = 0,
+    this.bottom = 0,
+  });
 
-  final File? file;
-  final double size;
+  final Widget child;
+  final double left;
+  final double right;
+  final double top;
+  final double bottom;
 
-  /// true: se desvanece en círculo; false: solo hacia la izquierda y abajo.
-  final bool radial;
+  static Widget _mask(Widget child, Alignment from, Alignment to, double f) => ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (rect) => LinearGradient(
+          begin: from,
+          end: to,
+          colors: const [Colors.transparent, Colors.white],
+          stops: [0, f],
+        ).createShader(rect),
+        child: child,
+      );
 
   @override
   Widget build(BuildContext context) {
-    if (file == null) return SizedBox.square(dimension: size);
-    final image = Image.file(file!,
-        width: size, height: size, fit: BoxFit.cover, filterQuality: FilterQuality.high);
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (rect) => radial
-          ? const RadialGradient(
-              // radius 0.5 = mitad del lado: transparente justo en el borde
-              // (con más radio los bordes salían cortados, ~80 % opacos).
-              radius: 0.5,
-              colors: [Colors.white, Colors.white, Colors.transparent],
-              stops: [0, 0.65, 1],
-            ).createShader(rect)
-          : const LinearGradient(
-              begin: Alignment.centerRight,
-              end: Alignment.centerLeft,
-              colors: [Colors.white, Colors.white, Colors.transparent],
-              stops: [0, 0.7, 1],
-            ).createShader(rect),
-      child: radial
-          ? image
-          : ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (rect) => const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.white, Colors.white, Colors.transparent],
-                stops: [0, 0.72, 1],
-              ).createShader(rect),
-              child: image,
-            ),
-    );
+    var w = child;
+    if (left > 0) w = _mask(w, Alignment.centerLeft, Alignment.centerRight, left);
+    if (right > 0) w = _mask(w, Alignment.centerRight, Alignment.centerLeft, right);
+    if (top > 0) w = _mask(w, Alignment.topCenter, Alignment.bottomCenter, top);
+    if (bottom > 0) w = _mask(w, Alignment.bottomCenter, Alignment.topCenter, bottom);
+    return w;
   }
 }
 
-/// Imagen pequeña de una carta (o su nombre si no se pudo descargar), con el
-/// número de copias arriba a la izquierda si [count] no es null.
+/// Ilustración que llena su espacio (recortada, sin deformar).
+Widget _artFill(File? file) => file == null
+    ? const SizedBox.expand()
+    : Image.file(file, fit: BoxFit.cover, filterQuality: FilterQuality.high);
+
+/// Imagen pequeña de una carta (o su nombre si no se pudo descargar).
 class _CardTile extends StatelessWidget {
-  const _CardTile({required this.card, required this.file, required this.width, this.count});
+  const _CardTile({required this.card, required this.file, required this.width});
 
   final YgoCard card;
   final File? file;
   final double width;
-  final int? count;
 
   @override
   Widget build(BuildContext context) {
-    final h = width * _cardRatio;
     return SizedBox(
       width: width,
-      height: h,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(width * 0.04),
-              child: file != null
-                  ? Image.file(file!, fit: BoxFit.cover, filterQuality: FilterQuality.medium)
-                  : Container(
-                      color: AppColors.surfaceHigh,
-                      padding: const EdgeInsets.all(3),
-                      alignment: Alignment.center,
-                      child: Text(card.name,
-                          textAlign: TextAlign.center,
-                          maxLines: 5,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: width * 0.13, color: AppColors.textPrimary)),
-                    ),
-            ),
-          ),
-          if (count != null)
-            Positioned(
-              left: 2,
-              top: 2,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: width * 0.07),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(3),
-                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 3)],
-                ),
-                child: Text('$count',
-                    style: TextStyle(
-                        fontSize: width * 0.2,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black,
-                        height: 1.2)),
+      height: width * _cardRatio,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(width * 0.04),
+        child: file != null
+            ? Image.file(file!, fit: BoxFit.cover, filterQuality: FilterQuality.medium)
+            : Container(
+                color: AppColors.surfaceHigh,
+                padding: const EdgeInsets.all(3),
+                alignment: Alignment.center,
+                child: Text(card.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 5,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: width * 0.13, color: AppColors.textPrimary)),
               ),
-            ),
-        ],
       ),
     );
   }
@@ -364,45 +351,49 @@ List<YgoCard> _everyCopy(DeckCards cards, DeckSection s, CardDb db) => [
 
 // ───────────────────────── Modelo Clásico ─────────────────────────
 
-/// Como los carteles de los torneos de Edison: ilustración de fondo, la
-/// principal y la secundaria a la izquierda fundiéndose con el fondo, y a la
-/// derecha puesto, jugador, mazo y la lista en paneles (Main con el número de
-/// copias de cada carta; Side y Extra una imagen por copia).
+/// Como los carteles de los torneos de Edison (vertical, 1080 px):
+/// - columna izquierda: imagen 1 (arriba) e imagen 2 (abajo), cada una
+///   llenando su mitad y fundiéndose hacia la derecha;
+/// - a la derecha, la ilustración de fondo (más desenfocada) y encima el
+///   título, puesto, jugador, mazo y la lista en paneles (una imagen por copia).
 class ClassicDeckListPoster extends StatelessWidget {
   const ClassicDeckListPoster({super.key, required this.data});
 
   final DeckListArt data;
 
   static const width = 1080.0;
-  static const _left = 330.0;
-  static const _right = 34.0;
+  static const minHeight = 1350.0;
+
+  /// Ancho de la columna de imágenes de la izquierda.
+  static const _leftCol = 340.0;
+  static const _padL = 22.0;
+  static const _padR = 28.0;
   static const _panelPad = 10.0;
   static const _panelBorder = 2.0;
 
-  /// Alto mínimo: la imagen secundaria llega hasta y = 1140.
-  static const _minHeight = 1350.0;
-
   /// Ancho útil dentro de un panel (descontando relleno y borde).
-  static const _inner = width - _left - _right - 2 * _panelPad - 2 * _panelBorder - 1;
-  static const _mainCols = 10;
-  static const _gap = 6.0;
-  static const _mainCard = (_inner - (_mainCols - 1) * _gap) / _mainCols;
+  static const _inner =
+      width - _leftCol - _padL - _padR - 2 * _panelPad - 2 * _panelBorder - 1;
+  static const _gap = 5.0;
 
-  static double _rowCard(int n) {
-    final cols = math.min(15, math.max(10, n));
-    return (_inner - (cols - 1) * 4) / cols;
+  /// Columnas por fila: 10 en el Main (hasta 6 filas); Side y Extra en una o
+  /// dos filas de hasta 15.
+  static int _cols(DeckSection s, int n) =>
+      s == DeckSection.main ? 10 : math.min(15, math.max(10, n));
+
+  static double _cardW(DeckSection s, int n) {
+    final cols = _cols(s, n);
+    return (_inner - (cols - 1) * _gap) / cols;
   }
 
   static double estimateHeight(DeckCards cards, CardDb db) {
-    final mainRows = (groupedSection(cards, DeckSection.main, db).length / _mainCols).ceil();
-    var h = 40 + 80 + 230 + 40 + mainRows * (_mainCard * _cardRatio + _gap) + 2 * _panelPad;
-    for (final s in [DeckSection.side, DeckSection.extra]) {
+    var h = 30.0 + 150 + 200;
+    for (final s in DeckSection.values) {
       final n = cards.of(s).length;
       if (n == 0) continue;
-      final cols = math.min(15, math.max(10, n));
-      h += 40 + (n / cols).ceil() * (_rowCard(n) * _cardRatio + 4) + 2 * _panelPad + 14;
+      h += 44 + (n / _cols(s, n)).ceil() * (_cardW(s, n) * _cardRatio + _gap) + 2 * _panelPad;
     }
-    return math.max(h + 170, _minHeight);
+    return math.max(h + 160, minHeight);
   }
 
   @override
@@ -414,30 +405,26 @@ class ClassicDeckListPoster extends StatelessWidget {
     final shadow = [const Shadow(color: Colors.black, blurRadius: 10, offset: Offset(0, 2))];
     TextStyle style(double size, {Color color = white, FontWeight w = FontWeight.w900}) =>
         TextStyle(fontSize: size, color: color, fontWeight: w, shadows: shadow, height: 1.05);
-    final main = groupedSection(d.cards, DeckSection.main, d.db);
+    final base = Color.lerp(d.tone, Colors.black, 0.35)!;
 
     Widget label(String text) => Padding(
           padding: const EdgeInsets.only(top: 14, bottom: 6),
           child: Text(text, style: style(22, w: FontWeight.w800)),
         );
-    Widget panel(Color color, Widget child) => Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(_panelPad),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color, width: _panelBorder),
-          ),
-          child: child,
-        );
-    Widget row(DeckSection s, Color color) {
+    Widget panel(DeckSection s, Color color) {
       final copies = _everyCopy(d.cards, s, d.db);
-      final w = _rowCard(copies.length);
-      return panel(
-        color,
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
+      final w = _cardW(s, copies.length);
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(_panelPad),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color, width: _panelBorder),
+        ),
+        child: Wrap(
+          spacing: _gap,
+          runSpacing: _gap,
           children: [
             for (final c in copies) _CardTile(card: c, file: d.small[c.id], width: w),
           ],
@@ -445,109 +432,98 @@ class ClassicDeckListPoster extends StatelessWidget {
       );
     }
 
-    return SizedBox(
+    const sections = [
+      (DeckSection.main, 'MAIN', Color(0xFF8E5BD6)),
+      (DeckSection.side, 'SIDE', Color(0xFF2EA6A6)),
+      (DeckSection.extra, 'EXTRA', Color(0xFFD08A3A)),
+    ];
+
+    return Container(
       width: width,
+      color: base,
       child: Stack(
         children: [
-          // Fondo: ilustración elegida, desenfocada y oscurecida un poco.
-          Positioned.fill(
-            child: d.backgroundArt == null
-                ? DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [d.contrast, Color.lerp(d.contrast, Colors.black, 0.6)!],
-                      ),
-                    ),
-                  )
-                : ImageFiltered(
+          // Fondo (zona derecha): ilustración elegida, bien difuminada, que
+          // se funde por la izquierda con las imágenes de la columna.
+          Positioned(
+            left: _leftCol - 60,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            child: EdgeFade(
+              left: 0.12,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ImageFiltered(
                     imageFilter:
-                        ui.ImageFilter.blur(sigmaX: 4, sigmaY: 4, tileMode: ui.TileMode.clamp),
-                    child: Image.file(d.backgroundArt!,
-                        fit: BoxFit.cover, filterQuality: FilterQuality.medium),
+                        ui.ImageFilter.blur(sigmaX: 9, sigmaY: 9, tileMode: ui.TileMode.clamp),
+                    child: _artFill(d.backgroundArt),
                   ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.25),
-                    Colors.black.withValues(alpha: 0.45),
-                  ],
-                ),
+                  ColoredBox(color: Colors.black.withValues(alpha: 0.38)),
+                ],
               ),
             ),
           ),
-          // Imágenes de la izquierda.
-          Positioned(left: -90, top: 70, child: FadedArt(file: d.featuredArt, size: 560)),
-          Positioned(left: -70, top: 640, child: FadedArt(file: d.secondaryArt, size: 500)),
-          // Contenido (alto mínimo: la imagen secundaria no queda cortada).
+          // Columna izquierda: imagen 1 arriba e imagen 2 abajo.
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: _leftCol,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: EdgeFade(right: 0.18, bottom: 0.06, child: _artFill(d.featuredArt)),
+                ),
+                Expanded(
+                  child: EdgeFade(right: 0.18, top: 0.06, child: _artFill(d.secondaryArt)),
+                ),
+              ],
+            ),
+          ),
+          // Contenido (zona derecha).
           Padding(
-            padding: const EdgeInsets.fromLTRB(28, 30, _right, 30),
+            padding: const EdgeInsets.fromLTRB(_leftCol + _padL, 28, _padR, 28),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: _minHeight - 60),
+              constraints: const BoxConstraints(minHeight: minHeight - 56),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Column(
-                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text('GARAGE TCG',
                           textAlign: TextAlign.center,
-                          style: style(64).copyWith(letterSpacing: 3)),
-                      Text(t.tournamentName.toUpperCase(),
-                          textAlign: TextAlign.center, style: style(26, w: FontWeight.w700)),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(DateFormat('dd/MM/yy').format(t.date),
-                            style: style(20, w: FontWeight.w700)),
+                          style: style(60).copyWith(letterSpacing: 3)),
+                      Text(
+                        '${t.tournamentName.toUpperCase()} · '
+                        '${DateFormat('dd/MM/yy').format(t.date)}',
+                        textAlign: TextAlign.center,
+                        style: style(24, w: FontWeight.w700),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: _left - 28),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (d.positionLabel.isNotEmpty)
-                              Text(d.positionLabel, style: style(50, color: gold)),
-                            const SizedBox(height: 6),
-                            Text(t.playerName, style: style(40, w: FontWeight.w800)),
-                            const SizedBox(height: 4),
-                            Text('MAZO', style: style(18, w: FontWeight.w700)),
-                            Text(t.deckName ?? 'Sin mazo', style: style(52)),
-                            label('MAIN: ${d.cards.main.length}'),
-                            panel(
-                              const Color(0xFF8E5BD6),
-                              Wrap(
-                                spacing: _gap,
-                                runSpacing: _gap,
-                                children: [
-                                  for (final (c, n) in main)
-                                    _CardTile(
-                                        card: c, file: d.small[c.id], width: _mainCard, count: n),
-                                ],
-                              ),
-                            ),
-                            if (d.cards.side.isNotEmpty) ...[
-                              label('SIDE: ${d.cards.side.length}'),
-                              row(DeckSection.side, const Color(0xFF2EA6A6)),
-                            ],
-                            if (d.cards.extra.isNotEmpty) ...[
-                              label('EXTRA: ${d.cards.extra.length}'),
-                              row(DeckSection.extra, const Color(0xFFD08A3A)),
-                            ],
-                          ],
-                        ),
-                      ),
+                      const SizedBox(height: 18),
+                      if (d.positionLabel.isNotEmpty)
+                        Text(d.positionLabel, style: style(50, color: gold)),
+                      const SizedBox(height: 4),
+                      Text(t.playerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: style(40, w: FontWeight.w800)),
+                      const SizedBox(height: 6),
+                      Text('MAZO', style: style(18, w: FontWeight.w700)),
+                      Text(t.deckName ?? 'Sin mazo', style: style(50)),
+                      for (final (s, name, color) in sections)
+                        if (d.cards.of(s).isNotEmpty) ...[
+                          label('$name: ${d.cards.of(s).length}'),
+                          panel(s, color),
+                        ],
                     ],
                   ),
                   Padding(
-                    padding: const EdgeInsets.only(left: _left - 28, top: 24),
+                    padding: const EdgeInsets.only(top: 24),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -578,9 +554,9 @@ class ClassicDeckListPoster extends StatelessWidget {
 
 // ───────────────────────── Modelo Contraste ─────────────────────────
 
-/// Fondo con el color que contrasta con la carta principal (degradado, no
-/// negro), la lista a la izquierda (una imagen por copia) y la ilustración
-/// principal grande a la derecha, sin marco, fundiéndose con el fondo.
+/// Horizontal (1600 px): a la izquierda la lista sobre un fondo del color de
+/// la ilustración principal (mismo tono, oscuro); a la derecha la ilustración
+/// principal ocupando todo el alto, sin marco, fundiéndose por la izquierda.
 class ContrastDeckListPoster extends StatelessWidget {
   const ContrastDeckListPoster({super.key, required this.data});
 
@@ -592,7 +568,10 @@ class ContrastDeckListPoster extends StatelessWidget {
   static const _gap = 6.0;
   static const _cardW = 86.0;
   static const _leftW = _cols * _cardW + (_cols - 1) * _gap;
-  static const _art = 820.0;
+
+  /// La ilustración empieza aquí (se funde por su borde izquierdo).
+  static const _artLeft = _pad + _leftW - 40;
+  static const minHeight = 900.0;
 
   static double estimateHeight(DeckCards cards) {
     var h = _pad * 2 + 170 + 40;
@@ -601,17 +580,17 @@ class ContrastDeckListPoster extends StatelessWidget {
       if (n == 0) continue;
       h += 46 + (n / _cols).ceil() * (_cardW * _cardRatio + _gap) + 18;
     }
-    return math.max(h, _art + 120);
+    return math.max(h, minHeight);
   }
 
   @override
   Widget build(BuildContext context) {
     final d = data;
     final t = d.target;
-    final darkBg = d.contrast.computeLuminance() < 0.4;
-    final text = darkBg ? Colors.white : const Color(0xFF0B0B0D);
-    final accent = darkBg ? AppColors.neon : const Color(0xFF0E3B22);
-    final muted = text.withValues(alpha: 0.7);
+    const text = Colors.white;
+    const accent = AppColors.neon;
+    final muted = Colors.white.withValues(alpha: 0.75);
+    final shadow = [const Shadow(color: Colors.black87, blurRadius: 10)];
 
     List<Widget> section(DeckSection s) {
       final copies = _everyCopy(d.cards, s, d.db);
@@ -619,7 +598,7 @@ class ContrastDeckListPoster extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 10, top: 6),
           child: Text('${s.label.toUpperCase()} · ${copies.length}',
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2, color: accent)),
         ),
         Wrap(
@@ -640,52 +619,51 @@ class ContrastDeckListPoster extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.lerp(d.contrast, Colors.black, darkBg ? 0.25 : 0.0)!,
-            d.contrast,
-            Color.lerp(d.contrast, darkBg ? Colors.black : Colors.white, 0.35)!,
+            Color.lerp(d.tone, Colors.white, 0.08)!,
+            d.tone,
+            Color.lerp(d.tone, Colors.black, 0.45)!,
           ],
         ),
-        border: Border.all(color: AppColors.neon, width: 3),
       ),
       child: Stack(
         children: [
-          // Ilustración principal, grande y sin marco.
+          // Ilustración principal: todo el alto de la zona derecha.
           Positioned(
-            right: -20,
+            left: _artLeft,
             top: 0,
-            child: FadedArt(file: d.featuredArt, size: _art, radial: false),
+            right: 0,
+            bottom: 0,
+            child: EdgeFade(left: 0.22, child: _artFill(d.featuredArt)),
           ),
           if (d.featured != null)
             Positioned(
-              left: _pad + _leftW + 40,
+              left: _artLeft + 120,
               right: _pad,
-              top: _art - 70,
+              bottom: 60,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(d.featured!.name,
                     maxLines: 1,
                     style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: text,
-                      shadows: [
-                        Shadow(color: darkBg ? Colors.black : Colors.white54, blurRadius: 8),
-                      ],
-                    )),
+                        fontSize: 34, fontWeight: FontWeight.w900, color: text, shadows: shadow)),
               ),
             ),
           Positioned(
             right: _pad,
-            bottom: 26,
+            bottom: 24,
             child: Text('GARAGE TCG · EDISON FORMAT',
                 style: TextStyle(
-                    fontSize: 16, letterSpacing: 3, fontWeight: FontWeight.w800, color: muted)),
+                    fontSize: 16,
+                    letterSpacing: 3,
+                    fontWeight: FontWeight.w800,
+                    color: muted,
+                    shadows: shadow)),
           ),
           Padding(
             padding: const EdgeInsets.all(_pad),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: _art + 40 - 2 * _pad),
+              constraints: const BoxConstraints(minHeight: minHeight - 2 * _pad),
               child: SizedBox(
                 width: _leftW,
                 child: Column(
@@ -706,7 +684,7 @@ class ContrastDeckListPoster extends StatelessWidget {
                                   if (d.positionLabel.isNotEmpty) d.positionLabel,
                                   t.tournamentName.toUpperCase(),
                                 ].join(' · '),
-                                style: TextStyle(
+                                style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 2,
@@ -715,7 +693,7 @@ class ContrastDeckListPoster extends StatelessWidget {
                               Text(t.playerName,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                       fontSize: 56,
                                       height: 1.1,
                                       fontWeight: FontWeight.w900,

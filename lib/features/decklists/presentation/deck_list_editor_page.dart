@@ -103,26 +103,33 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                     _Header(target: t),
                     if (!_cards.isEmpty) ...[
                       const SectionLabel('Imágenes para exportar'),
+                      const _LayoutGuide(),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
                           children: [
                             _ArtSlot(
-                              label: 'Principal',
+                              label: '1 · Arriba izq.',
                               card: _featured == null ? null : cardDb.byId(_featured!),
-                              onTap: () => _pickArt(cardDb, 'Imagen principal', _featured,
+                              onTap: () => _pickArt(
+                                  cardDb,
+                                  '1 · Arriba a la izquierda (Clásico) y grande a la derecha '
+                                      '(Contraste)',
+                                  _featured,
                                   (id) => _featured = id),
                             ),
                             _ArtSlot(
-                              label: 'Secundaria',
+                              label: '2 · Abajo izq.',
                               card: _secondary == null ? null : cardDb.byId(_secondary!),
-                              onTap: () => _pickArt(cardDb, 'Imagen secundaria', _secondary,
+                              onTap: () => _pickArt(
+                                  cardDb, '2 · Abajo a la izquierda (Clásico)', _secondary,
                                   (id) => _secondary = id),
                             ),
                             _ArtSlot(
-                              label: 'Fondo',
+                              label: '3 · Fondo',
                               card: _background == null ? null : cardDb.byId(_background!),
-                              onTap: () => _pickArt(cardDb, 'Imagen de fondo', _background,
+                              onTap: () => _pickArt(
+                                  cardDb, '3 · Fondo detrás de la lista (Clásico)', _background,
                                   (id) => _background = id),
                             ),
                           ],
@@ -131,8 +138,9 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                       const Padding(
                         padding: EdgeInsets.fromLTRB(16, 6, 16, 0),
                         child: Text(
-                          'La principal sale en grande en los dos modelos. La secundaria y '
-                          'el fondo, en el modelo Clásico.',
+                          'La 1 sale en los dos modelos (en Contraste ocupa todo el lado '
+                          'derecho). La 2 y la 3 solo en el modelo Clásico. La estrella de '
+                          'una carta también la pone como 1.',
                           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                         ),
                       ),
@@ -426,6 +434,67 @@ class _Header extends StatelessWidget {
                     style: const TextStyle(color: AppColors.textSecondary)),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Esquema de dónde va cada imagen en los dos modelos.
+class _LayoutGuide extends StatelessWidget {
+  const _LayoutGuide();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget zone(String text, {Color color = AppColors.forest, int flex = 1}) => Expanded(
+          flex: flex,
+          child: Container(
+            margin: const EdgeInsets.all(1.5),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppColors.outline),
+            ),
+            child: Text(text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+          ),
+        );
+    Widget model(String title, double aspect, Widget body) => Expanded(
+          child: Column(
+            children: [
+              AspectRatio(aspectRatio: aspect, child: body),
+              const SizedBox(height: 4),
+              Text(title,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            ],
+          ),
+        );
+    const list = AppColors.surfaceHigh;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          model(
+            'Clásico',
+            1080 / 1350,
+            Row(
+              children: [
+                Expanded(
+                  child: Column(children: [zone('1'), zone('2')]),
+                ),
+                zone('3\nFondo\n+ lista', color: AppColors.moss, flex: 2),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          model(
+            'Contraste',
+            1600 / 1000,
+            Row(children: [zone('Lista', color: list, flex: 3), zone('1', flex: 2)]),
           ),
         ],
       ),
