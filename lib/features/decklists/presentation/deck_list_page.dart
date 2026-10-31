@@ -43,11 +43,12 @@ class DeckListPage extends ConsumerWidget {
               tooltip: 'Exportar imagen',
               icon: const Icon(Icons.ios_share),
               onPressed: () async {
-                final style = await askDeckListStyle(context);
-                if (style == null || !context.mounted) return;
+                final choice = await askDeckListStyle(context);
+                if (choice == null || !context.mounted) return;
                 await exportDeckListImage(
                   context,
-                  style: style,
+                  style: choice.$1,
+                  format: choice.$2,
                   target: target,
                   cards: cards!,
                   featured: saved.featuredCard,

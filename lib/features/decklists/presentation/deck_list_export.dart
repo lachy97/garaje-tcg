@@ -86,28 +86,68 @@ enum DeckListStyle {
   final String description;
 }
 
-/// Pregunta qué modelo exportar.
-Future<DeckListStyle?> askDeckListStyle(BuildContext context) =>
-    showModalBottomSheet<DeckListStyle>(
+/// Proporción de la imagen exportada.
+enum DeckListFormat {
+  /// La de cada modelo (Clásico vertical; Contraste horizontal, alto según
+  /// la lista).
+  natural('Actual'),
+
+  /// 16:9 (1920 × 1080): las cartas se ajustan para que quepa toda la lista.
+  wide('16:9');
+
+  const DeckListFormat(this.label);
+  final String label;
+}
+
+/// Pregunta el modelo y la proporción de la imagen.
+Future<(DeckListStyle, DeckListFormat)?> askDeckListStyle(BuildContext context) =>
+    showModalBottomSheet<(DeckListStyle, DeckListFormat)>(
       context: context,
       showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final s in DeckListStyle.values)
-              ListTile(
-                leading: Icon(s == DeckListStyle.classic
-                    ? Icons.crop_portrait
-                    : Icons.crop_landscape),
-                title: Text('Modelo ${s.label}'),
-                subtitle: Text(s.description),
-                onTap: () => Navigator.pop(ctx, s),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      builder: (ctx) {
+        var format = DeckListFormat.natural;
+        return StatefulBuilder(
+          builder: (ctx, setState) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SegmentedButton<DeckListFormat>(
+                    segments: const [
+                      ButtonSegment(
+                          value: DeckListFormat.natural,
+                          icon: Icon(Icons.crop_original),
+                          label: Text('Actual')),
+                      ButtonSegment(
+                          value: DeckListFormat.wide,
+                          icon: Icon(Icons.crop_16_9),
+                          label: Text('16:9')),
+                    ],
+                    selected: {format},
+                    onSelectionChanged: (v) => setState(() => format = v.first),
+                  ),
+                ),
+                for (final s in DeckListStyle.values)
+                  ListTile(
+                    leading: Icon(format == DeckListFormat.wide
+                        ? Icons.crop_16_9
+                        : s == DeckListStyle.classic
+                            ? Icons.crop_portrait
+                            : Icons.crop_landscape),
+                    title: Text('Modelo ${s.label}'),
+                    subtitle: Text(format == DeckListFormat.wide
+                        ? '${s.description.split(' (').first} · 1920 × 1080'
+                        : s.description),
+                    onTap: () => Navigator.pop(ctx, (s, format)),
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
     );
 
 /// Todo lo que necesitan los dos modelos (imágenes ya en el teléfono).
@@ -154,6 +194,7 @@ bool _exporting = false;
 Future<void> exportDeckListImage(
   BuildContext context, {
   required DeckListStyle style,
+  DeckListFormat format = DeckListFormat.natural,
   required DeckListTarget target,
   required DeckCards cards,
   required CardDb db,
@@ -208,11 +249,15 @@ Future<void> exportDeckListImage(
       contrast: contrastBackground(dominant ?? AppColors.forest),
       tone: harmonyBackground(dominant ?? AppColors.forest),
     );
-    final (Widget page, double width, double height) = switch (style) {
-      DeckListStyle.classic =>
+    final (Widget page, double width, double height) = switch ((style, format)) {
+      (DeckListStyle.classic, DeckListFormat.wide) =>
+        (ClassicWidePoster(data: data), wideSize.width, wideSize.height),
+      (DeckListStyle.contrast, DeckListFormat.wide) =>
+        (ContrastWidePoster(data: data), wideSize.width, wideSize.height),
+      (DeckListStyle.classic, _) =>
         (ClassicDeckListPoster(data: data), ClassicDeckListPoster.width,
             ClassicDeckListPoster.estimateHeight(cards, db)),
-      DeckListStyle.contrast =>
+      (DeckListStyle.contrast, _) =>
         (ContrastDeckListPoster(data: data), ContrastDeckListPoster.width,
             ContrastDeckListPoster.estimateHeight(cards)),
     };
@@ -225,7 +270,7 @@ Future<void> exportDeckListImage(
         contentWidth: width,
         summaryHeightEstimate: height,
         legend: '',
-        fileBase: 'lista_${style.name}_${_fileSafe(target.playerName)}_'
+        fileBase: 'lista_${style.name}${format == DeckListFormat.wide ? '_16x9' : ''}_${_fileSafe(target.playerName)}_'
             '${_fileSafe(target.tournamentName)}',
         shareText: '${target.position == null ? '' : '${target.position}º · '}'
             '${target.playerName} · ${target.deckName ?? ''} · ${target.tournamentName}',
@@ -714,6 +759,385 @@ class ContrastDeckListPoster extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────── Formato 16:9 ─────────────────────────
+
+/// Tamaño de las imágenes 16:9.
+const wideSize = Size(1920, 1080);
+
+/// Ancho de carta más grande con el que todas las secciones caben en
+/// [width] × [height] (cada sección suma [perSection] de título y márgenes).
+/// Las cartas de cada fila se colocan con [gap] de separación.
+double fitCardWidth({
+  required List<int> counts,
+  required double width,
+  required double height,
+  required double gap,
+  required double perSection,
+  double maxWidth = 140,
+}) {
+  double used(double cw) {
+    final cols = math.max(1, ((width + gap) / (cw + gap)).floor());
+    var t = 0.0;
+    for (final n in counts) {
+      if (n == 0) continue;
+      t += perSection + (n / cols).ceil() * (cw * _cardRatio + gap);
+    }
+    return t;
+  }
+
+  var lo = 12.0, hi = maxWidth;
+  if (used(hi) <= height) return hi;
+  for (var i = 0; i < 40; i++) {
+    final mid = (lo + hi) / 2;
+    if (used(mid) <= height) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo.floorToDouble();
+}
+
+/// Modelo Clásico en 16:9: columna de imágenes 1 y 2 a la izquierda (mitad
+/// y mitad), fondo difuminado detrás y la lista a la derecha.
+class ClassicWidePoster extends StatelessWidget {
+  const ClassicWidePoster({super.key, required this.data});
+
+  final DeckListArt data;
+
+  static const _leftCol = 540.0;
+  static const _padL = 26.0;
+  static const _padR = 32.0;
+  static const _padV = 26.0;
+  static const _panelPad = 8.0;
+  static const _panelBorder = 2.0;
+  static const _gap = 5.0;
+  static const _header = 186.0;
+  static const _label = 34.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = data;
+    final t = d.target;
+    const gold = Color(0xFFE9C46A);
+    const white = Colors.white;
+    final shadow = [const Shadow(color: Colors.black, blurRadius: 10, offset: Offset(0, 2))];
+    TextStyle style(double size, {Color color = white, FontWeight w = FontWeight.w900}) =>
+        TextStyle(fontSize: size, color: color, fontWeight: w, shadows: shadow, height: 1.05);
+
+    final w = wideSize.width, h = wideSize.height;
+    final inner = w - _leftCol - _padL - _padR - 2 * _panelPad - 2 * _panelBorder - 2;
+    final counts = [for (final s in DeckSection.values) d.cards.of(s).length];
+    final cardW = fitCardWidth(
+      counts: counts,
+      width: inner,
+      height: h - 2 * _padV - _header,
+      gap: _gap,
+      perSection: _label + 2 * _panelPad + 2 * _panelBorder + 2,
+    );
+    const sections = [
+      (DeckSection.main, 'MAIN', Color(0xFF8E5BD6)),
+      (DeckSection.side, 'SIDE', Color(0xFF2EA6A6)),
+      (DeckSection.extra, 'EXTRA', Color(0xFFD08A3A)),
+    ];
+
+    return Container(
+      width: w,
+      height: h,
+      color: Color.lerp(d.tone, Colors.black, 0.35),
+      child: Stack(
+        children: [
+          Positioned(
+            left: _leftCol - 80,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            child: EdgeFade(
+              left: 0.1,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ImageFiltered(
+                    imageFilter:
+                        ui.ImageFilter.blur(sigmaX: 9, sigmaY: 9, tileMode: ui.TileMode.clamp),
+                    child: _artFill(d.backgroundArt),
+                  ),
+                  ColoredBox(color: Colors.black.withValues(alpha: 0.4)),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: _leftCol,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: EdgeFade(right: 0.18, bottom: 0.06, child: _artFill(d.featuredArt)),
+                ),
+                Expanded(
+                  child: EdgeFade(right: 0.18, top: 0.06, child: _artFill(d.secondaryArt)),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(_leftCol + _padL, _padV, _padR, _padV),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: _header,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              [
+                                if (d.positionLabel.isNotEmpty) d.positionLabel,
+                                '${t.tournamentName.toUpperCase()} · '
+                                    '${DateFormat('dd/MM/yy').format(t.date)}',
+                              ].join('  ·  '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: style(30, color: gold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(t.playerName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: style(56)),
+                            const SizedBox(height: 6),
+                            Text('MAZO · ${t.deckName ?? 'Sin mazo'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: style(40, w: FontWeight.w800)),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        children: [
+                          Image.asset(BrandAssets.logo,
+                              width: 110, height: 110, filterQuality: FilterQuality.high),
+                          Text('GARAGE TCG', style: style(22).copyWith(letterSpacing: 2)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                for (final (s, name, color) in sections)
+                  if (d.cards.of(s).isNotEmpty) ...[
+                    SizedBox(
+                      height: _label,
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text('$name: ${d.cards.of(s).length}',
+                              style: style(22, w: FontWeight.w800)),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(_panelPad),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: color, width: _panelBorder),
+                      ),
+                      child: Wrap(
+                        spacing: _gap,
+                        runSpacing: _gap,
+                        children: [
+                          for (final c in _everyCopy(d.cards, s, d.db))
+                            _CardTile(card: c, file: d.small[c.id], width: cardW),
+                        ],
+                      ),
+                    ),
+                  ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Modelo Contraste en 16:9: la lista a la izquierda sobre el tono de la
+/// ilustración principal y la ilustración ocupando todo el alto a la derecha.
+class ContrastWidePoster extends StatelessWidget {
+  const ContrastWidePoster({super.key, required this.data});
+
+  final DeckListArt data;
+
+  static const _pad = 36.0;
+  static const _artW = 700.0;
+  static const _gap = 6.0;
+  static const _header = 150.0;
+  static const _label = 40.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = data;
+    final t = d.target;
+    const text = Colors.white;
+    const accent = AppColors.neon;
+    final muted = Colors.white.withValues(alpha: 0.75);
+    final shadow = [const Shadow(color: Colors.black87, blurRadius: 10)];
+
+    final w = wideSize.width, h = wideSize.height;
+    final listW = w - _artW - 2 * _pad;
+    final counts = [for (final s in DeckSection.values) d.cards.of(s).length];
+    final cardW = fitCardWidth(
+      counts: counts,
+      width: listW - 1,
+      height: h - 2 * _pad - _header,
+      gap: _gap,
+      perSection: _label + 6,
+    );
+
+    return Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(d.tone, Colors.white, 0.08)!,
+            d.tone,
+            Color.lerp(d.tone, Colors.black, 0.45)!,
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: w - _artW - 60,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            child: EdgeFade(left: 0.2, child: _artFill(d.featuredArt)),
+          ),
+          if (d.featured != null)
+            Positioned(
+              left: w - _artW + 60,
+              right: _pad,
+              bottom: 56,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(d.featured!.name,
+                    maxLines: 1,
+                    style: TextStyle(
+                        fontSize: 34, fontWeight: FontWeight.w900, color: text, shadows: shadow)),
+              ),
+            ),
+          Positioned(
+            right: _pad,
+            bottom: 22,
+            child: Text('GARAGE TCG · EDISON FORMAT',
+                style: TextStyle(
+                    fontSize: 16,
+                    letterSpacing: 3,
+                    fontWeight: FontWeight.w800,
+                    color: muted,
+                    shadows: shadow)),
+          ),
+          Positioned(
+            left: _pad,
+            top: _pad,
+            width: listW,
+            bottom: _pad,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: _header,
+                  child: Row(
+                    children: [
+                      Image.asset(BrandAssets.logo,
+                          width: 110, height: 110, filterQuality: FilterQuality.high),
+                      const SizedBox(width: 22),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              [
+                                if (d.positionLabel.isNotEmpty) d.positionLabel,
+                                t.tournamentName.toUpperCase(),
+                              ].join(' · '),
+                              style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 2,
+                                  color: accent),
+                            ),
+                            Text(t.playerName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 54,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w900,
+                                    color: text)),
+                            Text(
+                                '${t.deckName ?? 'Sin mazo'} · '
+                                '${DateFormat('dd/MM/yyyy').format(t.date)}',
+                                style: TextStyle(
+                                    fontSize: 24, fontWeight: FontWeight.w700, color: muted)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                for (final s in DeckSection.values)
+                  if (d.cards.of(s).isNotEmpty) ...[
+                    SizedBox(
+                      height: _label,
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text('${s.label.toUpperCase()} · ${d.cards.of(s).length}',
+                              style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2,
+                                  color: accent)),
+                        ),
+                      ),
+                    ),
+                    Wrap(
+                      spacing: _gap,
+                      runSpacing: _gap,
+                      children: [
+                        for (final c in _everyCopy(d.cards, s, d.db))
+                          _CardTile(card: c, file: d.small[c.id], width: cardW),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+              ],
             ),
           ),
         ],
