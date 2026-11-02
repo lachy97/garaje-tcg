@@ -230,6 +230,23 @@ void main() {
       expect(out.pairings.where((p) => p.isBye).length, 1);
     });
 
+    test('mesa elegida para una pareja; el resto ocupa las libres', () {
+      final out = SwissPairingEngine(random: Random(2)).pairFirstRoundWith(
+        players: _players(8),
+        fixed: const [('p01', 'p02'), ('p03', 'p04')],
+        tables: const {'p01': 3},
+      );
+      final byTable = {for (final p in out.pairings) p.table: (p.player1Id, p.player2Id)};
+      expect(byTable[3], ('p01', 'p02'));
+      expect(byTable[1], ('p03', 'p04'), reason: 'la otra definida toma la libre más baja');
+      expect(out.pairings.map((p) => p.table), [1, 2, 3, 4]);
+      expect(() => SwissPairingEngine.assignTables(pairCount: 4, chosen: const {0: 5}),
+          throwsA(isA<TournamentException>()));
+      expect(() => SwissPairingEngine.assignTables(pairCount: 4, chosen: const {0: 2, 1: 2}),
+          throwsA(isA<TournamentException>()));
+      expect(SwissPairingEngine.assignTables(pairCount: 3, chosen: const {2: 1}), [2, 3, 1]);
+    });
+
     test('errores: jugador repetido, BYE con número par', () {
       final e = SwissPairingEngine();
       expect(

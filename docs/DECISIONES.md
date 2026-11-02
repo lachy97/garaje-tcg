@@ -164,3 +164,10 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - Esquema **v9**: `deck_lists.background_card` y `secondary_card`.
 - **Ajustes (31/10)**: Clásico → Main con una imagen por copia y sin número de copias; columna izquierda dividida en dos mitades (imagen 1 arriba, imagen 2 abajo) que la llenan entera y se funden hacia la derecha; el fondo (imagen 3) solo detrás de la lista, más difuminado. Contraste → la ilustración 1 ocupa todo el alto del lado derecho; el lado de la lista lleva un fondo del **mismo tono** que la ilustración (oscuro, texto blanco). En el editor, las imágenes se llaman 1 · Arriba izq., 2 · Abajo izq. y 3 · Fondo, con un esquema de los dos modelos.
 - **Formato (31/10)**: al exportar una lista se elige **Actual** (Clásico vertical 1080 px / Contraste horizontal 1600 px, alto según la lista) o **16:9** (1920 × 1080 fijo, ambos modelos). En 16:9 el tamaño de las cartas se calcula para que quepan Main, Side y Extra completos.
+
+## Cambios 02/11
+- **Ronda 1: mesa de cada cruce definido**: en "Definir cruces" se toca "Mesa N" de una pareja y se elige el número (o "Automática"). Las parejas sin mesa elegida y las que se emparejan al azar ocupan las mesas libres más bajas. No se puede repetir mesa.
+- **Resumen en 3 apartados**: **Puntos** (solo los que suman puntos de ranking), **Top y metagame** (listas del Top 4 y la dona; selector **Todos / Top N** para ver solo el metagame del Top Cut; al exportar se elige **con o sin leyenda**; sin leyenda la dona sale más grande) y **Participantes** (tabla #, jugador, mazo, récord, win %).
+- **Ficha del jugador en 3 pestañas**: **Resumen** (datos, estadísticas, mazos usados, penalizaciones), **Rivales** (enfrentamientos por rival) e **Historial** (partidas por torneo).
+- **Matriz de enfrentamientos**: la columna de nombres y la fila de imágenes quedan fijas al desplazarse; ahora muestra hasta 20 mazos.
+- **Datos**: Torneo 01/11, ronda 5 mesa 6: Cacharro 2-0 a Lachy Lawton (antes al revés). Solo el resultado de la partida; puestos finales y puntos de ranking del torneo sin cambios.

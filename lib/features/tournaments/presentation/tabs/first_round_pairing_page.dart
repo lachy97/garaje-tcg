@@ -7,12 +7,16 @@ import '../../../../app/widgets/common.dart';
 import '../../../../core/db/app_database.dart';
 import '../../../../core/db/daos/tournaments_dao.dart';
 import '../../../decks/presentation/deck_image.dart';
+import '../../domain/models.dart';
+import '../../domain/swiss/swiss_pairing_engine.dart';
 import '../providers.dart';
 
 /// Ronda 1 con enfrentamientos definidos por el organizador: se toca un
 /// jugador y luego su rival (o "BYE" si el número es impar). Los que queden
-/// sin definir se emparejan al azar. Devuelve las parejas (rival null = BYE)
-/// o null si se cancela.
+/// sin definir se emparejan al azar. A cada pareja se le puede elegir la mesa
+/// (tocando "Mesa N"); si no, toma la libre más baja.
+/// Devuelve las parejas (rival null = BYE) y las mesas elegidas (por el
+/// primer jugador de la pareja), o null si se cancela.
 class FirstRoundPairingPage extends ConsumerStatefulWidget {
   const FirstRoundPairingPage({super.key, required this.tournament});
 
@@ -24,6 +28,9 @@ class FirstRoundPairingPage extends ConsumerStatefulWidget {
 
 class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
   final _pairs = <(String, String?)>[];
+
+  /// Mesa elegida a mano para una pareja (clave: su primer jugador).
+  final _tables = <String, int>{};
   String? _selected;
   String _query = '';
   final _search = TextEditingController();
@@ -79,6 +86,27 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
           final odd = players.length.isOdd;
           final randomCount = free.length;
           String name(String id) => byId[id]?.player.nickname ?? '?';
+          final tableCount = players.length ~/ 2;
+          // Vista previa de las mesas de las parejas definidas (las al azar
+          // ocupan luego las que queden libres).
+          final real = [for (final p in _pairs) if (p.$2 != null) p];
+          var preview = const <int>[];
+          try {
+            preview = SwissPairingEngine.assignTables(
+              pairCount: tableCount,
+              chosen: {
+                for (var i = 0; i < real.length; i++)
+                  if (_tables[real[i].$1] case final t?) i: t,
+              },
+            );
+          } on TournamentException {
+            preview = const [];
+          }
+          String tableLabel((String, String?) pair) {
+            if (pair.$2 == null) return 'BYE';
+            final i = real.indexOf(pair);
+            return i >= 0 && i < preview.length ? 'Mesa ${preview[i]}' : 'Mesa ?';
+          }
 
           return Column(
             children: [
@@ -89,8 +117,9 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
                     const Padding(
                       padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                       child: Text(
-                        'Toca un jugador y después su rival. Los que no tengan '
-                        'enfrentamiento definido se emparejan al azar al generar la ronda.',
+                        'Toca un jugador y después su rival. Toca "Mesa" para elegir en qué '
+                        'mesa juegan. Los que no tengan enfrentamiento definido se emparejan '
+                        'al azar en las mesas que queden libres.',
                         style: TextStyle(color: AppColors.textSecondary),
                       ),
                     ),
@@ -98,10 +127,17 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
                       SectionLabel('Definidos (${_pairs.length})'),
                       for (var i = 0; i < _pairs.length; i++)
                         _PairTile(
-                          label: _pairs[i].$2 == null ? 'BYE' : 'Mesa ${_tableOf(i)}',
+                          label: tableLabel(_pairs[i]),
+                          chosen: _tables.containsKey(_pairs[i].$1),
                           a: name(_pairs[i].$1),
                           b: _pairs[i].$2 == null ? 'BYE' : name(_pairs[i].$2!),
-                          onRemove: () => setState(() => _pairs.removeAt(i)),
+                          onTable: _pairs[i].$2 == null
+                              ? null
+                              : () => _chooseTable(_pairs[i].$1, tableCount),
+                          onRemove: () => setState(() {
+                            _tables.remove(_pairs[i].$1);
+                            _pairs.removeAt(i);
+                          }),
                         ),
                     ],
                     SectionLabel('Sin definir (${free.length})'),
@@ -152,7 +188,9 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
                   child: SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _selected != null ? null : () => Navigator.pop(context, _pairs),
+                      onPressed: _selected != null
+                          ? null
+                          : () => Navigator.pop(context, (pairs: _pairs, tables: _tables)),
                       child: Text(
                         'GENERAR RONDA 1 · ${_pairs.length} definido(s)'
                         '${randomCount > 0 ? ' · $randomCount al azar' : ''}',
@@ -169,13 +207,50 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
     );
   }
 
-  /// Número de mesa de la pareja i (las del BYE no cuentan).
-  int _tableOf(int i) {
-    var n = 0;
-    for (var k = 0; k <= i; k++) {
-      if (_pairs[k].$2 != null) n++;
-    }
-    return n;
+  /// Elegir la mesa de una pareja: 1..[count]; las elegidas por otras
+  /// parejas no se pueden usar. "Automática" deja que tome la libre más baja.
+  Future<void> _chooseTable(String pairKey, int count) async {
+    final taken = {
+      for (final MapEntry(:key, :value) in _tables.entries)
+        if (key != pairKey) value,
+    };
+    final current = _tables[pairKey];
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mesa'),
+        content: SingleChildScrollView(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Automática'),
+                selected: current == null,
+                onSelected: (_) => Navigator.pop(ctx, 0),
+              ),
+              for (var t = 1; t <= count; t++)
+                ChoiceChip(
+                  label: Text('$t'),
+                  selected: current == t,
+                  onSelected: taken.contains(t) ? null : (_) => Navigator.pop(ctx, t),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (picked == 0) {
+        _tables.remove(pairKey);
+      } else {
+        _tables[pairKey] = picked;
+      }
+    });
   }
 
   Widget _playerTile(RegisteredPlayer r) {
@@ -194,9 +269,22 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
 }
 
 class _PairTile extends StatelessWidget {
-  const _PairTile({required this.label, required this.a, required this.b, required this.onRemove});
+  const _PairTile({
+    required this.label,
+    required this.a,
+    required this.b,
+    required this.onRemove,
+    this.onTable,
+    this.chosen = false,
+  });
 
   final String label;
+
+  /// Elegir la mesa (null en el BYE).
+  final VoidCallback? onTable;
+
+  /// La mesa se eligió a mano.
+  final bool chosen;
   final String a;
   final String b;
   final VoidCallback onRemove;
@@ -207,10 +295,27 @@ class _PairTile extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
       child: Row(
         children: [
-          SizedBox(
-            width: 64,
-            child: Text(label,
-                style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
+          InkWell(
+            onTap: onTable,
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              width: 86,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(label,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: chosen ? AppColors.neonBright : AppColors.neon)),
+                  ),
+                  if (onTable != null)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 2),
+                      child: Icon(Icons.edit, size: 14, color: AppColors.textSecondary),
+                    ),
+                ],
+              ),
+            ),
           ),
           Expanded(
             child: Text.rich(

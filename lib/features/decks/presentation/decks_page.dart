@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
-import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
@@ -78,9 +77,8 @@ class _DecksPageState extends ConsumerState<DecksPage> {
           final season = pickSeason(all, _seasonId);
           return AsyncView(
             value: ref.watch(seasonDecksProvider(season.id)),
-            builder: (decks) => ListView(
-              padding: const EdgeInsets.only(bottom: 32),
-              children: [
+            builder: (decks) {
+              final header = <Widget>[
                 SeasonPicker(
                   seasons: all,
                   selected: season,
@@ -101,6 +99,42 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                       ],
                     ),
                   ),
+              ];
+              final toggle = Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Tier list')),
+                    ButtonSegment(value: true, label: Text('Enfrentamientos')),
+                  ],
+                  selected: {_matrix},
+                  onSelectionChanged: (v) => setState(() => _matrix = v.first),
+                ),
+              );
+              // Enfrentamientos: la matriz ocupa el resto de la pantalla para
+              // poder fijar su fila y su columna de cabecera.
+              if (_matrix && decks.isNotEmpty) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ...header,
+                    toggle,
+                    const SectionLabel('Matriz de enfrentamientos'),
+                    Expanded(
+                      child: DeckMatrixView(
+                        seasonId: season.id,
+                        decks: decks,
+                        onTapDeck: (d) => _openDeck(season, d),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return ListView(
+              padding: const EdgeInsets.only(bottom: 32),
+              children: [
+                ...header,
                 if (decks.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 48),
@@ -112,26 +146,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     ),
                   )
                 else ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    child: SegmentedButton<bool>(
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: false, label: Text('Tier list')),
-                        ButtonSegment(value: true, label: Text('Enfrentamientos')),
-                      ],
-                      selected: {_matrix},
-                      onSelectionChanged: (v) => setState(() => _matrix = v.first),
-                    ),
-                  ),
-                  if (_matrix) ...[
-                    const SectionLabel('Matriz de enfrentamientos'),
-                    DeckMatrixView(
-                      seasonId: season.id,
-                      decks: decks,
-                      onTapDeck: (d) => _openDeck(season, d),
-                    ),
-                  ] else ...[
+                  toggle,
                   const SectionLabel('Tier list'),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -181,10 +196,10 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ),
-                  ],
                 ],
               ],
-            ),
+            );
+            },
           );
         },
       ),

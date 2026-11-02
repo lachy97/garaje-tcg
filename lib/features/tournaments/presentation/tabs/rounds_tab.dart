@@ -440,7 +440,8 @@ class _AdvanceFab extends ConsumerWidget {
     late final String title;
     late final String message;
     // [fixed]: enfrentamientos definidos a mano (solo ronda 1).
-    late final Future<void> Function(List<(String, String?)> fixed) step;
+    late final Future<void> Function(
+        List<(String, String?)> fixed, Map<String, int> tables) step;
     var firstRound = false;
     String? success;
     IconData icon = Icons.chevron_right;
@@ -466,8 +467,9 @@ class _AdvanceFab extends ConsumerWidget {
               : 'Se generan los cruces de la ronda $n de ${t.swissRounds}.';
           success = 'Ronda $n generada';
           firstRound = n == 1;
-          step = (fixed) async {
-            final out = await service.generateNextSwissRound(t.id, fixedPairs: fixed);
+          step = (fixed, tables) async {
+            final out = await service.generateNextSwissRound(t.id,
+                fixedPairs: fixed, fixedTables: tables);
             if (out.rematches > 0 && context.mounted) {
               showMessage(context,
                   'Aviso: ${out.rematches} cruce(s) repetidos (no había otra opción).');
@@ -495,7 +497,7 @@ class _AdvanceFab extends ConsumerWidget {
             success = '¡Top $size generado!';
             icon = Icons.emoji_events;
           }
-          step = (_) => service.startTopCut(t.id);
+          step = (_, _) => service.startTopCut(t.id);
         }
       case TournamentStatus.topCut:
         final isFinal = currentRound?.bracketSize == 2;
@@ -505,7 +507,7 @@ class _AdvanceFab extends ConsumerWidget {
             : 'Los ganadores pasan a la siguiente ronda.';
         success = isFinal ? '¡Torneo terminado! Puntos sumados al ranking.' : null;
         icon = isFinal ? Icons.flag : Icons.chevron_right;
-        step = (_) => service.advanceTopCut(t.id);
+        step = (_, _) => service.advanceTopCut(t.id);
       case TournamentStatus.finished:
         return const SizedBox.shrink();
     }
@@ -517,23 +519,26 @@ class _AdvanceFab extends ConsumerWidget {
           ? null
           : () => onRun(() async {
                 var fixed = const <(String, String?)>[];
+                var tables = const <String, int>{};
                 if (firstRound) {
                   // Ronda 1: al azar, o definiendo los enfrentamientos a mano.
                   final define = await _askFirstRound(context, title, message);
                   if (define == null || !context.mounted) throw const ActionCancelled();
                   if (define) {
-                    final pairs = await Navigator.of(context).push<List<(String, String?)>>(
+                    final pairs = await Navigator.of(context)
+                        .push<({List<(String, String?)> pairs, Map<String, int> tables})>(
                       MaterialPageRoute(builder: (_) => FirstRoundPairingPage(tournament: t)),
                     );
                     if (pairs == null) throw const ActionCancelled();
-                    fixed = pairs;
+                    fixed = pairs.pairs;
+                    tables = pairs.tables;
                   }
                 } else {
                   final ok = await confirmDialog(context,
                       title: title, message: message, confirm: 'Continuar');
                   if (!ok) throw const ActionCancelled();
                 }
-                await step(fixed);
+                await step(fixed, tables);
               }, success: success),
       icon: busy
           ? const SizedBox(

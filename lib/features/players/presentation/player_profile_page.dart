@@ -13,8 +13,9 @@ import '../data/player_profile_repository.dart';
 import '../domain/player_profile.dart';
 import 'players_page.dart' show showPlayerForm;
 
-/// Perfil del jugador: datos personales, resumen, mazos usados y el historial
-/// completo de partidas (rival, fase y resultado), agrupado por torneo.
+/// Perfil del jugador en tres pestañas: Resumen (datos, estadísticas, mazos
+/// usados y penalizaciones), Rivales (cara a cara con cada jugador) e
+/// Historial (partidas agrupadas por torneo).
 class PlayerProfilePage extends ConsumerWidget {
   const PlayerProfilePage({super.key, required this.playerId});
 
@@ -34,45 +35,76 @@ class PlayerProfilePage extends ConsumerWidget {
             body: const EmptyState(icon: Icons.person_off, title: 'Jugador no encontrado'),
           );
         }
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(p.nickname.toUpperCase(), overflow: TextOverflow.ellipsis),
-            actions: [
-              IconButton(
-                tooltip: 'Editar datos',
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () => showPlayerForm(context, ref, player: p),
-              ),
-            ],
-          ),
-          body: AsyncView(
-            value: profile,
-            builder: (data) => ListView(
-              padding: const EdgeInsets.only(bottom: 40),
-              children: [
-                _Header(player: p),
-                _StatsGrid(totals: data.totals),
-                const SectionLabel('Mazos usados'),
-                if (data.decks.isEmpty)
-                  const _Empty('Todavía no ha jugado con ningún mazo.')
-                else
-                  _DecksTable(decks: data.decks),
-                SectionLabel('Enfrentamientos por rival (${data.rivals.length})'),
-                if (data.rivals.isEmpty)
-                  const _Empty('Todavía no ha jugado contra nadie.')
-                else
-                  _RivalsTable(rivals: data.rivals),
-                _PlayerPenalties(playerId: playerId),
-                const SectionLabel('Historial de partidas'),
-                if (data.tournaments.isEmpty)
-                  const _Empty('Aún no ha participado en torneos.')
-                else
-                  for (final t in data.tournaments)
-                    _TournamentHistory(
-                      tournament: t,
-                      matches: data.historyByTournament[t.tournamentId] ?? const [],
-                    ),
+        return DefaultTabController(
+          length: 3,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(p.nickname.toUpperCase(), overflow: TextOverflow.ellipsis),
+              actions: [
+                IconButton(
+                  tooltip: 'Editar datos',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => showPlayerForm(context, ref, player: p),
+                ),
               ],
+              bottom: const TabBar(
+                labelColor: AppColors.neon,
+                unselectedLabelColor: AppColors.textSecondary,
+                indicatorColor: AppColors.neon,
+                dividerColor: Colors.transparent,
+                tabs: [
+                  Tab(text: 'Resumen'),
+                  Tab(text: 'Rivales'),
+                  Tab(text: 'Historial'),
+                ],
+              ),
+            ),
+            body: AsyncView(
+              value: profile,
+              builder: (data) => TabBarView(
+                children: [
+                  // 1) Datos, estadísticas, mazos usados y penalizaciones.
+                  ListView(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    children: [
+                      _Header(player: p),
+                      _StatsGrid(totals: data.totals),
+                      const SectionLabel('Mazos usados'),
+                      if (data.decks.isEmpty)
+                        const _Empty('Todavía no ha jugado con ningún mazo.')
+                      else
+                        _DecksTable(decks: data.decks),
+                      _PlayerPenalties(playerId: playerId),
+                    ],
+                  ),
+                  // 2) Enfrentamientos por rival.
+                  ListView(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    children: [
+                      SectionLabel('Enfrentamientos por rival (${data.rivals.length})'),
+                      if (data.rivals.isEmpty)
+                        const _Empty('Todavía no ha jugado contra nadie.')
+                      else
+                        _RivalsTable(rivals: data.rivals),
+                    ],
+                  ),
+                  // 3) Historial de partidas por torneo.
+                  ListView(
+                    padding: const EdgeInsets.only(bottom: 40),
+                    children: [
+                      SectionLabel('Historial de partidas (${data.tournaments.length} torneos)'),
+                      if (data.tournaments.isEmpty)
+                        const _Empty('Aún no ha participado en torneos.')
+                      else
+                        for (final t in data.tournaments)
+                          _TournamentHistory(
+                            tournament: t,
+                            matches: data.historyByTournament[t.tournamentId] ?? const [],
+                          ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );

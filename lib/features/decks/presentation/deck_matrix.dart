@@ -25,22 +25,23 @@ Color matchupColor(MatchupRecord r) {
 /// Matriz mazo contra mazo de la temporada. Filas y columnas en el orden de
 /// la tier list (los [maxDecks] primeros con partidas). Cada celda: victorias-
 /// derrotas del mazo de la fila contra el de la columna.
+///
+/// Al desplazarse, la columna de nombres (izquierda) y la fila de imágenes
+/// (arriba) quedan fijas. Necesita un alto acotado (p. ej. dentro de un
+/// Expanded).
 class DeckMatrixView extends ConsumerWidget {
   const DeckMatrixView({
     super.key,
     required this.seasonId,
     required this.decks,
     this.onTapDeck,
-    this.maxDecks = 12,
+    this.maxDecks = 20,
   });
 
   final String seasonId;
   final List<DeckSeasonStats> decks;
   final void Function(DeckSeasonStats deck)? onTapDeck;
   final int maxDecks;
-
-  static const _cell = 56.0;
-  static const _head = 132.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -58,17 +59,98 @@ class DeckMatrixView extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Cabecera: imágenes de los mazos de las columnas.
-                  Row(
+            Expanded(child: _StickyMatrix(matchups: m, decks: shown, onTapDeck: onTapDeck)),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                'Celda: victorias-derrotas(-empates) del mazo de la FILA contra el de la '
+                'columna (Swiss y Top, torneos terminados). Verde ≥ 60 % · amarillo · '
+                'rojo ≤ 40 %. Diagonal: espejos. Toca una celda para el detalle o un '
+                'nombre para abrir la ficha.',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StickyMatrix extends StatefulWidget {
+  const _StickyMatrix({required this.matchups, required this.decks, this.onTapDeck});
+
+  final DeckMatchups matchups;
+  final List<DeckSeasonStats> decks;
+  final void Function(DeckSeasonStats deck)? onTapDeck;
+
+  @override
+  State<_StickyMatrix> createState() => _StickyMatrixState();
+}
+
+class _StickyMatrixState extends State<_StickyMatrix> {
+  static const _cell = 56.0;
+  static const _head = 132.0;
+
+  // Cuerpo y cabeceras se mueven juntos (en los dos sentidos).
+  final _hHead = ScrollController();
+  final _hBody = ScrollController();
+  final _vLeft = ScrollController();
+  final _vBody = ScrollController();
+  bool _syncing = false;
+
+  void _link(ScrollController from, ScrollController to) {
+    from.addListener(() {
+      if (_syncing || !to.hasClients) return;
+      _syncing = true;
+      to.jumpTo(from.offset.clamp(0.0, to.position.maxScrollExtent));
+      _syncing = false;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _link(_hBody, _hHead);
+    _link(_hHead, _hBody);
+    _link(_vBody, _vLeft);
+    _link(_vLeft, _vBody);
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_hHead, _hBody, _vLeft, _vBody]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = widget.decks;
+    final m = widget.matchups;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        children: [
+          // Fila fija de arriba: imágenes de los mazos de las columnas.
+          Row(
+            children: [
+              const SizedBox(
+                width: _head,
+                height: _cell,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Fila vs columna',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _hHead,
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      const SizedBox(width: _head, child: Text('Fila vs columna',
-                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary))),
                       for (final c in shown)
                         SizedBox(
                           width: _cell,
@@ -81,48 +163,67 @@ class DeckMatrixView extends ConsumerWidget {
                         ),
                     ],
                   ),
-                  for (final r in shown)
-                    Row(
+                ),
+              ),
+            ],
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Columna fija de la izquierda: imagen y nombre de cada mazo.
+                SizedBox(
+                  width: _head,
+                  child: SingleChildScrollView(
+                    controller: _vLeft,
+                    child: Column(
                       children: [
-                        InkWell(
-                          onTap: onTapDeck == null ? null : () => onTapDeck!(r),
-                          child: SizedBox(
-                            width: _head,
-                            height: _cell,
-                            child: Row(
-                              children: [
-                                DeckImage(path: r.imagePath, name: r.name, width: 28),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(r.name,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontSize: 12, fontWeight: FontWeight.w700)),
-                                ),
-                              ],
+                        for (final r in shown)
+                          InkWell(
+                            onTap: widget.onTapDeck == null ? null : () => widget.onTapDeck!(r),
+                            child: SizedBox(
+                              width: _head,
+                              height: _cell,
+                              child: Row(
+                                children: [
+                                  DeckImage(path: r.imagePath, name: r.name, width: 28),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(r.name,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontSize: 12, fontWeight: FontWeight.w700)),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        for (final c in shown) _cellOf(context, m, r, c),
                       ],
                     ),
-                ],
-              ),
+                  ),
+                ),
+                // Celdas: se desplazan en los dos sentidos.
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _vBody,
+                    child: SingleChildScrollView(
+                      controller: _hBody,
+                      scrollDirection: Axis.horizontal,
+                      child: Column(
+                        children: [
+                          for (final r in shown)
+                            Row(children: [for (final c in shown) _cellOf(context, m, r, c)]),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Text(
-                'Cada celda: victorias-derrotas(-empates) del mazo de la FILA contra el de '
-                'la columna, en torneos terminados (Swiss y Top). Verde ≥ 60 % · amarillo · '
-                'rojo ≤ 40 %. En la diagonal, los espejos. Toca una celda para ver el detalle '
-                'o el nombre de un mazo para abrir su ficha.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 

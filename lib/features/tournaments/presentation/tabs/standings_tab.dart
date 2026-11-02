@@ -29,7 +29,7 @@ class StandingsTab extends ConsumerWidget {
           padding: const EdgeInsets.only(bottom: 32),
           children: [
             if (tournament.status == TournamentStatus.finished)
-              _FinalResults(tournament: tournament, names: names, decks: decks),
+              FinalResults(tournament: tournament, names: names, decks: decks),
             _SwissStandings(tournament: tournament, names: names, decks: decks),
           ],
         );
@@ -38,12 +38,23 @@ class StandingsTab extends ConsumerWidget {
   }
 }
 
-class _FinalResults extends ConsumerWidget {
-  const _FinalResults({required this.tournament, required this.names, required this.decks});
+/// Resultado final con los puntos de ranking de cada jugador.
+/// [onlyScoring]: solo los que suman puntos (pestaña Resumen).
+class FinalResults extends ConsumerWidget {
+  const FinalResults({
+    super.key,
+    required this.tournament,
+    required this.names,
+    required this.decks,
+    this.onlyScoring = false,
+    this.showTitle = true,
+  });
 
   final Tournament tournament;
   final Map<String, String> names;
   final Map<String, String?> decks;
+  final bool onlyScoring;
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,8 +65,9 @@ class _FinalResults extends ConsumerWidget {
       data: (list) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SectionLabel('Resultado final'),
+          if (showTitle) const SectionLabel('Resultado final'),
           for (final r in list)
+            if (!onlyScoring || r.points > 0)
             NeonCard(
               glow: r.position == 1,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

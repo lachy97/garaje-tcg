@@ -110,10 +110,14 @@ class SwissPairingEngine {
   /// Ronda 1 con enfrentamientos definidos a mano por el organizador.
   /// [fixed]: parejas (jugador, rival); rival null = BYE (solo uno, y solo si
   /// el número de jugadores es impar). El resto se empareja al azar; si
-  /// queda uno suelto recibe el BYE. Las mesas definidas van primero.
+  /// queda uno suelto recibe el BYE.
+  /// [tables]: mesa elegida para una pareja definida (clave: su primer
+  /// jugador). Las parejas sin mesa, primero las definidas y luego las al
+  /// azar, ocupan las mesas libres más bajas.
   PairingOutcome pairFirstRoundWith({
     required List<SwissPlayer> players,
     required List<(String, String?)> fixed,
+    Map<String, int> tables = const {},
   }) {
     final active = players.where((p) => p.isActiveFor(1)).map((p) => p.id).toList();
     if (active.length < 2) {
@@ -147,7 +151,49 @@ class SwissPairingEngine {
         if (b != null) (a, b),
       for (var i = 0; i + 1 < rest.length; i += 2) (rest[i], rest[i + 1]),
     ];
-    return _build(pairs, bye);
+    final tableOf = assignTables(
+      pairCount: pairs.length,
+      chosen: {
+        for (var i = 0; i < pairs.length; i++)
+          if (tables[pairs[i].$1] case final t?) i: t,
+      },
+    );
+    final ordered = [
+      for (var i = 0; i < pairs.length; i++)
+        Pairing(player1Id: pairs[i].$1, player2Id: pairs[i].$2, table: tableOf[i]),
+    ]..sort((x, y) => x.table!.compareTo(y.table!));
+    return PairingOutcome([
+      ...ordered,
+      if (bye != null) Pairing(player1Id: bye),
+    ]);
+  }
+
+  /// Número de mesa de cada pareja (por su posición). [chosen]: mesas
+  /// elegidas a mano (1..[pairCount], sin repetir); el resto, en orden, toma
+  /// las libres más bajas.
+  static List<int> assignTables({required int pairCount, Map<int, int> chosen = const {}}) {
+    final used = <int>{};
+    for (final t in chosen.values) {
+      if (t < 1 || t > pairCount) {
+        throw TournamentException('La mesa $t no existe (hay $pairCount mesas).');
+      }
+      if (!used.add(t)) throw TournamentException('La mesa $t está elegida dos veces.');
+    }
+    final out = List<int>.filled(pairCount, 0);
+    var next = 1;
+    for (var i = 0; i < pairCount; i++) {
+      final t = chosen[i];
+      if (t != null) {
+        out[i] = t;
+        continue;
+      }
+      while (used.contains(next)) {
+        next++;
+      }
+      used.add(next);
+      out[i] = next;
+    }
+    return out;
   }
 
   PairingOutcome _build(List<(String, String)> pairs, String? bye, {int rematches = 0}) {

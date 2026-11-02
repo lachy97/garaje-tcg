@@ -73,6 +73,7 @@ Future<void> exportParticipants(
 const _kBg = 'assets/export/tierlist_bg.jpg';
 const _kPad = 48.0;
 const _kDonut = 640.0;
+const _kDonutBig = 860.0;
 const _kLegendFont = 22.0;
 
 /// Imágenes de los mazos (y la de "Otros") para cargarlas antes de exportar.
@@ -83,10 +84,14 @@ List<ImageProvider> _deckImages(TournamentReport report) => [
     ];
 
 /// Exporta el gráfico de metagame (cuántos jugadores usaron cada mazo).
+/// [showLegend]: con la lista de mazos debajo o solo el gráfico (más grande).
+/// [scope]: p. ej. "TOP 8" si el gráfico es solo de los del Top Cut.
 Future<void> exportMetagame(
   BuildContext context, {
   required Tournament tournament,
   required TournamentReport report,
+  bool showLegend = true,
+  String? scope,
 }) async {
   final images = await loadChartImages(report.chart);
   if (!context.mounted) {
@@ -100,12 +105,20 @@ Future<void> exportMetagame(
       ExportSpec(
         heading: 'METAGAME · ${tournament.name.toUpperCase()}',
         items: report.metagame,
-        page: MetagamePoster(tournament: tournament, report: report, images: images),
+        page: MetagamePoster(
+          tournament: tournament,
+          report: report,
+          images: images,
+          showLegend: showLegend,
+          scope: scope,
+        ),
         contentWidth: MetagamePoster.width,
-        summaryHeightEstimate:
-            _kPad * 2 + 130 + 40 + _kDonut + 40 + legendRows * (_kLegendFont * 2.4) + 60,
+        summaryHeightEstimate: showLegend
+            ? _kPad * 2 + 130 + 40 + _kDonut + 40 + legendRows * (_kLegendFont * 2.4) + 60
+            : _kPad * 2 + 130 + 40 + _kDonutBig + 80,
         legend: '',
-        fileBase: 'metagame_${_fileSafe(tournament.name)}',
+        fileBase: 'metagame_${scope == null ? '' : '${_fileSafe(scope)}_'}'
+            '${_fileSafe(tournament.name)}',
         shareText: '${tournament.name} · Metagame',
         preload: [const AssetImage(_kBg), ..._deckImages(report)],
       ),
@@ -122,11 +135,17 @@ class MetagamePoster extends StatelessWidget {
     required this.tournament,
     required this.report,
     required this.images,
+    this.showLegend = true,
+    this.scope,
   });
 
   final Tournament tournament;
   final TournamentReport report;
   final ChartImages images;
+  final bool showLegend;
+
+  /// "TOP 8" si el gráfico es solo de los jugadores del Top Cut.
+  final String? scope;
 
   static const width = 1080.0;
 
@@ -154,9 +173,9 @@ class MetagamePoster extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'METAGAME',
-                      style: TextStyle(
+                    Text(
+                      scope == null ? 'METAGAME' : 'METAGAME $scope',
+                      style: const TextStyle(
                         fontSize: 96,
                         height: 1,
                         fontWeight: FontWeight.w900,
@@ -184,9 +203,14 @@ class MetagamePoster extends StatelessWidget {
           ),
           const SizedBox(height: 40),
           Center(
-            child: MetaDonut(chart: report.chart, images: images, size: _kDonut),
+            child: MetaDonut(
+              chart: report.chart,
+              images: images,
+              size: showLegend ? _kDonut : _kDonutBig,
+            ),
           ),
           const SizedBox(height: 40),
+          if (showLegend) ...[
           Container(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
             decoration: BoxDecoration(
@@ -204,12 +228,15 @@ class MetagamePoster extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          ],
           Row(
             children: [
               Expanded(
                 child: Text(
-                  '${report.deckCount} mazos · jugadores por mazo y % del total · '
-                  'en OTROS, los mazos con un solo jugador',
+                  showLegend
+                      ? '${report.deckCount} mazos · jugadores por mazo y % del total · '
+                          'en OTROS, los mazos con un solo jugador'
+                      : '${report.deckCount} mazos',
                   style: const TextStyle(fontSize: 16, color: muted),
                 ),
               ),
