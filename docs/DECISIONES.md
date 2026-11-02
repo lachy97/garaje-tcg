@@ -171,3 +171,9 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - **Ficha del jugador en 3 pestañas**: **Resumen** (datos, estadísticas, mazos usados, penalizaciones), **Rivales** (enfrentamientos por rival) e **Historial** (partidas por torneo).
 - **Matriz de enfrentamientos**: la columna de nombres y la fila de imágenes quedan fijas al desplazarse; ahora muestra hasta 20 mazos.
 - **Datos**: Torneo 01/11, ronda 5 mesa 6: Cacharro 2-0 a Lachy Lawton (antes al revés). Solo el resultado de la partida; puestos finales y puntos de ranking del torneo sin cambios.
+
+## Imagen de la lista: diseño único (02/11)
+- Se deja **un solo diseño** (se quitan los modelos Clásico y Contraste): base del Contraste (fondo en degradado del tono de la ilustración principal; la ilustración ocupa todo el alto del lado derecho) y, en la zona de la lista, las letras y paneles del Clásico: GARAGE TCG + torneo · fecha, puesto en dorado, jugador, "MAZO" y el mazo; MAIN (morado, 10 por fila), SIDE (turquesa) y EXTRA (naranja), una imagen por copia.
+- Abajo a la derecha: **GARAGE TCG · EDISON FORMAT · CUBA** con la bandera de Cuba (dibujada, sin archivo). Ya no sale el nombre de la carta principal.
+- Formatos: **Actual** (1600 px de ancho, alto según la lista) o **16:9** (1920 × 1080; el Main se ajusta para que quepa).
+- En el editor solo se elige la **imagen principal** (las columnas de imagen secundaria y fondo de la v9 se conservan pero no se usan).

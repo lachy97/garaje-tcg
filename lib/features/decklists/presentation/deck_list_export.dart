@@ -71,25 +71,9 @@ Color textOn(Color bg) => bg.computeLuminance() > 0.4 ? const Color(0xFF0B0B0D) 
 
 // ───────────────────────── Exportar ─────────────────────────
 
-/// Modelos de la imagen exportada.
-enum DeckListStyle {
-  /// Como los carteles de torneos de Edison: ilustración de fondo, dos
-  /// imágenes a la izquierda y la lista en paneles (vertical, 1080 px).
-  classic('Clásico', 'Ilustración de fondo y dos imágenes a la izquierda (vertical)'),
-
-  /// Fondo del color que contrasta con la carta principal y su ilustración
-  /// en grande (horizontal, 1600 px).
-  contrast('Contraste', 'Fondo que contrasta con la carta principal (horizontal)');
-
-  const DeckListStyle(this.label, this.description);
-  final String label;
-  final String description;
-}
-
 /// Proporción de la imagen exportada.
 enum DeckListFormat {
-  /// La de cada modelo (Clásico vertical; Contraste horizontal, alto según
-  /// la lista).
+  /// Horizontal de 1600 px; el alto depende de la lista.
   natural('Actual'),
 
   /// 16:9 (1920 × 1080): las cartas se ajustan para que quepa toda la lista.
@@ -99,58 +83,34 @@ enum DeckListFormat {
   final String label;
 }
 
-/// Pregunta el modelo y la proporción de la imagen.
-Future<(DeckListStyle, DeckListFormat)?> askDeckListStyle(BuildContext context) =>
-    showModalBottomSheet<(DeckListStyle, DeckListFormat)>(
+/// Pregunta la proporción de la imagen.
+Future<DeckListFormat?> askDeckListFormat(BuildContext context) =>
+    showModalBottomSheet<DeckListFormat>(
       context: context,
       showDragHandle: true,
-      builder: (ctx) {
-        var format = DeckListFormat.natural;
-        return StatefulBuilder(
-          builder: (ctx, setState) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: SegmentedButton<DeckListFormat>(
-                    segments: const [
-                      ButtonSegment(
-                          value: DeckListFormat.natural,
-                          icon: Icon(Icons.crop_original),
-                          label: Text('Actual')),
-                      ButtonSegment(
-                          value: DeckListFormat.wide,
-                          icon: Icon(Icons.crop_16_9),
-                          label: Text('16:9')),
-                    ],
-                    selected: {format},
-                    onSelectionChanged: (v) => setState(() => format = v.first),
-                  ),
-                ),
-                for (final s in DeckListStyle.values)
-                  ListTile(
-                    leading: Icon(format == DeckListFormat.wide
-                        ? Icons.crop_16_9
-                        : s == DeckListStyle.classic
-                            ? Icons.crop_portrait
-                            : Icons.crop_landscape),
-                    title: Text('Modelo ${s.label}'),
-                    subtitle: Text(format == DeckListFormat.wide
-                        ? '${s.description.split(' (').first} · 1920 × 1080'
-                        : s.description),
-                    onTap: () => Navigator.pop(ctx, (s, format)),
-                  ),
-                const SizedBox(height: 8),
-              ],
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.crop_landscape),
+              title: const Text('Actual'),
+              subtitle: const Text('1600 px de ancho, el alto según la lista'),
+              onTap: () => Navigator.pop(ctx, DeckListFormat.natural),
             ),
-          ),
-        );
-      },
+            ListTile(
+              leading: const Icon(Icons.crop_16_9),
+              title: const Text('16:9'),
+              subtitle: const Text('1920 × 1080, las cartas se ajustan para que quepa todo'),
+              onTap: () => Navigator.pop(ctx, DeckListFormat.wide),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
 
-/// Todo lo que necesitan los dos modelos (imágenes ya en el teléfono).
+/// Todo lo que necesita la imagen (archivos ya en el teléfono).
 class DeckListArt {
   const DeckListArt({
     required this.target,
@@ -159,9 +119,6 @@ class DeckListArt {
     required this.small,
     this.featured,
     this.featuredArt,
-    this.secondaryArt,
-    this.backgroundArt,
-    required this.contrast,
     required this.tone,
   });
 
@@ -171,11 +128,6 @@ class DeckListArt {
   final Map<int, File> small;
   final YgoCard? featured;
   final File? featuredArt;
-  final File? secondaryArt;
-  final File? backgroundArt;
-
-  /// Color que contrasta con la ilustración principal.
-  final Color contrast;
 
   /// Color acorde con la ilustración principal (mismo tono, oscuro).
   final Color tone;
@@ -190,18 +142,15 @@ class DeckListArt {
 /// Evita lanzar dos exportaciones a la vez (doble toque).
 bool _exporting = false;
 
-/// Exporta la lista como imagen en el modelo elegido.
+/// Exporta la lista como imagen.
 Future<void> exportDeckListImage(
   BuildContext context, {
-  required DeckListStyle style,
   DeckListFormat format = DeckListFormat.natural,
   required DeckListTarget target,
   required DeckCards cards,
   required CardDb db,
   required CardImageStore store,
   int? featured,
-  int? secondary,
-  int? background,
 }) async {
   if (_exporting) return;
   _exporting = true;
@@ -221,15 +170,9 @@ Future<void> exportDeckListImage(
           }
         }),
     ]);
-    // 2) Ilustraciones: principal, secundaria y fondo (con valores por defecto).
+    // 2) Ilustración principal y su color.
     final mainId = featured ?? _fallbackFeatured(cards, db);
-    final secondId = secondary ?? _fallbackSecondary(cards, db, mainId);
-    final bgId = background ?? mainId;
-    Future<File?> art(int? id) =>
-        id == null ? Future.value() : store.get(id, CardImageSize.art);
-    final featuredArt = await art(mainId);
-    final secondaryArt = await art(secondId);
-    final backgroundArt = await art(bgId);
+    final featuredArt = mainId == null ? null : await store.get(mainId, CardImageSize.art);
     final dominant = featuredArt == null ? null : await averageColor(featuredArt);
     if (!context.mounted) return;
     if (missing > 0) {
@@ -244,40 +187,26 @@ Future<void> exportDeckListImage(
       small: small,
       featured: mainId == null ? null : db.byId(mainId),
       featuredArt: featuredArt,
-      secondaryArt: secondaryArt,
-      backgroundArt: backgroundArt,
-      contrast: contrastBackground(dominant ?? AppColors.forest),
       tone: harmonyBackground(dominant ?? AppColors.forest),
     );
-    final (Widget page, double width, double height) = switch ((style, format)) {
-      (DeckListStyle.classic, DeckListFormat.wide) =>
-        (ClassicWidePoster(data: data), wideSize.width, wideSize.height),
-      (DeckListStyle.contrast, DeckListFormat.wide) =>
-        (ContrastWidePoster(data: data), wideSize.width, wideSize.height),
-      (DeckListStyle.classic, _) =>
-        (ClassicDeckListPoster(data: data), ClassicDeckListPoster.width,
-            ClassicDeckListPoster.estimateHeight(cards, db)),
-      (DeckListStyle.contrast, _) =>
-        (ContrastDeckListPoster(data: data), ContrastDeckListPoster.width,
-            ContrastDeckListPoster.estimateHeight(cards)),
-    };
+    final wide = format == DeckListFormat.wide;
+    final poster = DeckListPoster(data: data, wide: wide);
     await runExport<int>(
       context,
       ExportSpec(
         heading: 'LISTA · ${target.playerName}',
         items: const [],
-        page: page,
-        contentWidth: width,
-        summaryHeightEstimate: height,
+        page: poster,
+        contentWidth: poster.width,
+        summaryHeightEstimate: poster.estimatedHeight,
         legend: '',
-        fileBase: 'lista_${style.name}${format == DeckListFormat.wide ? '_16x9' : ''}_${_fileSafe(target.playerName)}_'
+        fileBase: 'lista${wide ? '_16x9' : ''}_${_fileSafe(target.playerName)}_'
             '${_fileSafe(target.tournamentName)}',
         shareText: '${target.position == null ? '' : '${target.position}º · '}'
             '${target.playerName} · ${target.deckName ?? ''} · ${target.tournamentName}',
         preload: [
           for (final f in small.values) FileImage(f),
-          for (final f in [featuredArt, secondaryArt, backgroundArt])
-            if (f != null) FileImage(f),
+          if (featuredArt != null) FileImage(featuredArt),
         ],
       ),
     );
@@ -291,16 +220,6 @@ int? _fallbackFeatured(DeckCards cards, CardDb db) {
     if (db.byId(id)?.group == CardGroup.monster) return id;
   }
   return cards.main.firstOrNull ?? cards.extra.firstOrNull;
-}
-
-int? _fallbackSecondary(DeckCards cards, CardDb db, int? exclude) {
-  for (final id in [...cards.extra, ...cards.main]) {
-    if (id != exclude && db.byId(id)?.group != CardGroup.spell &&
-        db.byId(id)?.group != CardGroup.trap) {
-      return id;
-    }
-  }
-  return null;
 }
 
 String _fileSafe(String s) =>
@@ -394,383 +313,62 @@ List<YgoCard> _everyCopy(DeckCards cards, DeckSection s, CardDb db) => [
         for (var i = 0; i < n; i++) card,
     ];
 
-// ───────────────────────── Modelo Clásico ─────────────────────────
+/// Bandera de Cuba (5 franjas, triángulo rojo y estrella blanca).
+class CubaFlag extends StatelessWidget {
+  const CubaFlag({super.key, this.height = 24});
 
-/// Como los carteles de los torneos de Edison (vertical, 1080 px):
-/// - columna izquierda: imagen 1 (arriba) e imagen 2 (abajo), cada una
-///   llenando su mitad y fundiéndose hacia la derecha;
-/// - a la derecha, la ilustración de fondo (más desenfocada) y encima el
-///   título, puesto, jugador, mazo y la lista en paneles (una imagen por copia).
-class ClassicDeckListPoster extends StatelessWidget {
-  const ClassicDeckListPoster({super.key, required this.data});
-
-  final DeckListArt data;
-
-  static const width = 1080.0;
-  static const minHeight = 1350.0;
-
-  /// Ancho de la columna de imágenes de la izquierda.
-  static const _leftCol = 340.0;
-  static const _padL = 22.0;
-  static const _padR = 28.0;
-  static const _panelPad = 10.0;
-  static const _panelBorder = 2.0;
-
-  /// Ancho útil dentro de un panel (descontando relleno y borde).
-  static const _inner =
-      width - _leftCol - _padL - _padR - 2 * _panelPad - 2 * _panelBorder - 1;
-  static const _gap = 5.0;
-
-  /// Columnas por fila: 10 en el Main (hasta 6 filas); Side y Extra en una o
-  /// dos filas de hasta 15.
-  static int _cols(DeckSection s, int n) =>
-      s == DeckSection.main ? 10 : math.min(15, math.max(10, n));
-
-  static double _cardW(DeckSection s, int n) {
-    final cols = _cols(s, n);
-    return (_inner - (cols - 1) * _gap) / cols;
-  }
-
-  static double estimateHeight(DeckCards cards, CardDb db) {
-    var h = 30.0 + 150 + 200;
-    for (final s in DeckSection.values) {
-      final n = cards.of(s).length;
-      if (n == 0) continue;
-      h += 44 + (n / _cols(s, n)).ceil() * (_cardW(s, n) * _cardRatio + _gap) + 2 * _panelPad;
-    }
-    return math.max(h + 160, minHeight);
-  }
+  final double height;
 
   @override
-  Widget build(BuildContext context) {
-    final d = data;
-    final t = d.target;
-    const gold = Color(0xFFE9C46A);
-    const white = Colors.white;
-    final shadow = [const Shadow(color: Colors.black, blurRadius: 10, offset: Offset(0, 2))];
-    TextStyle style(double size, {Color color = white, FontWeight w = FontWeight.w900}) =>
-        TextStyle(fontSize: size, color: color, fontWeight: w, shadows: shadow, height: 1.05);
-    final base = Color.lerp(d.tone, Colors.black, 0.35)!;
-
-    Widget label(String text) => Padding(
-          padding: const EdgeInsets.only(top: 14, bottom: 6),
-          child: Text(text, style: style(22, w: FontWeight.w800)),
-        );
-    Widget panel(DeckSection s, Color color) {
-      final copies = _everyCopy(d.cards, s, d.db);
-      final w = _cardW(s, copies.length);
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(_panelPad),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color, width: _panelBorder),
-        ),
-        child: Wrap(
-          spacing: _gap,
-          runSpacing: _gap,
-          children: [
-            for (final c in copies) _CardTile(card: c, file: d.small[c.id], width: w),
-          ],
-        ),
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(height * 0.08),
+        child: CustomPaint(size: Size(height * 2, height), painter: const _CubaFlagPainter()),
       );
-    }
-
-    const sections = [
-      (DeckSection.main, 'MAIN', Color(0xFF8E5BD6)),
-      (DeckSection.side, 'SIDE', Color(0xFF2EA6A6)),
-      (DeckSection.extra, 'EXTRA', Color(0xFFD08A3A)),
-    ];
-
-    return Container(
-      width: width,
-      color: base,
-      child: Stack(
-        children: [
-          // Fondo (zona derecha): ilustración elegida, bien difuminada, que
-          // se funde por la izquierda con las imágenes de la columna.
-          Positioned(
-            left: _leftCol - 60,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            child: EdgeFade(
-              left: 0.12,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ImageFiltered(
-                    imageFilter:
-                        ui.ImageFilter.blur(sigmaX: 9, sigmaY: 9, tileMode: ui.TileMode.clamp),
-                    child: _artFill(d.backgroundArt),
-                  ),
-                  ColoredBox(color: Colors.black.withValues(alpha: 0.38)),
-                ],
-              ),
-            ),
-          ),
-          // Columna izquierda: imagen 1 arriba e imagen 2 abajo.
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: _leftCol,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: EdgeFade(right: 0.18, bottom: 0.06, child: _artFill(d.featuredArt)),
-                ),
-                Expanded(
-                  child: EdgeFade(right: 0.18, top: 0.06, child: _artFill(d.secondaryArt)),
-                ),
-              ],
-            ),
-          ),
-          // Contenido (zona derecha).
-          Padding(
-            padding: const EdgeInsets.fromLTRB(_leftCol + _padL, 28, _padR, 28),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: minHeight - 56),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('GARAGE TCG',
-                          textAlign: TextAlign.center,
-                          style: style(60).copyWith(letterSpacing: 3)),
-                      Text(
-                        '${t.tournamentName.toUpperCase()} · '
-                        '${DateFormat('dd/MM/yy').format(t.date)}',
-                        textAlign: TextAlign.center,
-                        style: style(24, w: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 18),
-                      if (d.positionLabel.isNotEmpty)
-                        Text(d.positionLabel, style: style(50, color: gold)),
-                      const SizedBox(height: 4),
-                      Text(t.playerName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: style(40, w: FontWeight.w800)),
-                      const SizedBox(height: 6),
-                      Text('MAZO', style: style(18, w: FontWeight.w700)),
-                      Text(t.deckName ?? 'Sin mazo', style: style(50)),
-                      for (final (s, name, color) in sections)
-                        if (d.cards.of(s).isNotEmpty) ...[
-                          label('$name: ${d.cards.of(s).length}'),
-                          panel(s, color),
-                        ],
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('LUGAR', style: style(18, w: FontWeight.w700)),
-                              Text('Garage TCG', style: style(28, w: FontWeight.w800)),
-                              Text('Edison Format', style: style(18, w: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                        Image.asset(BrandAssets.logo,
-                            width: 110, height: 110, filterQuality: FilterQuality.high),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// ───────────────────────── Modelo Contraste ─────────────────────────
+class _CubaFlagPainter extends CustomPainter {
+  const _CubaFlagPainter();
 
-/// Horizontal (1600 px): a la izquierda la lista sobre un fondo del color de
-/// la ilustración principal (mismo tono, oscuro); a la derecha la ilustración
-/// principal ocupando todo el alto, sin marco, fundiéndose por la izquierda.
-class ContrastDeckListPoster extends StatelessWidget {
-  const ContrastDeckListPoster({super.key, required this.data});
-
-  final DeckListArt data;
-
-  static const width = 1600.0;
-  static const _pad = 40.0;
-  static const _cols = 10;
-  static const _gap = 6.0;
-  static const _cardW = 86.0;
-  static const _leftW = _cols * _cardW + (_cols - 1) * _gap;
-
-  /// La ilustración empieza aquí (se funde por su borde izquierdo).
-  static const _artLeft = _pad + _leftW - 40;
-  static const minHeight = 900.0;
-
-  static double estimateHeight(DeckCards cards) {
-    var h = _pad * 2 + 170 + 40;
-    for (final s in DeckSection.values) {
-      final n = cards.of(s).length;
-      if (n == 0) continue;
-      h += 46 + (n / _cols).ceil() * (_cardW * _cardRatio + _gap) + 18;
+  @override
+  void paint(Canvas canvas, Size size) {
+    const blue = Color(0xFF002A8F);
+    const red = Color(0xFFCF142B);
+    final w = size.width, h = size.height, stripe = h / 5;
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+    for (final i in [0, 2, 4]) {
+      canvas.drawRect(Rect.fromLTWH(0, i * stripe, w, stripe), Paint()..color = blue);
     }
-    return math.max(h, minHeight);
+    final tri = h * math.sqrt(3) / 2; // triángulo equilátero
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, 0)
+        ..lineTo(tri, h / 2)
+        ..lineTo(0, h)
+        ..close(),
+      Paint()..color = red,
+    );
+    // Estrella de 5 puntas en el centro del triángulo.
+    final c = Offset(tri / 3, h / 2);
+    final r = h * 0.17, ri = r * 0.4;
+    final star = Path();
+    for (var k = 0; k < 10; k++) {
+      final rad = k.isEven ? r : ri;
+      final a = -math.pi / 2 + k * math.pi / 5;
+      final p = c + Offset(math.cos(a) * rad, math.sin(a) * rad);
+      if (k == 0) {
+        star.moveTo(p.dx, p.dy);
+      } else {
+        star.lineTo(p.dx, p.dy);
+      }
+    }
+    canvas.drawPath(star..close(), Paint()..color = Colors.white);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final d = data;
-    final t = d.target;
-    const text = Colors.white;
-    const accent = AppColors.neon;
-    final muted = Colors.white.withValues(alpha: 0.75);
-    final shadow = [const Shadow(color: Colors.black87, blurRadius: 10)];
-
-    List<Widget> section(DeckSection s) {
-      final copies = _everyCopy(d.cards, s, d.db);
-      return [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10, top: 6),
-          child: Text('${s.label.toUpperCase()} · ${copies.length}',
-              style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2, color: accent)),
-        ),
-        Wrap(
-          spacing: _gap,
-          runSpacing: _gap,
-          children: [
-            for (final c in copies) _CardTile(card: c, file: d.small[c.id], width: _cardW),
-          ],
-        ),
-        const SizedBox(height: 18),
-      ];
-    }
-
-    return Container(
-      width: width,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(d.tone, Colors.white, 0.08)!,
-            d.tone,
-            Color.lerp(d.tone, Colors.black, 0.45)!,
-          ],
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Ilustración principal: todo el alto de la zona derecha.
-          Positioned(
-            left: _artLeft,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            child: EdgeFade(left: 0.22, child: _artFill(d.featuredArt)),
-          ),
-          if (d.featured != null)
-            Positioned(
-              left: _artLeft + 120,
-              right: _pad,
-              bottom: 60,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Text(d.featured!.name,
-                    maxLines: 1,
-                    style: TextStyle(
-                        fontSize: 34, fontWeight: FontWeight.w900, color: text, shadows: shadow)),
-              ),
-            ),
-          Positioned(
-            right: _pad,
-            bottom: 24,
-            child: Text('GARAGE TCG · EDISON FORMAT',
-                style: TextStyle(
-                    fontSize: 16,
-                    letterSpacing: 3,
-                    fontWeight: FontWeight.w800,
-                    color: muted,
-                    shadows: shadow)),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(_pad),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: minHeight - 2 * _pad),
-              child: SizedBox(
-                width: _leftW,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Image.asset(BrandAssets.logo,
-                            width: 110, height: 110, filterQuality: FilterQuality.high),
-                        const SizedBox(width: 22),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                [
-                                  if (d.positionLabel.isNotEmpty) d.positionLabel,
-                                  t.tournamentName.toUpperCase(),
-                                ].join(' · '),
-                                style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 2,
-                                    color: accent),
-                              ),
-                              Text(t.playerName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 56,
-                                      height: 1.1,
-                                      fontWeight: FontWeight.w900,
-                                      color: text)),
-                              Text(
-                                  '${t.deckName ?? 'Sin mazo'} · '
-                                  '${DateFormat('dd/MM/yyyy').format(t.date)}',
-                                  style: TextStyle(
-                                      fontSize: 24, fontWeight: FontWeight.w700, color: muted)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 26),
-                    for (final s in DeckSection.values)
-                      if (d.cards.of(s).isNotEmpty) ...section(s),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ───────────────────────── Formato 16:9 ─────────────────────────
-
-/// Tamaño de las imágenes 16:9.
-const wideSize = Size(1920, 1080);
+// ───────────────────────── Fórmulas de tamaño ─────────────────────────
 
 /// Ancho de carta más grande con el que todas las secciones caben en
 /// [width] × [height] (cada sección suma [perSection] de título y márgenes).
@@ -806,22 +404,104 @@ double fitCardWidth({
   return lo.floorToDouble();
 }
 
-/// Modelo Clásico en 16:9: columna de imágenes 1 y 2 a la izquierda (mitad
-/// y mitad), fondo difuminado detrás y la lista a la derecha.
-class ClassicWidePoster extends StatelessWidget {
-  const ClassicWidePoster({super.key, required this.data});
+// ───────────────────────── Imagen de la lista ─────────────────────────
+
+/// Imagen de la lista (diseño único):
+/// - fondo en degradado del mismo tono que la ilustración principal;
+/// - a la derecha, la ilustración principal ocupando todo el alto, sin marco,
+///   fundiéndose por la izquierda; abajo "GARAGE TCG · EDISON FORMAT · CUBA"
+///   con la bandera;
+/// - a la izquierda, como los carteles de Edison: GARAGE TCG, torneo y fecha,
+///   puesto en dorado, jugador, "MAZO" y el mazo; MAIN (panel morado, 10 por
+///   fila), SIDE (turquesa) y EXTRA (naranja), una imagen por copia.
+/// [wide]: 1920 × 1080 fijo (cartas ajustadas); si no, 1600 de ancho y alto
+/// según la lista.
+class DeckListPoster extends StatelessWidget {
+  const DeckListPoster({super.key, required this.data, this.wide = false});
 
   final DeckListArt data;
+  final bool wide;
 
-  static const _leftCol = 540.0;
-  static const _padL = 26.0;
-  static const _padR = 32.0;
-  static const _padV = 26.0;
-  static const _panelPad = 8.0;
+  double get width => wide ? 1920 : 1600;
+  double get _artW => wide ? 720 : 660;
+  double get _pad => wide ? 30 : 40;
+
+  /// Ancho de la zona de la lista.
+  double get _listW => width - _artW - _pad;
+
+  static const _panelPad = 10.0;
   static const _panelBorder = 2.0;
-  static const _gap = 5.0;
-  static const _header = 186.0;
-  static const _label = 34.0;
+  static const _labelH = 38.0;
+  static const _mainGap = 6.0;
+  static const _rowGap = 4.0;
+  double get _header => wide ? 250 : 300;
+
+  /// Ancho útil dentro de un panel.
+  double get _inner => _listW - 2 * _panelPad - 2 * _panelBorder - 2;
+
+  static const _sections = [
+    (DeckSection.main, 'MAIN', Color(0xFF8E5BD6)),
+    (DeckSection.side, 'SIDE', Color(0xFF2EA6A6)),
+    (DeckSection.extra, 'EXTRA', Color(0xFFD08A3A)),
+  ];
+
+  int _count(DeckSection s) => data.cards.of(s).length;
+
+  /// Side y Extra: una fila de hasta 15 (si hay más, siguen en otra).
+  double get _rowCard {
+    final n = math.max(_count(DeckSection.side), _count(DeckSection.extra));
+    final cols = math.min(15, math.max(10, n));
+    return (_inner - (cols - 1) * _rowGap) / cols;
+  }
+
+  int _rows(int n, double cw, double gap) {
+    // + 1e-9: (inner+gap)/(cw+gap) puede dar 12.999… cuando cw sale de dividir
+    // el ancho exacto entre 13 columnas.
+    final cols = math.max(1, ((_inner + gap) / (cw + gap) + 1e-9).floor());
+    return (n / cols).ceil();
+  }
+
+  double _panelH(int n, double cw, double gap) => n == 0
+      ? 0
+      : _labelH +
+          2 * _panelPad +
+          2 * _panelBorder +
+          _rows(n, cw, gap) * (cw * _cardRatio + gap) -
+          gap;
+
+  /// Main: 10 por fila; en 16:9, lo que quepa en el alto que queda.
+  double get _mainCard {
+    final ten = (_inner - 9 * _mainGap) / 10;
+    if (!wide) return ten;
+    final rest = 1080 -
+        2 * _pad -
+        _header -
+        _panelH(_count(DeckSection.side), _rowCard, _rowGap) -
+        _panelH(_count(DeckSection.extra), _rowCard, _rowGap) -
+        12;
+    return math.min(
+      ten,
+      fitCardWidth(
+        counts: [_count(DeckSection.main)],
+        width: _inner,
+        height: rest,
+        gap: _mainGap,
+        perSection: _labelH + 2 * _panelPad + 2 * _panelBorder,
+        maxWidth: ten,
+      ),
+    );
+  }
+
+  double get estimatedHeight {
+    if (wide) return 1080;
+    final h = 2 * _pad +
+        _header +
+        _panelH(_count(DeckSection.main), _mainCard, _mainGap) +
+        _panelH(_count(DeckSection.side), _rowCard, _rowGap) +
+        _panelH(_count(DeckSection.extra), _rowCard, _rowGap) +
+        60;
+    return math.max(h, 1000);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -830,191 +510,105 @@ class ClassicWidePoster extends StatelessWidget {
     const gold = Color(0xFFE9C46A);
     const white = Colors.white;
     final shadow = [const Shadow(color: Colors.black, blurRadius: 10, offset: Offset(0, 2))];
+    final k = wide ? 0.85 : 1.0; // letra algo menor en 16:9
     TextStyle style(double size, {Color color = white, FontWeight w = FontWeight.w900}) =>
-        TextStyle(fontSize: size, color: color, fontWeight: w, shadows: shadow, height: 1.05);
+        TextStyle(
+            fontSize: size * k, color: color, fontWeight: w, shadows: shadow, height: 1.05);
+    final mainCard = _mainCard, rowCard = _rowCard;
 
-    final w = wideSize.width, h = wideSize.height;
-    final inner = w - _leftCol - _padL - _padR - 2 * _panelPad - 2 * _panelBorder - 2;
-    final counts = [for (final s in DeckSection.values) d.cards.of(s).length];
-    final cardW = fitCardWidth(
-      counts: counts,
-      width: inner,
-      height: h - 2 * _padV - _header,
-      gap: _gap,
-      perSection: _label + 2 * _panelPad + 2 * _panelBorder + 2,
-    );
-    const sections = [
-      (DeckSection.main, 'MAIN', Color(0xFF8E5BD6)),
-      (DeckSection.side, 'SIDE', Color(0xFF2EA6A6)),
-      (DeckSection.extra, 'EXTRA', Color(0xFFD08A3A)),
-    ];
-
-    return Container(
-      width: w,
-      height: h,
-      color: Color.lerp(d.tone, Colors.black, 0.35),
-      child: Stack(
+    Widget panel(DeckSection s, String name, Color color) {
+      final isMain = s == DeckSection.main;
+      final cw = isMain ? mainCard : rowCard;
+      final gap = isMain ? _mainGap : _rowGap;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Positioned(
-            left: _leftCol - 80,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            child: EdgeFade(
-              left: 0.1,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ImageFiltered(
-                    imageFilter:
-                        ui.ImageFilter.blur(sigmaX: 9, sigmaY: 9, tileMode: ui.TileMode.clamp),
-                    child: _artFill(d.backgroundArt),
-                  ),
-                  ColoredBox(color: Colors.black.withValues(alpha: 0.4)),
-                ],
+          SizedBox(
+            height: _labelH,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('$name: ${_count(s)}', style: style(24, w: FontWeight.w800)),
               ),
             ),
           ),
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: _leftCol,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: EdgeFade(right: 0.18, bottom: 0.06, child: _artFill(d.featuredArt)),
-                ),
-                Expanded(
-                  child: EdgeFade(right: 0.18, top: 0.06, child: _artFill(d.secondaryArt)),
-                ),
-              ],
+          Container(
+            padding: const EdgeInsets.all(_panelPad),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: color, width: _panelBorder),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(_leftCol + _padL, _padV, _padR, _padV),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Wrap(
+              spacing: gap,
+              runSpacing: gap,
               children: [
-                SizedBox(
-                  height: _header,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              [
-                                if (d.positionLabel.isNotEmpty) d.positionLabel,
-                                '${t.tournamentName.toUpperCase()} · '
-                                    '${DateFormat('dd/MM/yy').format(t.date)}',
-                              ].join('  ·  '),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: style(30, color: gold),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(t.playerName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: style(56)),
-                            const SizedBox(height: 6),
-                            Text('MAZO · ${t.deckName ?? 'Sin mazo'}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: style(40, w: FontWeight.w800)),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        children: [
-                          Image.asset(BrandAssets.logo,
-                              width: 110, height: 110, filterQuality: FilterQuality.high),
-                          Text('GARAGE TCG', style: style(22).copyWith(letterSpacing: 2)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                for (final (s, name, color) in sections)
-                  if (d.cards.of(s).isNotEmpty) ...[
-                    SizedBox(
-                      height: _label,
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text('$name: ${d.cards.of(s).length}',
-                              style: style(22, w: FontWeight.w800)),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(_panelPad),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: color, width: _panelBorder),
-                      ),
-                      child: Wrap(
-                        spacing: _gap,
-                        runSpacing: _gap,
-                        children: [
-                          for (final c in _everyCopy(d.cards, s, d.db))
-                            _CardTile(card: c, file: d.small[c.id], width: cardW),
-                        ],
-                      ),
-                    ),
-                  ],
+                for (final c in _everyCopy(d.cards, s, d.db))
+                  _CardTile(card: c, file: d.small[c.id], width: cw),
               ],
             ),
           ),
         ],
+      );
+    }
+
+    final header = SizedBox(
+      height: _header,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Row(
+            children: [
+              Image.asset(BrandAssets.logo,
+                  width: 84 * k, height: 84 * k, filterQuality: FilterQuality.high),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('GARAGE TCG', style: style(56).copyWith(letterSpacing: 3)),
+                    Text(
+                      '${t.tournamentName.toUpperCase()} · '
+                      '${DateFormat('dd/MM/yy').format(t.date)}',
+                      style: style(22, w: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 14 * k),
+          if (d.positionLabel.isNotEmpty) Text(d.positionLabel, style: style(46, color: gold)),
+          Text(t.playerName,
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: style(38, w: FontWeight.w800)),
+          Text('MAZO', style: style(16, w: FontWeight.w700)),
+          Text(t.deckName ?? 'Sin mazo',
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: style(48)),
+        ],
       ),
     );
-  }
-}
 
-/// Modelo Contraste en 16:9: la lista a la izquierda sobre el tono de la
-/// ilustración principal y la ilustración ocupando todo el alto a la derecha.
-class ContrastWidePoster extends StatelessWidget {
-  const ContrastWidePoster({super.key, required this.data});
-
-  final DeckListArt data;
-
-  static const _pad = 36.0;
-  static const _artW = 700.0;
-  static const _gap = 6.0;
-  static const _header = 150.0;
-  static const _label = 40.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final d = data;
-    final t = d.target;
-    const text = Colors.white;
-    const accent = AppColors.neon;
-    final muted = Colors.white.withValues(alpha: 0.75);
-    final shadow = [const Shadow(color: Colors.black87, blurRadius: 10)];
-
-    final w = wideSize.width, h = wideSize.height;
-    final listW = w - _artW - 2 * _pad;
-    final counts = [for (final s in DeckSection.values) d.cards.of(s).length];
-    final cardW = fitCardWidth(
-      counts: counts,
-      width: listW - 1,
-      height: h - 2 * _pad - _header,
-      gap: _gap,
-      perSection: _label + 6,
+    final content = Padding(
+      padding: EdgeInsets.fromLTRB(_pad, _pad, 0, _pad),
+      child: SizedBox(
+        width: _listW,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            header,
+            for (final (s, name, color) in _sections)
+              if (_count(s) > 0) panel(s, name, color),
+          ],
+        ),
+      ),
     );
 
     return Container(
-      width: w,
-      height: h,
+      width: width,
+      height: wide ? 1080 : null,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -1028,118 +622,37 @@ class ContrastWidePoster extends StatelessWidget {
       ),
       child: Stack(
         children: [
+          // Ilustración principal: todo el alto del lado derecho.
           Positioned(
-            left: w - _artW - 60,
+            left: width - _artW - 70,
             top: 0,
             right: 0,
             bottom: 0,
             child: EdgeFade(left: 0.2, child: _artFill(d.featuredArt)),
           ),
-          if (d.featured != null)
-            Positioned(
-              left: w - _artW + 60,
-              right: _pad,
-              bottom: 56,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Text(d.featured!.name,
-                    maxLines: 1,
-                    style: TextStyle(
-                        fontSize: 34, fontWeight: FontWeight.w900, color: text, shadows: shadow)),
-              ),
-            ),
+          // Comunidad, formato y país.
           Positioned(
             right: _pad,
-            bottom: 22,
-            child: Text('GARAGE TCG · EDISON FORMAT',
-                style: TextStyle(
-                    fontSize: 16,
-                    letterSpacing: 3,
-                    fontWeight: FontWeight.w800,
-                    color: muted,
-                    shadows: shadow)),
-          ),
-          Positioned(
-            left: _pad,
-            top: _pad,
-            width: listW,
-            bottom: _pad,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            bottom: _pad - 6,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  height: _header,
-                  child: Row(
-                    children: [
-                      Image.asset(BrandAssets.logo,
-                          width: 110, height: 110, filterQuality: FilterQuality.high),
-                      const SizedBox(width: 22),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              [
-                                if (d.positionLabel.isNotEmpty) d.positionLabel,
-                                t.tournamentName.toUpperCase(),
-                              ].join(' · '),
-                              style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 2,
-                                  color: accent),
-                            ),
-                            Text(t.playerName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 54,
-                                    height: 1.1,
-                                    fontWeight: FontWeight.w900,
-                                    color: text)),
-                            Text(
-                                '${t.deckName ?? 'Sin mazo'} · '
-                                '${DateFormat('dd/MM/yyyy').format(t.date)}',
-                                style: TextStyle(
-                                    fontSize: 24, fontWeight: FontWeight.w700, color: muted)),
-                          ],
-                        ),
-                      ),
-                    ],
+                Text('GARAGE TCG · EDISON FORMAT · CUBA',
+                    style: style(22, w: FontWeight.w900).copyWith(letterSpacing: 1.5)),
+                const SizedBox(width: 12),
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 8)],
                   ),
+                  child: CubaFlag(height: 24 * k),
                 ),
-                for (final s in DeckSection.values)
-                  if (d.cards.of(s).isNotEmpty) ...[
-                    SizedBox(
-                      height: _label,
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Text('${s.label.toUpperCase()} · ${d.cards.of(s).length}',
-                              style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 2,
-                                  color: accent)),
-                        ),
-                      ),
-                    ),
-                    Wrap(
-                      spacing: _gap,
-                      runSpacing: _gap,
-                      children: [
-                        for (final c in _everyCopy(d.cards, s, d.db))
-                          _CardTile(card: c, file: d.small[c.id], width: cardW),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                  ],
               ],
             ),
           ),
+          if (wide)
+            Positioned.fill(child: Align(alignment: Alignment.topLeft, child: content))
+          else
+            ConstrainedBox(constraints: const BoxConstraints(minHeight: 1000), child: content),
         ],
       ),
     );
