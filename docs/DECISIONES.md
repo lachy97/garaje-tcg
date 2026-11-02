@@ -177,3 +177,9 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - Abajo a la derecha: **GARAGE TCG · EDISON FORMAT · CUBA** con la bandera de Cuba (dibujada, sin archivo). Ya no sale el nombre de la carta principal.
 - Formatos: **Actual** (1600 px de ancho, alto según la lista) o **16:9** (1920 × 1080; el Main se ajusta para que quepa).
 - En el editor solo se elige la **imagen principal** (las columnas de imagen secundaria y fondo de la v9 se conservan pero no se usan).
+
+## Clasificación vs. resultado real (v10) · 02/11
+- **Clasificación** del torneo: solo la tabla Swiss (el resultado final con puntos está en Resumen → Puntos).
+- Nuevas columnas `matches.standings_result` y `standings_games1/draw/2` (esquema **v10**): un resultado que cuenta **solo para el torneo** (puntos y desempates Swiss, cruces siguientes, siembra del Top y récord del Resumen) cuando el organizador decide mantener uno distinto del real. Las estadísticas de jugadores (ficha, rivales) y de mazos (matriz, fichas) usan siempre el resultado real. En la tarjeta de la partida sale "En la clasificación del torneo cuenta: …".
+- Caso aplicado al actualizar a v10 (automático): Torneo 01/11, ronda 5, mesa 6 — real: Cacharro 2-0; clasificación: Lachy Lawton 2-0.
+- **Dona del Top Cut**: cada mazo con su propio sector, sin agrupar en OTROS.

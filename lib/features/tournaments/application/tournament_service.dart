@@ -532,10 +532,11 @@ class _Ctx {
           round: roundById[m.roundId]!.number,
           player1Id: m.player1Id,
           player2Id: m.player2Id,
-          result: m.result,
-          games1: m.games1,
-          gamesDraw: m.gamesDraw,
-          games2: m.games2,
+          // Si el organizador fijó otro resultado para la clasificación, ese.
+          result: m.standingsResult ?? m.result,
+          games1: m.standingsResult == null ? m.games1 : m.standingsGames1,
+          gamesDraw: m.standingsResult == null ? m.gamesDraw : m.standingsGamesDraw,
+          games2: m.standingsResult == null ? m.games2 : m.standingsGames2,
         ),
   ];
 

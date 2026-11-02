@@ -50,7 +50,8 @@ class SummaryTab extends ConsumerWidget {
               ReportMatch(
                 player1Id: m.player1Id,
                 player2Id: m.player2Id,
-                result: m.result,
+                // Récord del torneo: cuenta el resultado de la clasificación.
+                result: m.standingsResult ?? m.result,
                 isBye: m.isBye,
               ),
           ];
@@ -74,6 +75,8 @@ class SummaryTab extends ConsumerWidget {
                   ],
                   matches: reportMatches,
                   topCutSize: cut,
+                  // En el Top Cut cada mazo tiene su sector (sin "Otros").
+                  groupSingles: false,
                 );
           return DefaultTabController(
             length: 3,

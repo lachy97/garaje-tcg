@@ -390,4 +390,24 @@ void main() {
         reason: 'volver a subir revive la borrada');
     await db.close();
   });
+
+  test('Resultado distinto para la clasificación (v10)', () async {
+    final db = await open();
+    if (db == null) return;
+    final s = TournamentService(db);
+    final t = await create(db, 2, swissRounds: 1);
+    await s.generateNextSwissRound(t.id);
+    final m = (await db.tournamentsDao.matchesOfTournament(t.id)).single;
+    await s.reportScore(m.id, const GameScore(0, 0, 2)); // real: gana el jugador 2
+    await db.customStatement(
+        "UPDATE matches SET standings_result = 'p1Win', standings_games1 = 2, "
+        'standings_games_draw = 0, standings_games2 = 0 WHERE id = ?',
+        [m.id]);
+    final table = await s.standings(t.id);
+    expect(table.first.playerId, m.player1Id, reason: 'en el torneo cuenta la victoria del 1');
+    expect(table.first.wins, 1);
+    final real = (await db.tournamentsDao.matchById(m.id))!;
+    expect(real.result, MatchResult.p2Win, reason: 'el resultado real no cambia');
+    await db.close();
+  });
 }

@@ -213,6 +213,15 @@ class Matches extends Table with SyncColumns {
   IntColumn get games1 => integer().nullable()();
   IntColumn get gamesDraw => integer().nullable()();
   IntColumn get games2 => integer().nullable()();
+
+  /// Resultado que cuenta SOLO para la clasificación del torneo (cruces,
+  /// puntos y desempates Swiss, récord del resumen) cuando el organizador
+  /// decidió mantener uno distinto del real (v10). null = el real.
+  /// Las estadísticas de jugadores y mazos usan siempre el resultado real.
+  TextColumn get standingsResult => textEnum<MatchResult>().nullable()();
+  IntColumn get standingsGames1 => integer().nullable()();
+  IntColumn get standingsGamesDraw => integer().nullable()();
+  IntColumn get standingsGames2 => integer().nullable()();
 }
 
 /// Penalización de un jugador en un torneo (v6). Solo registro.

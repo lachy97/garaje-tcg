@@ -94,7 +94,15 @@ class DeckShare {
 
 /// Resumen de un torneo: participantes y metagame. Dart puro.
 class TournamentReport {
-  const TournamentReport({required this.participants, required this.metagame});
+  const TournamentReport({
+    required this.participants,
+    required this.metagame,
+    this.groupSingles = true,
+  });
+
+  /// true: en el gráfico, los mazos de un solo jugador van juntos en "Otros".
+  /// false: cada mazo con su propio sector (p. ej. el metagame del Top Cut).
+  final bool groupSingles;
 
   /// Por puesto final (los que no tienen puesto, al final por nombre).
   final List<ParticipantLine> participants;
@@ -112,7 +120,7 @@ class TournamentReport {
   List<DeckShare> get chart {
     final big = metagame.where((d) => d.players > 1).toList();
     final singles = metagame.where((d) => d.players <= 1).toList();
-    if (singles.isEmpty) return big;
+    if (!groupSingles || singles.isEmpty) return metagame;
     return [
       ...big,
       DeckShare(null, singles.length, singles.first.total, members: singles),
@@ -127,6 +135,7 @@ class TournamentReport {
     required List<ReportEntry> entries,
     required List<ReportMatch> matches,
     required int topCutSize,
+    bool groupSingles = true,
   }) {
     final w = <String, int>{}, l = <String, int>{}, d = <String, int>{};
     void add(Map<String, int> m, String? id) {
@@ -193,7 +202,7 @@ class TournamentReport {
         final c = b.players.compareTo(a.players);
         return c != 0 ? c : (a.name ?? '').toLowerCase().compareTo((b.name ?? '').toLowerCase());
       });
-    return TournamentReport(participants: lines, metagame: meta);
+    return TournamentReport(participants: lines, metagame: meta, groupSingles: groupSingles);
   }
 }
 

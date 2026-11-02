@@ -62,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,6 +113,23 @@ class AppDatabase extends _$AppDatabase {
             // (si viene de antes de la v8, createTable ya las crea).
             await m.addColumn(deckLists, deckLists.backgroundCard);
             await m.addColumn(deckLists, deckLists.secondaryCard);
+          }
+          if (from < 10) {
+            // v10: resultado distinto para la clasificación del torneo
+            await m.addColumn(matches, matches.standingsResult);
+            await m.addColumn(matches, matches.standingsGames1);
+            await m.addColumn(matches, matches.standingsGamesDraw);
+            await m.addColumn(matches, matches.standingsGames2);
+            // Caso pedido por el organizador (Torneo 01/11, ronda 5, mesa 6):
+            // la partida la ganó Cacharro 2-0 (estadísticas de jugadores y
+            // mazos), pero en la clasificación del torneo se mantiene la
+            // victoria 2-0 de Lachy Lawton. Solo si la partida existe con ese
+            // resultado real.
+            await customStatement(
+              "UPDATE matches SET standings_result = 'p1Win', standings_games1 = 2, "
+              'standings_games_draw = 0, standings_games2 = 0 '
+              "WHERE id = '01a19893-6890-7c18-9348-8190cf9dab59' AND result = 'p2Win'",
+            );
           }
         },
         beforeOpen: (details) async {

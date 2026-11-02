@@ -255,6 +255,16 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.w700, color: status.$2),
           ),
+          if (m.standingsResult != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'En la clasificación del torneo cuenta: '
+                '${_overrideLabel(m.standingsResult!, p1, p2 ?? '')}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: AppColors.draw),
+              ),
+            ),
           if (widget.editable && widget.canClear && reported)
             TextButton.icon(
               onPressed: enabled ? _clear : null,
@@ -398,3 +408,12 @@ class _ByeCard extends StatelessWidget {
     );
   }
 }
+
+/// Texto del resultado fijado para la clasificación (distinto del real).
+String _overrideLabel(MatchResult r, String p1, String p2) => switch (r) {
+      MatchResult.p1Win => 'gana $p1',
+      MatchResult.p2Win => 'gana $p2',
+      MatchResult.draw => 'empate',
+      MatchResult.doubleLoss => 'doble derrota',
+      MatchResult.pending => 'sin resultado',
+    };

@@ -11,7 +11,7 @@ import '../../domain/tournament_rules.dart';
 import '../providers.dart';
 import '../share_tournament.dart';
 
-/// Clasificación Swiss en vivo; al terminar, resultado final con puntos de ranking.
+/// Clasificación Swiss (el resultado final con puntos está en Resumen → Puntos).
 class StandingsTab extends ConsumerWidget {
   const StandingsTab({super.key, required this.tournament});
 
@@ -28,8 +28,6 @@ class StandingsTab extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.only(bottom: 32),
           children: [
-            if (tournament.status == TournamentStatus.finished)
-              FinalResults(tournament: tournament, names: names, decks: decks),
             _SwissStandings(tournament: tournament, names: names, decks: decks),
           ],
         );

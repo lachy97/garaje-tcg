@@ -61,6 +61,13 @@ void main() {
     expect(chartImagePath(chart[1]), kOthersImage);
   });
 
+  test('sin agrupar (Top Cut): cada mazo con su sector', () {
+    final top = TournamentReport.build(
+        entries: entries, matches: matches, topCutSize: 2, groupSingles: false);
+    expect(top.chart.length, 4);
+    expect(top.chart.any((d) => d.isOthers), isFalse);
+  });
+
   test('colores de respaldo: el más jugado primero, sin mazo en gris', () {
     final c = metaColors(r.metagame);
     expect(c['Blackwing'], kMetaPalette[0]);
