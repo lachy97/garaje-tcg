@@ -43,12 +43,12 @@ class RankingTable extends StatelessWidget {
     NeonColumn('Mejor', width: 50),
   ];
 
-  /// Columnas de la imagen: más anchas para letra grande (suman 724 + 24 ≤ 750).
+  /// Columnas de la imagen: más anchas para letra grande (720 + 24 + 4 ≤ 750).
   static const exportColumns = [
     NeonColumn('#', width: 40, align: TextAlign.start),
     NeonColumn('Jugador', width: 140, align: TextAlign.start, flex: true),
     NeonColumn('Pts', width: 62),
-    NeonColumn('Mazo', width: 150, align: TextAlign.start),
+    NeonColumn('Mazo', width: 146, align: TextAlign.start),
     NeonColumn('PJ', width: 42),
     NeonColumn('V', width: 38),
     NeonColumn('D', width: 38),
@@ -93,7 +93,7 @@ class RankingTable extends StatelessWidget {
               Text(r.lastDeck ?? '—',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: forExport ? kExportFontSize - 2 : 13, color: secondary)),
+                      fontSize: forExport ? kExportFontSize - 2 : 12, color: secondary)),
               Text('${r.played}'),
               Text('${r.wins}', style: const TextStyle(color: AppColors.win)),
               Text('${r.losses}', style: const TextStyle(color: AppColors.loss)),

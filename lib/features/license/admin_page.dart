@@ -171,7 +171,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
       maxLength: AdminVault.maxPinLength,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 22, letterSpacing: 8),
+      style: const TextStyle(fontSize: 20, letterSpacing: 8),
       onSubmitted: onSubmitted,
       decoration: InputDecoration(labelText: label, errorText: errorText, counterText: ''),
     );
@@ -410,7 +410,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
       subtitle: Text(
         on
             ? 'Activo: no se pueden hacer capturas ni grabar la pantalla de la app. '
-                'Exportar el ranking y la tier list sigue funcionando.'
+                'Compartir el ranking y la tier list sigue funcionando.'
             : 'Desactivado en este teléfono: se pueden hacer capturas. '
                 'Vuelve a activarlo cuando termines.',
         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
@@ -510,9 +510,9 @@ class _AdminPageState extends ConsumerState<AdminPage> {
             style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         SelectableText(pub,
-            style: const TextStyle(fontSize: 13, color: AppColors.neon)),
+            style: const TextStyle(fontSize: 12, color: AppColors.neon)),
         const SizedBox(height: 6),
-        Text(status, style: TextStyle(fontSize: 13, color: color)),
+        Text(status, style: TextStyle(fontSize: 12, color: color)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -613,7 +613,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
         ),
         Text(
           'Válida desde hoy hasta el ${formatDate(LicenseCodec.addMonths(DateTime.now(), _months))}',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
@@ -630,7 +630,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.neon),
             ),
-            child: SelectableText(_license!, style: const TextStyle(fontSize: 12.5)),
+            child: SelectableText(_license!, style: const TextStyle(fontSize: 12)),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -683,7 +683,7 @@ class _ClosedSeasons extends ConsumerWidget {
     final closed = seasons.where((s) => s.status == SeasonStatus.closed).toList();
     if (closed.isEmpty) {
       return const Text('No hay temporadas cerradas. Se cierran desde la pantalla de Ranking.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary));
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
     }
     return Column(
       children: [

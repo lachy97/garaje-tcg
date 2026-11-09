@@ -183,3 +183,14 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - Nuevas columnas `matches.standings_result` y `standings_games1/draw/2` (esquema **v10**): un resultado que cuenta **solo para el torneo** (puntos y desempates Swiss, cruces siguientes, siembra del Top y récord del Resumen) cuando el organizador decide mantener uno distinto del real. Las estadísticas de jugadores (ficha, rivales) y de mazos (matriz, fichas) usan siempre el resultado real. En la tarjeta de la partida sale "En la clasificación del torneo cuenta: …".
 - Caso aplicado al actualizar a v10 (automático): Torneo 01/11, ronda 5, mesa 6 — real: Cacharro 2-0; clasificación: Lachy Lawton 2-0.
 - **Dona del Top Cut**: cada mazo con su propio sector, sin agrupar en OTROS.
+
+## Correcciones 09/11
+- **Tablas**: todas las filas llevan la franja de color de la izquierda (transparente si no hay color), así el Top 8 del ranking queda alineado con el resto.
+- **Ranking**: un solo botón de compartir (arriba). El selector de temporada está siempre disponible para ver temporadas anteriores.
+- **Mazos**: compartir la tier list desde la barra superior (ya no al final). Tier list y enfrentamientos por temporada, con la opción **Histórico · todas las temporadas**.
+- **Torneo terminado**: solo se ve el Resumen; para corregir jugadores, rondas o clasificación, botón **Editar torneo** (⚙) en la barra y **Listo** para volver.
+- **Resumen**: tres pestañas con icono — **Participantes** (con la columna **Pts** de ranking; desaparece la pestaña Puntos y la tarjeta de metagame), **Deck Breakdown** (Todos / Top N) y **Listas** (de todo el Top Cut; sin Top Cut, los 4 primeros).
+- **Imagen del Deck Breakdown**: título "TOURNAMENT DECK BREAKDOWN" o "TOP CUT DECK BREAKDOWN", siempre en una línea.
+- **Ficha del jugador**: filtro de temporada (todas o cada temporada en la que jugó) para estadísticas, mazos, rivales e historial.
+- **Un solo término: "Compartir"** para las imágenes (la copia de seguridad sigue siendo "Exportar base de datos", porque es un archivo).
+- **Tamaños de letra** de la app reducidos a una escala fija: 11 · 12 · 14 · 16 · 20 · 24 (las imágenes compartidas mantienen los suyos).

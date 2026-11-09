@@ -52,7 +52,12 @@ class DeckDetailPage extends ConsumerWidget {
           body: ListView(
             padding: const EdgeInsets.only(bottom: 40),
             children: [
-              _Header(deck: d, season: season == null ? '' : seasonLabel(season.year, season.quarter)),
+              _Header(
+                deck: d,
+                season: season == null
+                    ? (seasonId == kAllSeasons ? 'Histórico' : '')
+                    : 'Temporada ${seasonLabel(season.year, season.quarter)}',
+              ),
               const SectionLabel('Torneos'),
               _Entries(seasonId: seasonId, deckId: deckId),
               const SectionLabel('Enfrentamientos'),
@@ -94,8 +99,8 @@ class _Header extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(deck.name,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                    Text('Temporada $season · puesto ${deck.rank}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                    Text(season.isEmpty ? 'Puesto ${deck.rank}' : '$season · puesto ${deck.rank}',
                         style: const TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),

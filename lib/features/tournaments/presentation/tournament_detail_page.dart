@@ -11,14 +11,27 @@ import 'tabs/rounds_tab.dart';
 import 'tabs/standings_tab.dart';
 import 'tabs/summary_tab.dart';
 
-class TournamentDetailPage extends ConsumerWidget {
+/// Detalle de un torneo.
+/// - En juego: pestañas Jugadores, Rondas y Clasificación.
+/// - Terminado: solo el Resumen (participantes, deck breakdown y listas). Para
+///   corregir algo, el botón "Editar torneo" de la barra muestra de nuevo las
+///   pestañas de Jugadores, Rondas y Clasificación.
+class TournamentDetailPage extends ConsumerStatefulWidget {
   const TournamentDetailPage({super.key, required this.tournamentId});
 
   final String tournamentId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tournament = ref.watch(tournamentProvider(tournamentId));
+  ConsumerState<TournamentDetailPage> createState() => _TournamentDetailPageState();
+}
+
+class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
+  /// Torneo terminado: mostrar las pestañas de edición en vez del resumen.
+  bool _editing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tournament = ref.watch(tournamentProvider(widget.tournamentId));
     return AsyncView(
       value: tournament,
       builder: (t) {
@@ -28,38 +41,65 @@ class TournamentDetailPage extends ConsumerWidget {
             body: const EmptyState(icon: Icons.search_off, title: 'Torneo no encontrado'),
           );
         }
+        final finished = t.status == TournamentStatus.finished;
+        final title = Text(t.name.toUpperCase(), overflow: TextOverflow.ellipsis);
+
+        // Terminado: solo el resumen.
+        if (finished && !_editing) {
+          return Scaffold(
+            appBar: AppBar(
+              title: title,
+              actions: [
+                IconButton(
+                  tooltip: 'Editar torneo (jugadores, rondas, clasificación)',
+                  icon: const Icon(Icons.tune),
+                  onPressed: () => setState(() => _editing = true),
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(36),
+                child: _Header(t: t),
+              ),
+            ),
+            body: SummaryTab(tournament: t),
+          );
+        }
+
         // Pestaña inicial según la fase: inscripción → rondas → clasificación
         final initial = switch (t.status) {
           TournamentStatus.draft => 0,
           TournamentStatus.swiss || TournamentStatus.topCut => 1,
-          TournamentStatus.finished => 2,
+          TournamentStatus.finished => 1,
         };
-        // Con el torneo terminado se añade la pestaña Resumen (metagame y participantes).
-        final finished = t.status == TournamentStatus.finished;
         return DefaultTabController(
           key: ValueKey(finished),
-          length: finished ? 4 : 3,
+          length: 3,
           initialIndex: initial,
           child: Scaffold(
             appBar: AppBar(
-              title: Text(t.name.toUpperCase(), overflow: TextOverflow.ellipsis),
+              title: title,
+              actions: [
+                if (finished)
+                  TextButton.icon(
+                    onPressed: () => setState(() => _editing = false),
+                    icon: const Icon(Icons.check),
+                    label: const Text('Listo'),
+                  ),
+              ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(84),
                 child: Column(
                   children: [
                     _Header(t: t),
-                    TabBar(
+                    const TabBar(
                       labelColor: AppColors.neon,
                       unselectedLabelColor: AppColors.textSecondary,
                       indicatorColor: AppColors.neon,
                       dividerColor: Colors.transparent,
-                      isScrollable: finished,
-                      tabAlignment: finished ? TabAlignment.center : null,
                       tabs: [
-                        const Tab(text: 'Jugadores'),
-                        const Tab(text: 'Rondas'),
-                        const Tab(text: 'Clasificación'),
-                        if (finished) const Tab(text: 'Resumen'),
+                        Tab(text: 'Jugadores'),
+                        Tab(text: 'Rondas'),
+                        Tab(text: 'Clasificación'),
                       ],
                     ),
                   ],
@@ -71,7 +111,6 @@ class TournamentDetailPage extends ConsumerWidget {
                 RegistrationTab(tournament: t),
                 RoundsTab(tournament: t),
                 StandingsTab(tournament: t),
-                if (finished) SummaryTab(tournament: t),
               ],
             ),
           ),

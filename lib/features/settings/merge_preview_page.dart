@@ -90,7 +90,7 @@ class _MergePreviewPageState extends State<_MergePreviewPage> {
             'Revisa qué se hará con cada torneo de la copia. Los jugadores y mazos '
             'nuevos se añaden; no se borra nada que no elijas reemplazar. Antes se '
             'guarda una copia automática por si necesitas volver atrás.',
-            style: TextStyle(fontSize: 13),
+            style: TextStyle(fontSize: 12),
           ),
           const SizedBox(height: 12),
           if (items.isEmpty)
@@ -111,7 +111,7 @@ class _MergePreviewPageState extends State<_MergePreviewPage> {
               Text(
                 '${count[MergeAction.add]} añadir · ${count[MergeAction.replace]} reemplazar · '
                 '${count[MergeAction.skip]} sin importar',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 8),
               Row(
@@ -157,7 +157,7 @@ class _MergePreviewPageState extends State<_MergePreviewPage> {
           Text(i.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
           Text(_date(i.date), style: const TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
-          Text(text, style: TextStyle(fontSize: 13, color: color)),
+          Text(text, style: TextStyle(fontSize: 12, color: color)),
           const SizedBox(height: 8),
           if (i.allowed.length == 1)
             Text(_actionLabel(i.action),

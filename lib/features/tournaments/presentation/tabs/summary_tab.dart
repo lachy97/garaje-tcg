@@ -12,13 +12,11 @@ import '../../domain/tournament_report.dart';
 import '../providers.dart';
 import '../report/report_export.dart';
 import '../report/report_widgets.dart';
-import 'standings_tab.dart' show FinalResults;
 
-/// Resumen de un torneo terminado, en tres apartados:
-/// 1. Puntos: los jugadores que suman puntos de ranking.
-/// 2. Top y metagame: listas del Top 4 y la dona de mazos (de todos o solo
-///    del Top Cut), exportable con o sin leyenda.
-/// 3. Participantes: puesto, récord, % de victorias y mazo.
+/// Resumen de un torneo terminado (es lo que se ve al abrirlo), en tres
+/// pestañas con icono: Participantes (puesto, mazo, récord, win % y puntos
+/// de ranking), Deck Breakdown (dona de todo el torneo o del Top Cut) y
+/// Listas (las del Top Cut entero).
 class SummaryTab extends ConsumerWidget {
   const SummaryTab({super.key, required this.tournament});
 
@@ -63,8 +61,6 @@ class SummaryTab extends ConsumerWidget {
           if (report.players == 0) {
             return const EmptyState(icon: Icons.pie_chart_outline, title: 'Sin participantes');
           }
-          final names = {for (final r in players) r.player.id: r.player.nickname};
-          final decks = {for (final r in players) r.player.id: r.deck?.name};
           final cut = tournament.topCutSize;
           final topReport = cut == 0
               ? null
@@ -78,6 +74,12 @@ class SummaryTab extends ConsumerWidget {
                   // En el Top Cut cada mazo tiene su sector (sin "Otros").
                   groupSingles: false,
                 );
+          final points = {
+            for (final r in ref.watch(tournamentResultsProvider(tournament.id)).value ??
+                const <SeasonResult>[])
+              r.playerId: r.points,
+          };
+          final listCut = cut > 0 ? cut : 4;
           return DefaultTabController(
             length: 3,
             child: Column(
@@ -87,69 +89,64 @@ class SummaryTab extends ConsumerWidget {
                   unselectedLabelColor: AppColors.textSecondary,
                   indicatorColor: AppColors.neon,
                   dividerColor: AppColors.outlineVariant,
-                  labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   tabs: [
-                    Tab(text: 'Puntos'),
-                    Tab(text: 'Top y metagame'),
-                    Tab(text: 'Participantes'),
+                    Tab(icon: Tooltip(message: 'Participantes', child: Icon(Icons.groups))),
+                    Tab(
+                        icon: Tooltip(
+                            message: 'Deck Breakdown', child: Icon(Icons.pie_chart_outline))),
+                    Tab(icon: Tooltip(message: 'Listas', child: Icon(Icons.style_outlined))),
                   ],
                 ),
                 Expanded(
                   child: TabBarView(
                     children: [
-                      ListView(
-                        padding: const EdgeInsets.only(bottom: 40, top: 4),
-                        children: [
-                          FinalResults(
-                            tournament: tournament,
-                            names: names,
-                            decks: decks,
-                            onlyScoring: true,
-                            showTitle: false,
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
-                            child: Text('Solo los jugadores que suman puntos de ranking.',
-                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                          ),
-                        ],
-                      ),
-                      _TopAndMetagame(
-                        tournament: tournament,
-                        report: report,
-                        topReport: topReport,
-                      ),
+                      // 1) Participantes, con los puntos de ranking ganados.
                       ListView(
                         padding: const EdgeInsets.only(bottom: 40),
                         children: [
-                          NeonCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(tournamentInfoLine(tournament, report),
-                                    style: const TextStyle(color: AppColors.textSecondary)),
-                                const SizedBox(height: 10),
-                                MetaHeadline(meta: report.metagame),
-                              ],
-                            ),
-                          ),
                           _Header(
                             title: 'Participantes',
-                            onExport: () => exportParticipants(context,
-                                tournament: tournament, report: report),
+                            onShare: () => exportParticipants(context,
+                                tournament: tournament, report: report, points: points),
                           ),
                           ParticipantsTable(
                             lines: report.participants,
+                            points: points,
                             onTapPlayer: (id) => context.push('/jugadores/$id'),
                           ),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                             child: Text(
                               'Récord de todo el torneo (Swiss y Top Cut). El BYE cuenta como '
-                              'victoria; las rondas perdidas por inscribirse tarde, como derrota.'
+                              'victoria; las rondas perdidas por inscribirse tarde, como derrota. '
+                              'Pts = puntos de ranking.'
                               '${cut > 0 ? ' Con franja verde, el Top $cut.' : ''}',
                               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
+                          ),
+                        ],
+                      ),
+                      // 2) Deck Breakdown (de todos o del Top Cut).
+                      _Breakdown(tournament: tournament, report: report, topReport: topReport),
+                      // 3) Listas de mazos de todo el Top Cut.
+                      ListView(
+                        padding: const EdgeInsets.only(bottom: 40),
+                        children: [
+                          TopDeckListsSection(
+                            tournamentId: tournament.id,
+                            targets: [
+                              for (final p in report.participants)
+                                if (p.position != null && p.position! <= listCut)
+                                  DeckListTarget(
+                                    tournamentId: tournament.id,
+                                    tournamentName: tournament.name,
+                                    date: tournament.date,
+                                    playerId: p.playerId,
+                                    playerName: p.name,
+                                    position: p.position,
+                                    deckName: p.deck,
+                                  ),
+                            ],
                           ),
                         ],
                       ),
@@ -165,19 +162,19 @@ class SummaryTab extends ConsumerWidget {
   }
 }
 
-/// Listas del Top 4 y la dona de mazos (de todos o solo del Top Cut).
-class _TopAndMetagame extends StatefulWidget {
-  const _TopAndMetagame({required this.tournament, required this.report, this.topReport});
+/// Deck Breakdown: dona de mazos de todo el torneo o solo del Top Cut.
+class _Breakdown extends StatefulWidget {
+  const _Breakdown({required this.tournament, required this.report, this.topReport});
 
   final Tournament tournament;
   final TournamentReport report;
   final TournamentReport? topReport;
 
   @override
-  State<_TopAndMetagame> createState() => _TopAndMetagameState();
+  State<_Breakdown> createState() => _BreakdownState();
 }
 
-class _TopAndMetagameState extends State<_TopAndMetagame> {
+class _BreakdownState extends State<_Breakdown> {
   bool _onlyTop = false;
 
   @override
@@ -187,29 +184,12 @@ class _TopAndMetagameState extends State<_TopAndMetagame> {
     final onlyTop = _onlyTop && top != null;
     // `onlyTop` implica top != null, pero Dart no promociona a través de un bool.
     final report = onlyTop ? top! : widget.report;
-    final scope = onlyTop ? 'TOP ${t.topCutSize}' : null;
     return ListView(
       padding: const EdgeInsets.only(bottom: 40),
       children: [
-        TopDeckListsSection(
-          tournamentId: t.id,
-          targets: [
-            for (final p in widget.report.participants)
-              if (p.position != null && p.position! <= 4)
-                DeckListTarget(
-                  tournamentId: t.id,
-                  tournamentName: t.name,
-                  date: t.date,
-                  playerId: p.playerId,
-                  playerName: p.name,
-                  position: p.position,
-                  deckName: p.deck,
-                ),
-          ],
-        ),
         _Header(
-          title: onlyTop ? 'Metagame del Top ${t.topCutSize}' : 'Metagame',
-          onExport: () => _export(report, scope),
+          title: onlyTop ? 'Top Cut Deck Breakdown' : 'Tournament Deck Breakdown',
+          onShare: () => _share(report, onlyTop),
         ),
         if (top != null)
           Padding(
@@ -248,8 +228,8 @@ class _TopAndMetagameState extends State<_TopAndMetagame> {
     );
   }
 
-  /// Pregunta si exportar con la leyenda (lista de mazos) o solo el gráfico.
-  Future<void> _export(TournamentReport report, String? scope) async {
+  /// Pregunta si compartir con la leyenda (lista de mazos) o solo el gráfico.
+  Future<void> _share(TournamentReport report, bool onlyTop) async {
     final legend = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -276,15 +256,15 @@ class _TopAndMetagameState extends State<_TopAndMetagame> {
     );
     if (legend == null || !mounted) return;
     await exportMetagame(context,
-        tournament: widget.tournament, report: report, showLegend: legend, scope: scope);
+        tournament: widget.tournament, report: report, showLegend: legend, topCut: onlyTop);
   }
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.title, required this.onExport});
+  const _Header({required this.title, required this.onShare});
 
   final String title;
-  final VoidCallback onExport;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -294,9 +274,9 @@ class _Header extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(top: 8, right: 4),
           child: TextButton.icon(
-            onPressed: onExport,
-            icon: const Icon(Icons.ios_share, size: 20),
-            label: const Text('Exportar'),
+            onPressed: onShare,
+            icon: const Icon(Icons.share, size: 20),
+            label: const Text('Compartir'),
           ),
         ),
       ],

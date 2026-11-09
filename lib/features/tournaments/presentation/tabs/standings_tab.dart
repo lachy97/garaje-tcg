@@ -87,7 +87,7 @@ class FinalResults extends ConsumerWidget {
                   Text(
                     r.points > 0 ? '+${r.points}' : '0',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: r.points > 0 ? AppColors.neon : AppColors.textDisabled,
                     ),

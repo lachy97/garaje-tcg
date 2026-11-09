@@ -14,7 +14,7 @@ Future<bool> runExport<T>(BuildContext context, ExportSpec<T> spec) async {
     await exportSingleImage(context, spec);
     return true;
   } catch (e) {
-    if (context.mounted) showMessage(context, 'No se pudo exportar: $e', error: true);
+    if (context.mounted) showMessage(context, 'No se pudo compartir: $e', error: true);
     return false;
   }
 }

@@ -486,9 +486,13 @@ class ParticipantsTable extends StatelessWidget {
     this.fontSize = 14,
     this.rowPadding = 8,
     this.onTapPlayer,
+    this.points,
   });
 
   final List<ParticipantLine> lines;
+
+  /// Puntos de ranking de cada jugador (columna "Pts"); null = sin columna.
+  final Map<String, int>? points;
 
   /// Ancho fijo (exportación). null = el de la pantalla.
   final double? width;
@@ -513,10 +517,11 @@ class ParticipantsTable extends StatelessWidget {
       columns: [
         NeonColumn('#', width: big ? 44 : 30, align: TextAlign.start),
         NeonColumn(big ? 'Jugador' : 'Jugador · mazo',
-            width: big ? 220 : 150, align: TextAlign.start, flex: true),
+            width: big ? 200 : 140, align: TextAlign.start, flex: true),
         NeonColumn('Récord', width: big ? 92 : 60),
         NeonColumn('Win %', width: big ? 80 : 52),
-        if (big) const NeonColumn('Mazo', width: 230, align: TextAlign.start),
+        if (points != null) NeonColumn('Pts', width: big ? 60 : 40),
+        if (big) const NeonColumn('Mazo', width: 220, align: TextAlign.start),
       ],
       rows: [
         for (final p in lines)
@@ -537,6 +542,16 @@ class ParticipantsTable extends StatelessWidget {
                 ),
               Text(p.record, style: const TextStyle(fontWeight: FontWeight.w700)),
               Text(p.played == 0 ? '-' : '${(p.winRate * 100).round()}%'),
+              if (points != null)
+                Text(
+                  (points![p.playerId] ?? 0) > 0 ? '${points![p.playerId]}' : '—',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: (points![p.playerId] ?? 0) > 0
+                        ? AppColors.neon
+                        : AppColors.textDisabled,
+                  ),
+                ),
               if (big) Align(alignment: Alignment.centerLeft, child: chip(p)),
             ],
           ),

@@ -71,7 +71,7 @@ class _DeckPickerState extends ConsumerState<_DeckPicker> {
     return Column(
       children: [
         const Text('Elegir mazo',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
           child: TextField(

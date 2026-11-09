@@ -69,8 +69,11 @@ class NeonTable extends StatelessWidget {
   final double rowPadding;
   final Color headerColor;
 
+  /// Ancho de la franja de color de la izquierda (todas las filas la llevan).
+  static const _stripe = 4.0;
+
   double get _minWidth =>
-      columns.fold<double>(0, (s, c) => s + c.width) + horizontalPadding * 2;
+      columns.fold<double>(0, (s, c) => s + c.width) + horizontalPadding * 2 + _stripe;
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +117,8 @@ class NeonTable extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: rowPadding),
+            padding: EdgeInsets.fromLTRB(
+                horizontalPadding + _stripe, rowPadding, horizontalPadding, rowPadding),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.moss, width: 1)),
             ),
@@ -136,9 +140,9 @@ class NeonTable extends StatelessWidget {
                         ? AppColors.forest.withValues(alpha: 0.35)
                         : null,
                 border: Border(
-                  left: r.accent == null
-                      ? BorderSide.none
-                      : BorderSide(color: r.accent!, width: 4),
+                  // Todas las filas llevan la franja (transparente si no hay
+                  // color) para que las columnas queden alineadas.
+                  left: BorderSide(color: r.accent ?? Colors.transparent, width: _stripe),
                   bottom: const BorderSide(color: AppColors.outlineVariant, width: 0.6),
                 ),
               ),

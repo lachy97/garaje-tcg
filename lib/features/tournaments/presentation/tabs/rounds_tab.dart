@@ -193,7 +193,7 @@ class _ConfigCard extends ConsumerWidget {
             children: [
               const Expanded(
                 child: Text('Rondas Swiss',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               ),
               NumberStepper(
                 value: t.swissRounds,
@@ -209,7 +209,7 @@ class _ConfigCard extends ConsumerWidget {
             children: [
               const Expanded(
                 child: Text('Tiempo por ronda',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               ),
               NumberStepper(
                 value: t.roundMinutes,
@@ -223,7 +223,7 @@ class _ConfigCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          const Text('Top Cut', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          const Text('Top Cut', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
           const SizedBox(height: 6),
           TopCutSelector(
             value: t.topCutSize,
@@ -233,14 +233,14 @@ class _ConfigCard extends ConsumerWidget {
           if (topTooBig) ...[
             const SizedBox(height: 6),
             Text('Hay $active jugadores: no alcanzan para un Top ${t.topCutSize}.',
-                style: const TextStyle(color: AppColors.loss, fontSize: 13)),
+                style: const TextStyle(color: AppColors.loss, fontSize: 12)),
           ],
           if (active > 0) ...[
             const SizedBox(height: 10),
             Text(
               'Sugerencia para $active jugadores: $sugRounds rondas · '
               '${sugTop == 0 ? 'sin Top' : 'Top $sugTop'} (solo orientativa)',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ],
         ],
@@ -313,7 +313,7 @@ class _MatchesSliver extends ConsumerWidget {
             title,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.w800,
               color: AppColors.neon,
               shadows: AppColors.textGlow(blur: 10),

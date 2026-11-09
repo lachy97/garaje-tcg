@@ -48,12 +48,12 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
           const Text(
             'Se usan para las listas de mazos del Top 4. Las imágenes se descargan '
             'solo la primera vez que se ven y quedan guardadas en el teléfono.',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
           if (usage != null && usage.$2 > 0) ...[
             const SizedBox(height: 6),
             Text('Imágenes guardadas: ${usage.$2} (${_mb(usage.$1)})',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -111,7 +111,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
                                   ? '${r.millis} ms · ${(r.bytes! / 1024).toStringAsFixed(0)} KB'
                                   : r.error!,
                               style: const TextStyle(
-                                  fontSize: 13, color: AppColors.textSecondary),
+                                  fontSize: 12, color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -132,7 +132,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
                 const Text(
                   'Comprueba que tienes datos o wifi. Si el servidor de imágenes no '
                   'responde, avisa al administrador.',
-                  style: TextStyle(fontSize: 13),
+                  style: TextStyle(fontSize: 12),
                 ),
             ],
           ),

@@ -40,8 +40,8 @@ class DeckListPage extends ConsumerWidget {
         actions: [
           if (saved != null && cardDb != null) ...[
             IconButton(
-              tooltip: 'Exportar imagen',
-              icon: const Icon(Icons.ios_share),
+              tooltip: 'Compartir imagen',
+              icon: const Icon(Icons.share),
               onPressed: () async {
                 final format = await askDeckListFormat(context);
                 if (format == null || !context.mounted) return;
@@ -119,7 +119,7 @@ class DeckListPage extends ConsumerWidget {
                                     fontWeight: FontWeight.w900, color: AppColors.neon)),
                           Text(target.playerName,
                               style: const TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.w800)),
+                                  fontSize: 16, fontWeight: FontWeight.w800)),
                           Text(target.deckName ?? 'Sin mazo',
                               style: const TextStyle(color: AppColors.textSecondary)),
                           const SizedBox(height: 6),

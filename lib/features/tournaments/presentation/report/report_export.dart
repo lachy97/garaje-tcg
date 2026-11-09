@@ -27,6 +27,7 @@ Future<void> exportParticipants(
   BuildContext context, {
   required Tournament tournament,
   required TournamentReport report,
+  Map<String, int>? points,
 }) {
   return runExport<ParticipantLine>(
     context,
@@ -55,10 +56,12 @@ Future<void> exportParticipants(
       tableBuilder: (rows, width) => ParticipantsTable(
         lines: rows,
         width: width,
+        points: points,
         fontSize: kExportFontSize,
         rowPadding: kExportRowPadding,
       ),
-      legend: 'Récord de todo el torneo (Swiss y Top Cut) · BYE = victoria'
+      legend: 'Récord de todo el torneo (Swiss y Top Cut) · BYE = victoria · '
+          'Pts = puntos de ranking'
           '${tournament.topCutSize > 0 ? ' · En verde, el Top ${tournament.topCutSize}' : ''}',
       fileBase: 'participantes_${_fileSafe(tournament.name)}',
       shareText: '${tournament.name} · Participantes',
@@ -83,15 +86,15 @@ List<ImageProvider> _deckImages(TournamentReport report) => [
         if (deckImageProvider(path) case final p?) p,
     ];
 
-/// Exporta el gráfico de metagame (cuántos jugadores usaron cada mazo).
+/// Comparte el Deck Breakdown (cuántos jugadores usaron cada mazo).
 /// [showLegend]: con la lista de mazos debajo o solo el gráfico (más grande).
-/// [scope]: p. ej. "TOP 8" si el gráfico es solo de los del Top Cut.
+/// [topCut]: el gráfico es solo de los jugadores del Top Cut.
 Future<void> exportMetagame(
   BuildContext context, {
   required Tournament tournament,
   required TournamentReport report,
   bool showLegend = true,
-  String? scope,
+  bool topCut = false,
 }) async {
   final images = await loadChartImages(report.chart);
   if (!context.mounted) {
@@ -103,23 +106,23 @@ Future<void> exportMetagame(
     await runExport<DeckShare>(
       context,
       ExportSpec(
-        heading: 'METAGAME · ${tournament.name.toUpperCase()}',
+        heading: 'DECK BREAKDOWN · ${tournament.name.toUpperCase()}',
         items: report.metagame,
         page: MetagamePoster(
           tournament: tournament,
           report: report,
           images: images,
           showLegend: showLegend,
-          scope: scope,
+          topCut: topCut,
         ),
         contentWidth: MetagamePoster.width,
         summaryHeightEstimate: showLegend
             ? _kPad * 2 + 130 + 40 + _kDonut + 40 + legendRows * (_kLegendFont * 2.4) + 60
             : _kPad * 2 + 130 + 40 + _kDonutBig + 80,
         legend: '',
-        fileBase: 'metagame_${scope == null ? '' : '${_fileSafe(scope)}_'}'
+        fileBase: '${topCut ? 'top_cut' : 'tournament'}_deck_breakdown_'
             '${_fileSafe(tournament.name)}',
-        shareText: '${tournament.name} · Metagame',
+        shareText: '${tournament.name} · ${topCut ? 'Top Cut' : 'Tournament'} Deck Breakdown',
         preload: [const AssetImage(_kBg), ..._deckImages(report)],
       ),
     );
@@ -128,7 +131,8 @@ Future<void> exportMetagame(
   }
 }
 
-/// Póster "METAGAME": dona con el % de cada mazo y la leyenda completa.
+/// Póster "Tournament / Top Cut Deck Breakdown": dona con el % de cada mazo
+/// y, si se pide, la leyenda completa.
 class MetagamePoster extends StatelessWidget {
   const MetagamePoster({
     super.key,
@@ -136,7 +140,7 @@ class MetagamePoster extends StatelessWidget {
     required this.report,
     required this.images,
     this.showLegend = true,
-    this.scope,
+    this.topCut = false,
   });
 
   final Tournament tournament;
@@ -144,8 +148,8 @@ class MetagamePoster extends StatelessWidget {
   final ChartImages images;
   final bool showLegend;
 
-  /// "TOP 8" si el gráfico es solo de los jugadores del Top Cut.
-  final String? scope;
+  /// Solo los jugadores del Top Cut.
+  final bool topCut;
 
   static const width = 1080.0;
 
@@ -173,14 +177,19 @@ class MetagamePoster extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      scope == null ? 'METAGAME' : 'METAGAME $scope',
-                      style: const TextStyle(
-                        fontSize: 96,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -1,
-                        color: title,
+                    // Siempre en una línea: se reduce si no cabe.
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        topCut ? 'TOP CUT DECK BREAKDOWN' : 'TOURNAMENT DECK BREAKDOWN',
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontSize: 58,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                          color: title,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),

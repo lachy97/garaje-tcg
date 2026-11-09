@@ -275,7 +275,7 @@ class _PaidCheck extends StatelessWidget {
               ),
               Text('Cover',
                   style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       color: paid ? AppColors.neon : AppColors.textSecondary)),
             ],
           ),

@@ -1,4 +1,5 @@
 import '../../../core/db/enums.dart';
+import '../../../core/utils/season_utils.dart';
 import '../../tournaments/domain/game_score.dart';
 
 /// Resultado de un match visto desde el jugador del perfil.
@@ -158,6 +159,24 @@ class PlayerProfileData {
         final d = b.last!.compareTo(a.last!);
         return d != 0 ? d : a.name.toLowerCase().compareTo(b.name.toLowerCase());
       });
+  }
+
+  /// Temporadas (año, trimestre) en las que jugó, la más reciente primero.
+  List<(int, int)> get seasons {
+    final set = <(int, int)>{
+      for (final t in tournaments) (t.date.year, quarterOf(t.date)),
+    };
+    return set.toList()
+      ..sort((a, b) => a.$1 != b.$1 ? b.$1.compareTo(a.$1) : b.$2.compareTo(a.$2));
+  }
+
+  /// El mismo perfil, solo con los torneos de una temporada.
+  PlayerProfileData forSeason(int year, int quarter) {
+    bool inSeason(DateTime d) => d.year == year && quarterOf(d) == quarter;
+    return PlayerProfileData(
+      history: [for (final h in history) if (inSeason(h.date)) h],
+      tournaments: [for (final t in tournaments) if (inSeason(t.date)) t],
+    );
   }
 
   /// Historial agrupado por torneo, en el orden de [history].

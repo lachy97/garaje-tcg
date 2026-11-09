@@ -16,7 +16,7 @@ final seasonRankingProvider =
   return ref.watch(rankingDaoProvider).watchSeasonRanking(seasonId);
 });
 
-/// Ranking trimestral en tabla, con exportación a imágenes.
+/// Ranking trimestral en tabla (se comparte como imagen desde la barra).
 class RankingPage extends ConsumerStatefulWidget {
   const RankingPage({super.key});
 
@@ -33,7 +33,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
     try {
       await exportRankingImage(context, season: season, rows: rows);
     } catch (e) {
-      if (mounted) showMessage(context, 'No se pudo exportar la imagen: $e', error: true);
+      if (mounted) showMessage(context, 'No se pudo compartir la imagen: $e', error: true);
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -52,14 +52,14 @@ class _RankingPageState extends ConsumerState<RankingPage> {
         actions: [
           if (s != null && rows != null && rows.isNotEmpty)
             IconButton(
-              tooltip: 'Exportar',
+              tooltip: 'Compartir',
               onPressed: _exporting ? null : () => _export(s, rows),
               icon: _exporting
                   ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.ios_share),
+                  : const Icon(Icons.share),
             ),
         ],
       ),
@@ -76,7 +76,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                 SeasonPicker(
                   seasons: all,
                   selected: season,
-                  onChanged: (v) => setState(() => _seasonId = v.id),
+                  onChanged: (v) => setState(() => _seasonId = v?.id),
                 ),
                 _SeasonStatusBar(season: season, hasRanking: list.isNotEmpty),
                 if (list.isEmpty)
@@ -96,23 +96,6 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                       'Desempates: puntos → mejor posición → winrate → menos torneos. '
                       'PJ = partidas jugadas (sin BYE). Desliza la tabla para ver todas '
                       'las columnas.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                    child: OutlinedButton.icon(
-                      onPressed: _exporting ? null : () => _export(season, list),
-                      icon: const Icon(Icons.image_outlined),
-                      label: const Text('EXPORTAR RANKING'),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Text(
-                      'Se genera una sola imagen con la tabla completa, en la máxima calidad. '
-                      'En WhatsApp toca "HD" antes de enviarla para que se vea nítida al hacer zoom.',
-                      textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ),
@@ -150,7 +133,7 @@ class _SeasonStatusBar extends ConsumerWidget {
             const SizedBox(width: 6),
             Flexible(
               child: Text('Temporada cerrada$when · ranking definitivo',
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ),
           ],
         ),

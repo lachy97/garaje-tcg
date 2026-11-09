@@ -129,7 +129,7 @@ class NumberStepper extends StatelessWidget {
               Text('$value',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.neon)),
+                      fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.neon)),
               if (suffix != null)
                 Text(suffix!,
                     style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),

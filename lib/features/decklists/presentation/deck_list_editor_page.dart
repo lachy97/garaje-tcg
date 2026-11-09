@@ -151,7 +151,7 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 2),
                                 child: Text('⚠ $w',
-                                    style: const TextStyle(fontSize: 13, color: AppColors.draw)),
+                                    style: const TextStyle(fontSize: 12, color: AppColors.draw)),
                               ),
                           ],
                         ),
@@ -233,7 +233,7 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                 children: [
                   Expanded(
                       child: Text(title,
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
                   if (current != null)
                     TextButton(onPressed: () => Navigator.pop(ctx, -1), child: const Text('Quitar')),
                 ],
@@ -408,14 +408,14 @@ class _Header extends StatelessWidget {
               padding: const EdgeInsets.only(right: 12),
               child: Text('${t.position}º',
                   style: const TextStyle(
-                      fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.neon)),
+                      fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.neon)),
             ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(t.playerName,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 Text('${t.deckName ?? 'Sin mazo'} · ${t.tournamentName}',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: AppColors.textSecondary)),

@@ -188,7 +188,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
         children: [
           Text(title,
               style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.1,
                   color: AppColors.textSecondary)),
@@ -270,7 +270,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
               onPressed: enabled ? _clear : null,
               icon: const Icon(Icons.undo, size: 18, color: AppColors.loss),
               label: const Text('Borrar resultado',
-                  style: TextStyle(color: AppColors.loss, fontSize: 13)),
+                  style: TextStyle(color: AppColors.loss, fontSize: 12)),
             ),
         ],
       ),

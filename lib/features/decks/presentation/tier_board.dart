@@ -5,8 +5,6 @@ import 'package:intl/intl.dart' show DateFormat;
 import '../../../app/export/export_models.dart';
 import '../../../app/export/export_sheet.dart';
 import '../../../app/widgets/brand.dart';
-import '../../../core/db/app_database.dart';
-import '../../../core/utils/season_utils.dart';
 import '../domain/deck_stats.dart';
 import '../domain/tier_style.dart';
 import 'deck_image.dart';
@@ -454,7 +452,7 @@ class TierListPoster extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'GARAGE TCG · TEMPORADA $season',
+                      'GARAGE TCG · ${season.toUpperCase()}',
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
@@ -528,11 +526,11 @@ class _ChevronsPainter extends CustomPainter {
 /// Exporta la tier list como UNA imagen con el diseño del póster (sin la tabla).
 Future<void> exportDeckTierImages(
   BuildContext context, {
-  required Season season,
+  required String label,
+  required String fileTag,
   required List<DeckSeasonStats> decks,
   required Map<DeckTier, TierStyle> styles,
 }) {
-  final label = seasonLabel(season.year, season.quarter);
   final date = DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now());
   return runExport<DeckSeasonStats>(
     context,
@@ -543,8 +541,8 @@ Future<void> exportDeckTierImages(
       contentWidth: TierListPoster.width,
       summaryHeightEstimate: _kPosterChrome + TierBoardMetrics.exported.height(decks),
       legend: '',
-      fileBase: 'tierlist_garage_tcg_${season.year}_T${season.quarter}',
-      shareText: 'Tier list de mazos Garage TCG · Temporada $label',
+      fileBase: 'tierlist_garage_tcg_$fileTag',
+      shareText: 'Tier list de mazos Garage TCG · $label',
       preload: [
         const AssetImage(_kPosterBg),
         for (final d in decks)

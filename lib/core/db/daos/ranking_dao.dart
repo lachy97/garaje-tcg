@@ -185,14 +185,14 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
 
   // ───────────────────────── Mazos (tier list) ─────────────────────────
 
-  /// Tabla de mazos de la temporada. Se recalcula al terminar torneos o al
-  /// renombrar/fusionar mazos.
+  /// Tabla de mazos de la temporada ([seasonId] = '*': todas, el histórico).
+  /// Se recalcula al terminar torneos o al renombrar/fusionar mazos.
   ///
   /// Si la temporada está CERRADA se devuelve la foto guardada al cerrarla.
   Stream<List<DeckSeasonStats>> watchSeasonDecks(String seasonId) {
     final db = attachedDatabase;
     return customSelect(
-      'SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?',
+      "SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?1 OR ?1 = '*'",
       variables: [Variable.withString(seasonId)],
       readsFrom: {
         db.tournaments,
@@ -219,7 +219,8 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
   /// Tabla de mazos calculada con los torneos actuales (sin mirar la foto).
   Future<List<DeckSeasonStats>> liveSeasonDecks(String seasonId) async {
     final sid = Variable.withString(seasonId);
-    const finished = "t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished'";
+    const finished =
+        "(t.season_id = ?1 OR ?1 = '*') AND t.deleted_at IS NULL AND t.status = 'finished'";
 
     final entries = await customSelect(
       'SELECT tp.deck_id AS deck, d.name AS name, d.image_path AS img, tp.player_id AS pid, '
@@ -252,7 +253,8 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
   /// Partidas (sin BYE, reportadas) de los torneos terminados de la temporada,
   /// con el mazo de cada lado.
   Future<List<DeckMatchRow>> seasonDeckMatches(String seasonId) async {
-    const finished = "t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished'";
+    const finished =
+        "(t.season_id = ?1 OR ?1 = '*') AND t.deleted_at IS NULL AND t.status = 'finished'";
     final rows = await customSelect(
       'SELECT m.deck1_id AS d1, m.deck2_id AS d2, m.result AS r, rd.phase AS phase '
       'FROM matches m '
@@ -276,7 +278,7 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
   Stream<DeckMatchups> watchSeasonMatchups(String seasonId) {
     final db = attachedDatabase;
     return customSelect(
-      'SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?',
+      "SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?1 OR ?1 = '*'",
       variables: [Variable.withString(seasonId)],
       readsFrom: {db.tournaments, db.matches, db.decks},
     ).watch().asyncMap((_) async => DeckMatchups.compute(await seasonDeckMatches(seasonId)));
@@ -292,8 +294,8 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
       'FROM tournament_players tp '
       'JOIN tournaments t ON t.id = tp.tournament_id '
       'JOIN players p ON p.id = tp.player_id '
-      "WHERE t.season_id = ? AND t.deleted_at IS NULL AND t.status = 'finished' "
-      'AND tp.deleted_at IS NULL AND tp.deck_id = ? '
+      "WHERE (t.season_id = ?1 OR ?1 = '*') AND t.deleted_at IS NULL "
+      "AND t.status = 'finished' AND tp.deleted_at IS NULL AND tp.deck_id = ?2 "
       'ORDER BY t.date DESC, tp.final_position ASC',
       variables: [Variable.withString(seasonId), Variable.withString(deckId)],
       readsFrom: {db.tournaments, db.tournamentPlayers, db.players},

@@ -8,7 +8,7 @@ import '../data/deck_lists_provider.dart';
 import 'deck_list_editor_page.dart';
 import 'deck_list_page.dart';
 
-/// "Listas del Top 4" en el resumen de un torneo terminado: cada jugador con
+/// "Listas" del Top Cut en el resumen de un torneo terminado: cada jugador con
 /// su estado (lista subida o no). Tocar abre su lista o la pantalla de subirla.
 class TopDeckListsSection extends ConsumerWidget {
   const TopDeckListsSection({super.key, required this.tournamentId, required this.targets});
@@ -35,7 +35,7 @@ class TopDeckListsSection extends ConsumerWidget {
                   width: 40,
                   child: Text('${t.position ?? '-'}º',
                       style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.neon)),
+                          fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.neon)),
                 ),
                 Expanded(
                   child: Column(

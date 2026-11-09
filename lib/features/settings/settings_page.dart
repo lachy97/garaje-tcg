@@ -117,7 +117,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           const Padding(
             padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
             child: Text('Se guardan solas antes de cada importación (las 5 últimas).',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ),
           for (final a in autos)
             SimpleDialogOption(
@@ -213,7 +213,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         if (s.data != null && s.data!.holder.isNotEmpty)
                           Text(s.data!.holder,
                               style: const TextStyle(
-                                  fontSize: 17, fontWeight: FontWeight.w800)),
+                                  fontSize: 16, fontWeight: FontWeight.w800)),
                         Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 12),
                         DeviceCodeCard(code: s.deviceCode),
@@ -241,7 +241,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       'Al importar se integra con lo que ya hay: los torneos con el mismo '
                       'nombre se actualizan y los demás se añaden. '
                       'Solo se aceptan archivos exportados por esta app.',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(

@@ -25,43 +25,59 @@ Season pickSeason(List<Season> seasons, String? selectedId) {
   );
 }
 
-/// Título "Temporada T4 2026 ▾" que abre la lista de temporadas.
-/// Sirve para ver el ranking o la tier list de un trimestre ya terminado.
+/// Id especial: todas las temporadas juntas (histórico).
+const kAllSeasons = '*';
+
+/// Selector de temporada (siempre desplegable): "Temporada T4 2026 ▾".
+/// Con [allowAll] añade "Histórico" (todas las temporadas); en ese caso
+/// [onChanged] recibe null.
 class SeasonPicker extends StatelessWidget {
   const SeasonPicker({
     super.key,
     required this.seasons,
     required this.selected,
     required this.onChanged,
+    this.allowAll = false,
+    this.allSelected = false,
   });
 
   final List<Season> seasons;
   final Season selected;
-  final ValueChanged<Season> onChanged;
+  final ValueChanged<Season?> onChanged;
+  final bool allowAll;
+
+  /// Está elegido el histórico.
+  final bool allSelected;
 
   @override
   Widget build(BuildContext context) {
-    final title = Text(
-      'Temporada ${seasonLabel(selected.year, selected.quarter)}',
-      textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            shadows: AppColors.textGlow(blur: 8),
-          ),
-    );
-    if (seasons.length < 2) {
-      return Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: title);
-    }
+    final label = allSelected
+        ? 'Histórico · todas las temporadas'
+        : 'Temporada ${seasonLabel(selected.year, selected.quarter)}';
     return Center(
-      child: PopupMenuButton<Season>(
+      child: PopupMenuButton<String>(
         tooltip: 'Cambiar temporada',
-        initialValue: selected,
-        onSelected: onChanged,
+        initialValue: allSelected ? kAllSeasons : selected.id,
+        onSelected: (id) => onChanged(
+            id == kAllSeasons ? null : seasons.firstWhere((s) => s.id == id)),
         itemBuilder: (_) => [
           for (final s in seasons)
             PopupMenuItem(
-              value: s,
+              value: s.id,
               child: Text('Temporada ${seasonLabel(s.year, s.quarter)}'
                   '${s.status == SeasonStatus.closed ? ' · cerrada' : ''}'),
+            ),
+          if (allowAll) ...[
+            const PopupMenuDivider(),
+            const PopupMenuItem(
+              value: kAllSeasons,
+              child: Text('Histórico · todas las temporadas'),
+            ),
+          ],
+          if (seasons.length < 2 && !allowAll)
+            const PopupMenuItem(
+              enabled: false,
+              child: Text('Aún no hay temporadas anteriores'),
             ),
         ],
         child: Padding(
@@ -69,7 +85,15 @@ class SeasonPicker extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Flexible(child: title),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        shadows: AppColors.textGlow(blur: 8),
+                      ),
+                ),
+              ),
               const SizedBox(width: 4),
               const Icon(Icons.arrow_drop_down, color: AppColors.neon),
             ],

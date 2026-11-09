@@ -132,7 +132,7 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
                 'Se usa exactamente lo que elijas (rondas, Top Cut y tiempo). '
                 'Puedes cambiarlo mientras inscribes '
                 'jugadores; al generar la ronda 1 queda fijo.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
             ),
             const SizedBox(height: 24),

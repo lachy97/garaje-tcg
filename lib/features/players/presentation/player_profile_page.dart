@@ -9,20 +9,31 @@ import '../../../app/widgets/common.dart';
 import '../../../app/widgets/neon_table.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
+import '../../../core/utils/season_utils.dart';
 import '../data/player_profile_repository.dart';
 import '../domain/player_profile.dart';
 import 'players_page.dart' show showPlayerForm;
 
 /// Perfil del jugador en tres pestañas: Resumen (datos, estadísticas, mazos
 /// usados y penalizaciones), Rivales (cara a cara con cada jugador) e
-/// Historial (partidas agrupadas por torneo).
-class PlayerProfilePage extends ConsumerWidget {
+/// Historial (partidas agrupadas por torneo). Arriba de cada pestaña se
+/// elige la temporada (o todas).
+class PlayerProfilePage extends ConsumerStatefulWidget {
   const PlayerProfilePage({super.key, required this.playerId});
 
   final String playerId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlayerProfilePage> createState() => _PlayerProfilePageState();
+}
+
+class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
+  /// Temporada elegida (año, trimestre); null = todas.
+  (int, int)? _season;
+
+  @override
+  Widget build(BuildContext context) {
+    final playerId = widget.playerId;
     final player = ref.watch(playerByIdProvider(playerId));
     final profile = ref.watch(playerProfileProvider(playerId));
 
@@ -61,54 +72,107 @@ class PlayerProfilePage extends ConsumerWidget {
             ),
             body: AsyncView(
               value: profile,
-              builder: (data) => TabBarView(
-                children: [
-                  // 1) Datos, estadísticas, mazos usados y penalizaciones.
-                  ListView(
-                    padding: const EdgeInsets.only(bottom: 40),
-                    children: [
-                      _Header(player: p),
-                      _StatsGrid(totals: data.totals),
-                      const SectionLabel('Mazos usados'),
-                      if (data.decks.isEmpty)
-                        const _Empty('Todavía no ha jugado con ningún mazo.')
-                      else
-                        _DecksTable(decks: data.decks),
-                      _PlayerPenalties(playerId: playerId),
-                    ],
-                  ),
-                  // 2) Enfrentamientos por rival.
-                  ListView(
-                    padding: const EdgeInsets.only(bottom: 40),
-                    children: [
-                      SectionLabel('Enfrentamientos por rival (${data.rivals.length})'),
-                      if (data.rivals.isEmpty)
-                        const _Empty('Todavía no ha jugado contra nadie.')
-                      else
-                        _RivalsTable(rivals: data.rivals),
-                    ],
-                  ),
-                  // 3) Historial de partidas por torneo.
-                  ListView(
-                    padding: const EdgeInsets.only(bottom: 40),
-                    children: [
-                      SectionLabel('Historial de partidas (${data.tournaments.length} torneos)'),
-                      if (data.tournaments.isEmpty)
-                        const _Empty('Aún no ha participado en torneos.')
-                      else
-                        for (final t in data.tournaments)
-                          _TournamentHistory(
-                            tournament: t,
-                            matches: data.historyByTournament[t.tournamentId] ?? const [],
-                          ),
-                    ],
-                  ),
-                ],
-              ),
+              builder: (all) {
+                final seasons = all.seasons;
+                final season = seasons.contains(_season) ? _season : null;
+                final data = season == null ? all : all.forSeason(season.$1, season.$2);
+                final picker = _SeasonFilter(
+                  seasons: seasons,
+                  selected: season,
+                  onChanged: (v) => setState(() => _season = v),
+                );
+                return TabBarView(
+                  children: [
+                    // 1) Datos, estadísticas, mazos usados y penalizaciones.
+                    ListView(
+                      padding: const EdgeInsets.only(bottom: 40),
+                      children: [
+                        _Header(player: p),
+                        picker,
+                        _StatsGrid(totals: data.totals),
+                        const SectionLabel('Mazos usados'),
+                        if (data.decks.isEmpty)
+                          const _Empty('Todavía no ha jugado con ningún mazo.')
+                        else
+                          _DecksTable(decks: data.decks),
+                        _PlayerPenalties(playerId: playerId),
+                      ],
+                    ),
+                    // 2) Enfrentamientos por rival.
+                    ListView(
+                      padding: const EdgeInsets.only(bottom: 40),
+                      children: [
+                        picker,
+                        SectionLabel('Enfrentamientos por rival (${data.rivals.length})'),
+                        if (data.rivals.isEmpty)
+                          const _Empty('Todavía no ha jugado contra nadie.')
+                        else
+                          _RivalsTable(rivals: data.rivals),
+                      ],
+                    ),
+                    // 3) Historial de partidas por torneo.
+                    ListView(
+                      padding: const EdgeInsets.only(bottom: 40),
+                      children: [
+                        picker,
+                        SectionLabel('Historial de partidas (${data.tournaments.length} torneos)'),
+                        if (data.tournaments.isEmpty)
+                          const _Empty('Aún no ha participado en torneos.')
+                        else
+                          for (final t in data.tournaments)
+                            _TournamentHistory(
+                              tournament: t,
+                              matches: data.historyByTournament[t.tournamentId] ?? const [],
+                            ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// "Todas las temporadas ▾" / "Temporada T4 2026 ▾": filtra el perfil.
+class _SeasonFilter extends StatelessWidget {
+  const _SeasonFilter({required this.seasons, required this.selected, required this.onChanged});
+
+  final List<(int, int)> seasons;
+  final (int, int)? selected;
+  final ValueChanged<(int, int)?> onChanged;
+
+  static String _label((int, int)? s) =>
+      s == null ? 'Todas las temporadas' : 'Temporada ${seasonLabel(s.$1, s.$2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      // (0, 0) = todas (un valor null en el menú no llama a onSelected).
+      child: PopupMenuButton<(int, int)>(
+        tooltip: 'Elegir temporada',
+        onSelected: (v) => onChanged(v == (0, 0) ? null : v),
+        itemBuilder: (_) => [
+          const PopupMenuItem(value: (0, 0), child: Text('Todas las temporadas')),
+          for (final s in seasons) PopupMenuItem(value: s, child: Text(_label(s))),
+        ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.calendar_month, size: 18, color: AppColors.neon),
+              const SizedBox(width: 6),
+              Text(_label(selected),
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.neon)),
+              const Icon(Icons.arrow_drop_down, color: AppColors.neon),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -136,7 +200,7 @@ class _Header extends StatelessWidget {
                 backgroundColor: AppColors.forest,
                 foregroundColor: AppColors.neon,
                 child: Text(p.nickname.characters.first.toUpperCase(),
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -145,13 +209,13 @@ class _Header extends StatelessWidget {
                   children: [
                     Text(p.nickname,
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
                           color: AppColors.neon,
                           shadows: AppColors.textGlow(blur: 8),
                         )),
                     if (p.fullName != null)
-                      Text(p.fullName!, style: const TextStyle(fontSize: 15)),
+                      Text(p.fullName!, style: const TextStyle(fontSize: 14)),
                     Text('Registrado desde $since',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   ],
@@ -240,7 +304,7 @@ class _StatsGrid extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(label.toUpperCase(),
                       style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.6,
                           color: AppColors.textSecondary)),

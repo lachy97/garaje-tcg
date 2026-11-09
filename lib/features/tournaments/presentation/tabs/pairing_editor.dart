@@ -90,7 +90,7 @@ class _PairingEditorPageState extends ConsumerState<_PairingEditorPage> {
               child: Text(
                 'Toca un jugador y luego otro de otra mesa para intercambiarlos. '
                 'Las mesas con resultado no se pueden cambiar (borra antes el resultado).',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ),
             for (final m in list) _table(m),
@@ -124,7 +124,7 @@ class _PairingEditorPageState extends ConsumerState<_PairingEditorPage> {
             width: 44,
             child: Text(m.isBye ? '—' : '${m.tableNumber ?? ''}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
           ),
           Expanded(child: player(1)),
           const Padding(
