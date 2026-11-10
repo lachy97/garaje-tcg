@@ -51,11 +51,25 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
               : roundList.firstWhere((r) => r.id == _selectedRoundId,
                   orElse: () => roundList.last);
           final current = roundList.isEmpty ? null : roundList.last;
+          // El tiempo de la ronda en juego queda fijo arriba (fuera del scroll).
+          final timerRound =
+              current != null && t.status != TournamentStatus.finished ? current : null;
 
           return Stack(
             children: [
               Positioned.fill(
-                child: CustomScrollView(
+                child: Column(
+                  children: [
+                    if (timerRound != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: RoundTimer(
+                            key: ValueKey(timerRound.id),
+                            round: timerRound,
+                            minutes: t.roundMinutes),
+                      ),
+                    Expanded(
+                      child: CustomScrollView(
                   slivers: [
                     if (t.status != TournamentStatus.finished)
                       SliverToBoxAdapter(
@@ -101,10 +115,12 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                             t.status != TournamentStatus.finished,
                         names: names,
                         deckNames: deckNames,
-                        roundMinutes: t.roundMinutes,
                       ),
                     // espacio para que el botón flotante no tape la última tarjeta
                     const SliverToBoxAdapter(child: SizedBox(height: 104)),
+                  ],
+                ),
+                    ),
                   ],
                 ),
               ),
@@ -282,7 +298,6 @@ class _MatchesSliver extends ConsumerWidget {
     required this.isCurrent,
     required this.names,
     required this.deckNames,
-    required this.roundMinutes,
   });
 
   final Tournament tournament;
@@ -290,7 +305,6 @@ class _MatchesSliver extends ConsumerWidget {
   final bool isCurrent;
   final Map<String, String> names;
   final Map<String, String> deckNames;
-  final int roundMinutes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -352,7 +366,6 @@ class _MatchesSliver extends ConsumerWidget {
                 label: const Text('Cambiar cruces'),
               ),
             ),
-          if (isCurrent) RoundTimer(round: round, minutes: roundMinutes),
           const SizedBox(height: 8),
           if (!isCurrent && editable)
             const Padding(

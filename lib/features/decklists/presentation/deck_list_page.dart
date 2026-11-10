@@ -1,9 +1,6 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
@@ -19,7 +16,7 @@ import 'deck_list_editor_page.dart';
 import 'deck_list_export.dart';
 
 /// Ver la lista de un jugador: carta principal, Main/Extra/Side. Desde aquí
-/// se exporta la imagen, se comparte el .ydk, se edita o se borra. Si aún no
+/// se comparte (imagen o .ydk), se edita o se borra. Si aún no
 /// tiene lista, ofrece subirla.
 class DeckListPage extends ConsumerWidget {
   const DeckListPage({super.key, required this.target});
@@ -38,19 +35,17 @@ class DeckListPage extends ConsumerWidget {
         title: Text('LISTA · ${target.playerName.toUpperCase()}',
             overflow: TextOverflow.ellipsis),
         actions: [
-          if (saved != null && cardDb != null) ...[
+          if (saved != null && cards != null) ...[
             IconButton(
-              tooltip: 'Compartir imagen',
+              tooltip: 'Compartir (imagen o .ydk)',
               icon: const Icon(Icons.share),
               onPressed: () async {
-                final format = await askDeckListFormat(context);
-                if (format == null || !context.mounted) return;
-                await exportDeckListImage(
+                final option = await askDeckListShare(context);
+                if (option == null || !context.mounted) return;
+                await shareDeckLists(
                   context,
-                  format: format,
-                  target: target,
-                  cards: cards!,
-                  featured: saved.featuredCard,
+                  option: option,
+                  lists: [(target: target, cards: cards, featured: saved.featuredCard)],
                   db: cardDb,
                   store: ref.read(cardImageStoreProvider),
                 );
@@ -59,13 +54,11 @@ class DeckListPage extends ConsumerWidget {
             PopupMenuButton<String>(
               onSelected: (v) => switch (v) {
                 'edit' => _edit(context, cards, saved),
-                'ydk' => _shareYdk(context, cards!),
                 'delete' => _delete(context, ref),
                 _ => null,
               },
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'edit', child: Text('Editar lista')),
-                PopupMenuItem(value: 'ydk', child: Text('Compartir .ydk')),
                 PopupMenuItem(value: 'delete', child: Text('Borrar lista')),
               ],
             ),
@@ -162,22 +155,6 @@ class DeckListPage extends ConsumerWidget {
         initialBackground: saved?.backgroundCard,
       ),
     ));
-  }
-
-  Future<void> _shareYdk(BuildContext context, DeckCards cards) async {
-    try {
-      final dir = await getTemporaryDirectory();
-      final name = '${target.playerName}_${target.deckName ?? 'mazo'}'
-          .replaceAll(RegExp(r'[^A-Za-z0-9_\-]+'), '_');
-      final file = File('${dir.path}/$name.ydk');
-      await file.writeAsString(cards.toYdk(), flush: true);
-      await SharePlus.instance.share(ShareParams(
-        files: [XFile(file.path, mimeType: 'text/plain', name: '$name.ydk')],
-        text: '${target.playerName} · ${target.deckName ?? ''} · ${target.tournamentName}',
-      ));
-    } catch (e) {
-      if (context.mounted) showMessage(context, 'No se pudo compartir: $e', error: true);
-    }
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {

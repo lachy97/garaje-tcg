@@ -55,12 +55,23 @@ double _pixelRatioFor(double width, double height) {
 /// la tabla COMPLETA en una sola columna) y la comparte como foto, ajustada al
 /// máximo de WhatsApp HD.
 Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) async {
+  final file = await renderExportImage(context, spec);
+  if (file == null) return;
+  await SharePlus.instance.share(ShareParams(
+    files: [XFile(file.path, mimeType: 'image/png', name: file.uri.pathSegments.last)],
+    text: spec.shareText,
+  ));
+}
+
+/// Dibuja la imagen de [spec] y la guarda como PNG en la carpeta temporal,
+/// sin compartirla (para compartir varias juntas). null = se cerró la pantalla.
+Future<File?> renderExportImage<T>(BuildContext context, ExportSpec<T> spec) async {
   await precacheImage(const AssetImage(BrandAssets.logo), context);
   for (final img in spec.preload) {
-    if (!context.mounted) return;
+    if (!context.mounted) return null;
     await precacheImage(img, context, onError: (_, _) {});
   }
-  if (!context.mounted) return;
+  if (!context.mounted) return null;
 
   final Widget page;
   final double width;
@@ -100,10 +111,7 @@ Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) asyn
   final dir = await getTemporaryDirectory();
   final file = File('${dir.path}/$name');
   await file.writeAsBytes(bytes, flush: true);
-  await SharePlus.instance.share(ShareParams(
-    files: [XFile(file.path, mimeType: 'image/png', name: name)],
-    text: spec.shareText,
-  ));
+  return file;
 }
 
 Future<Uint8List> _capture(

@@ -4,12 +4,14 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/export/export_models.dart';
-import '../../../app/export/export_sheet.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
+import '../../../app/widgets/table_export.dart';
 import '../data/card_images.dart';
 import '../domain/card_db.dart';
 import '../domain/deck_list.dart';
@@ -83,32 +85,57 @@ enum DeckListFormat {
   final String label;
 }
 
-/// Pregunta la proporción de la imagen.
-Future<DeckListFormat?> askDeckListFormat(BuildContext context) =>
-    showModalBottomSheet<DeckListFormat>(
+/// Qué compartir de una lista: la imagen (en uno de los dos formatos) o el
+/// archivo .ydk.
+enum DeckListShare {
+  natural,
+  wide,
+  ydk;
+
+  DeckListFormat get format => this == wide ? DeckListFormat.wide : DeckListFormat.natural;
+}
+
+/// Menú de compartir de una o varias listas: imagen Actual, imagen 16:9 o .ydk.
+Future<DeckListShare?> askDeckListShare(BuildContext context, {int count = 1}) =>
+    showModalBottomSheet<DeckListShare>(
       context: context,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (count > 1)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text('Compartir las $count listas',
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+              ),
             ListTile(
               leading: const Icon(Icons.crop_landscape),
-              title: const Text('Actual'),
+              title: Text(count > 1 ? 'Imágenes · Actual' : 'Imagen · Actual'),
               subtitle: const Text('1600 px de ancho, el alto según la lista'),
-              onTap: () => Navigator.pop(ctx, DeckListFormat.natural),
+              onTap: () => Navigator.pop(ctx, DeckListShare.natural),
             ),
             ListTile(
               leading: const Icon(Icons.crop_16_9),
-              title: const Text('16:9'),
+              title: Text(count > 1 ? 'Imágenes · 16:9' : 'Imagen · 16:9'),
               subtitle: const Text('1920 × 1080, las cartas se ajustan para que quepa todo'),
-              onTap: () => Navigator.pop(ctx, DeckListFormat.wide),
+              onTap: () => Navigator.pop(ctx, DeckListShare.wide),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: Text(count > 1 ? 'Archivos .ydk' : 'Archivo .ydk'),
+              subtitle: const Text('Para importar la lista en el simulador'),
+              onTap: () => Navigator.pop(ctx, DeckListShare.ydk),
             ),
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
+
+/// Una lista para compartir: de quién es, sus cartas y la carta principal.
+typedef DeckListEntry = ({DeckListTarget target, DeckCards cards, int? featured});
 
 /// Todo lo que necesita la imagen (archivos ya en el teléfono).
 class DeckListArt {
@@ -142,77 +169,143 @@ class DeckListArt {
 /// Evita lanzar dos exportaciones a la vez (doble toque).
 bool _exporting = false;
 
-/// Exporta la lista como imagen.
-Future<void> exportDeckListImage(
+String _shareText(DeckListTarget t) => '${t.position == null ? '' : '${t.position}º · '}'
+    '${t.playerName} · ${t.deckName ?? ''} · ${t.tournamentName}';
+
+/// Comparte una o varias listas según [option]: imágenes (todas juntas en el
+/// mismo menú de compartir) o archivos .ydk.
+Future<void> shareDeckLists(
   BuildContext context, {
-  DeckListFormat format = DeckListFormat.natural,
-  required DeckListTarget target,
-  required DeckCards cards,
-  required CardDb db,
+  required DeckListShare option,
+  required List<DeckListEntry> lists,
+  required CardDb? db,
   required CardImageStore store,
-  int? featured,
 }) async {
-  if (_exporting) return;
+  if (lists.isEmpty || _exporting) return;
   _exporting = true;
   try {
-    showMessage(context, 'Preparando la imagen…');
-    // 1) Imágenes de todas las cartas (se descargan las que falten).
-    final ids = {...cards.main, ...cards.extra, ...cards.side};
-    final small = <int, File>{};
+    if (option == DeckListShare.ydk) {
+      await _shareYdk(lists);
+      return;
+    }
+    if (db == null) {
+      showMessage(context, 'La base de cartas aún no está lista.', error: true);
+      return;
+    }
+    final wide = option == DeckListShare.wide;
+    final files = <File>[];
     var missing = 0;
-    await Future.wait([
-      for (final id in ids)
-        store.get(id, CardImageSize.small).then((f) {
-          if (f == null) {
-            missing++;
-          } else {
-            small[id] = f;
-          }
-        }),
-    ]);
-    // 2) Ilustración principal y su color.
-    final mainId = featured ?? _fallbackFeatured(cards, db);
-    final featuredArt = mainId == null ? null : await store.get(mainId, CardImageSize.art);
-    final dominant = featuredArt == null ? null : await averageColor(featuredArt);
-    if (!context.mounted) return;
+    for (var i = 0; i < lists.length; i++) {
+      if (!context.mounted) return;
+      showMessage(
+          context,
+          lists.length == 1
+              ? 'Preparando la imagen…'
+              : 'Preparando imagen ${i + 1} de ${lists.length}…');
+      final (spec, faltan) = await _deckListSpec(lists[i], db: db, store: store, wide: wide);
+      missing += faltan;
+      if (!context.mounted) return;
+      final file = await renderExportImage(context, spec);
+      if (file != null) files.add(file);
+    }
+    if (!context.mounted || files.isEmpty) return;
     if (missing > 0) {
       showMessage(context, '$missing carta(s) sin imagen (sin conexión): salen con su nombre.',
           error: true);
     }
-
-    final data = DeckListArt(
-      target: target,
-      cards: cards,
-      db: db,
-      small: small,
-      featured: mainId == null ? null : db.byId(mainId),
-      featuredArt: featuredArt,
-      tone: harmonyBackground(dominant ?? AppColors.forest),
-    );
-    final wide = format == DeckListFormat.wide;
-    final poster = DeckListPoster(data: data, wide: wide);
-    await runExport<int>(
-      context,
-      ExportSpec(
-        heading: 'LISTA · ${target.playerName}',
-        items: const [],
-        page: poster,
-        contentWidth: poster.width,
-        summaryHeightEstimate: poster.estimatedHeight,
-        legend: '',
-        fileBase: 'lista${wide ? '_16x9' : ''}_${_fileSafe(target.playerName)}_'
-            '${_fileSafe(target.tournamentName)}',
-        shareText: '${target.position == null ? '' : '${target.position}º · '}'
-            '${target.playerName} · ${target.deckName ?? ''} · ${target.tournamentName}',
-        preload: [
-          for (final f in small.values) FileImage(f),
-          if (featuredArt != null) FileImage(featuredArt),
-        ],
-      ),
-    );
+    await SharePlus.instance.share(ShareParams(
+      files: [
+        for (final f in files)
+          XFile(f.path, mimeType: 'image/png', name: f.uri.pathSegments.last),
+      ],
+      text: lists.length == 1
+          ? _shareText(lists.first.target)
+          : 'Listas del Top ${lists.length} · ${lists.first.target.tournamentName}',
+    ));
+  } catch (e) {
+    if (context.mounted) showMessage(context, 'No se pudo compartir: $e', error: true);
   } finally {
     _exporting = false;
   }
+}
+
+Future<void> _shareYdk(List<DeckListEntry> lists) async {
+  final dir = await getTemporaryDirectory();
+  final files = <XFile>[];
+  for (final l in lists) {
+    final t = l.target;
+    final name = '${t.position == null ? '' : '${t.position}_'}'
+            '${t.playerName}_${t.deckName ?? 'mazo'}'
+        .replaceAll(RegExp(r'[^A-Za-z0-9_\-]+'), '_');
+    final file = File('${dir.path}/$name.ydk');
+    await file.writeAsString(l.cards.toYdk(), flush: true);
+    files.add(XFile(file.path, mimeType: 'text/plain', name: '$name.ydk'));
+  }
+  await SharePlus.instance.share(ShareParams(
+    files: files,
+    text: lists.length == 1
+        ? _shareText(lists.first.target)
+        : 'Listas del Top ${lists.length} · ${lists.first.target.tournamentName}',
+  ));
+}
+
+/// Prepara la imagen de una lista (descarga las cartas que falten).
+/// Devuelve la especificación y cuántas cartas quedaron sin imagen.
+Future<(ExportSpec<int>, int)> _deckListSpec(
+  DeckListEntry entry, {
+  required CardDb db,
+  required CardImageStore store,
+  required bool wide,
+}) async {
+  final (:target, :cards, :featured) = entry;
+  // 1) Imágenes de todas las cartas (se descargan las que falten).
+  final ids = {...cards.main, ...cards.extra, ...cards.side};
+  final small = <int, File>{};
+  var missing = 0;
+  await Future.wait([
+    for (final id in ids)
+      store.get(id, CardImageSize.small).then((f) {
+        if (f == null) {
+          missing++;
+        } else {
+          small[id] = f;
+        }
+      }),
+  ]);
+  // 2) Ilustración principal y su color.
+  final mainId = featured ?? _fallbackFeatured(cards, db);
+  final featuredArt = mainId == null ? null : await store.get(mainId, CardImageSize.art);
+  final dominant = featuredArt == null ? null : await averageColor(featuredArt);
+
+  final data = DeckListArt(
+    target: target,
+    cards: cards,
+    db: db,
+    small: small,
+    featured: mainId == null ? null : db.byId(mainId),
+    featuredArt: featuredArt,
+    tone: harmonyBackground(dominant ?? AppColors.forest),
+  );
+  final poster = DeckListPoster(data: data, wide: wide);
+  final position = target.position == null ? '' : '${target.position}_';
+  return (
+    ExportSpec<int>(
+      heading: 'LISTA · ${target.playerName}',
+      items: const [],
+      page: poster,
+      contentWidth: poster.width,
+      summaryHeightEstimate: poster.estimatedHeight,
+      legend: '',
+      fileBase: 'lista${wide ? '_16x9' : ''}_$position${_fileSafe(target.playerName)}_'
+          '${_fileSafe(target.tournamentName)}',
+      shareText: _shareText(target),
+      preload: [
+        for (final f in small.values) FileImage(f),
+        if (featuredArt != null) FileImage(featuredArt),
+      ],
+    ),
+    missing,
+  );
 }
 
 int? _fallbackFeatured(DeckCards cards, CardDb db) {

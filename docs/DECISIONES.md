@@ -194,3 +194,8 @@ Konami no publica fórmula de tier list (sus "Deck Breakdown" de YCS solo cuenta
 - **Ficha del jugador**: filtro de temporada (todas o cada temporada en la que jugó) para estadísticas, mazos, rivales e historial.
 - **Un solo término: "Compartir"** para las imágenes (la copia de seguridad sigue siendo "Exportar base de datos", porque es un archivo).
 - **Tamaños de letra** de la app reducidos a una escala fija: 11 · 12 · 14 · 16 · 20 · 24 (las imágenes compartidas mantienen los suyos).
+
+## Correcciones 09/11 (2)
+- **Compartir una lista**: un solo botón de compartir con tres opciones: **Imagen · Actual**, **Imagen · 16:9** y **Archivo .ydk** (ya no está aparte en el menú ⋮).
+- **Listas del Top Cut**: botón **Compartir todas** (o "Compartir N de M" si faltan listas por subir) que comparte de una vez todas las listas subidas, como imágenes (en el formato elegido) o como archivos .ydk.
+- **Rondas**: el tiempo de la ronda en juego queda **fijo arriba**; los cruces se desplazan por debajo.
