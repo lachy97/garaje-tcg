@@ -35,7 +35,7 @@ export async function handle(request, env, opts) {
   const sync = new SyncService(env, auth);
   try {
     // Fase 0: prueba de conexión desde Cuba.
-    if (path === '/v1/health' && m === 'GET') {
+    if ((path === '/v1/health' || path === '/') && m === 'GET') {
       const db = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts').first();
       return json({ ok: true, service: 'garage-tcg', version: VERSION, time: new Date().toISOString(), db: db ? 'ok' : 'error' });
     }

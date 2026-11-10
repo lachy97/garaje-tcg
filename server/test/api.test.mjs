@@ -169,3 +169,10 @@ test('sin correo ni modo pruebas: 503', async () => {
   env.DEV_CODES = '0';
   assert.equal((await reg(call, 'leo', 'leo@gmail.com')).status, 503);
 });
+
+test('la raíz también responde como /v1/health', async () => {
+  const { call } = setup();
+  const r = await call('GET', '/');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.ok, true);
+});
