@@ -217,3 +217,11 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - Administrador: la cuenta registrada con el Gmail guardado en el secreto `ADMIN_EMAIL`. Sin Brevo configurado el servidor queda en **modo de pruebas** (`DEV_CODES = "1"`): devuelve el código y la app lo muestra; pasar a `"0"` antes de abrir el registro a los jugadores.
 - Seguridad: PBKDF2-SHA256 100.000 iteraciones, tokens y códigos guardados como hash, 10 inicios fallidos cada 15 min.
 - App: `lib/core/auth/server_config.dart` (`kServerUrl`; vacía = servidor simulado) y `HttpAuthApi`. **Ajustes → Servidor**: a qué servidor está conectada y **Probar conexión** (también con una dirección escrita a mano, para la fase 0 sin recompilar). Sin conexión la sesión guardada sigue valiendo; al abrir la app se actualizan rol y ficha.
+
+## Sincronización · fase 2 (10/11)
+- El teléfono del organizador **sube** sus datos al servidor; el servidor es la copia principal. Los torneos se siguen jugando con la base local, sin conexión.
+- **Cola automática**: disparadores de SQLite (`lib/core/sync/sync_schema.dart`, se instalan al abrir la base; sin cambiar la versión del esquema) apuntan en `sync_outbox` cada fila insertada, cambiada o borrada de las 13 tablas. Así cualquier cambio (pantallas, importar .gtcg, deshacer ronda…) se sube sin tocar cada consulta.
+- **Subida** (`SyncController`): cada 30 s, al volver a la app y al salir, en lotes de 200 filas (fila completa en JSON tal como está en SQLite; borrado = marca de borrado). La primera vez que una cuenta sube desde un teléfono se pone en cola todo.
+- **Servidor** (`server/src/sync.js`, tabla `sync_rows`, migración `0002_sync.sql`): solo organizadores y administrador suben; gana el cambio más reciente; una fila solo la cambia quien la subió primero (o el administrador). `/v1/sync/pull` (por número de llegada) y `/v1/sync/status` quedan listos para la fase 3 (bajar datos a los jugadores según permisos) y para restaurar.
+- **Ajustes → Sincronización**: pendientes, última subida, "Sincronizar ahora" y "Volver a subir todo".
+- Límites conocidos: las fotos propias de jugadores y mazos no se suben (solo su ruta). "Volver a subir todo" marca las filas con la hora actual (si se usa desde un teléfono con datos viejos, pisaría datos más nuevos del servidor). Por ahora solo un teléfono organizador (el de Lachy).

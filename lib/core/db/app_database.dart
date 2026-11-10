@@ -5,6 +5,7 @@ import '../../features/ranking/domain/points_scale.dart';
 // Lo usa el código generado (app_database.g.dart): los ids por defecto
 // de las tablas llaman a newId(), definido aquí.
 import '../utils/ids.dart';
+import '../sync/sync_schema.dart';
 import 'daos/decks_dao.dart';
 import 'daos/players_dao.dart';
 import 'daos/ranking_dao.dart';
@@ -134,6 +135,8 @@ class AppDatabase extends _$AppDatabase {
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
+          // Cola de cambios para subir al servidor (fase 2).
+          await installSyncSchema(this);
           await seedDefaultPointsScales();
           await decksDao.seedCatalog();
           // Fotos propias de mazos: rutas absolutas antiguas → relativas (AppPaths).

@@ -1,0 +1,58 @@
+import 'package:drift/drift.dart';
+
+/// Tablas de la app que se suben al servidor (mismo orden y nombres que
+/// server/src/sync.js). Las fotos propias (jugadores, mazos) no se suben:
+/// solo su ruta.
+const kSyncTables = [
+  'players',
+  'decks',
+  'seasons',
+  'points_scale_entries',
+  'tournaments',
+  'tournament_players',
+  'rounds',
+  'matches',
+  'season_results',
+  'ranking_snapshots',
+  'deck_snapshots',
+  'penalties',
+  'deck_lists',
+];
+
+/// Milisegundos actuales en SQL.
+const _nowMs = "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)";
+
+/// Cola de cambios pendientes de subir + disparadores que la llenan solos al
+/// insertar, cambiar o borrar cualquier fila. Así no hace falta tocar cada
+/// pantalla ni cada consulta. Idempotente: se ejecuta en cada apertura.
+Future<void> installSyncSchema(DatabaseConnectionUser db) async {
+  await db.customStatement(
+    'CREATE TABLE IF NOT EXISTS sync_outbox ('
+    'tbl TEXT NOT NULL, row_id TEXT NOT NULL, changed_at INTEGER NOT NULL, '
+    'PRIMARY KEY (tbl, row_id))',
+  );
+  await db.customStatement(
+    'CREATE TABLE IF NOT EXISTS sync_state (k TEXT PRIMARY KEY, v TEXT)',
+  );
+  for (final t in kSyncTables) {
+    for (final (when, ref) in [('INSERT', 'NEW'), ('UPDATE', 'NEW'), ('DELETE', 'OLD')]) {
+      await db.customStatement(
+        'CREATE TRIGGER IF NOT EXISTS sync_${t}_${when.toLowerCase()} '
+        'AFTER $when ON $t BEGIN '
+        "INSERT OR REPLACE INTO sync_outbox (tbl, row_id, changed_at) VALUES ('$t', $ref.id, $_nowMs); "
+        'END',
+      );
+    }
+  }
+}
+
+/// Pone en la cola TODAS las filas (primera subida de un teléfono, o para
+/// volver a subir todo). No toca lo que ya estaba en cola.
+Future<void> enqueueAllRows(DatabaseConnectionUser db) async {
+  for (final t in kSyncTables) {
+    await db.customStatement(
+      'INSERT OR IGNORE INTO sync_outbox (tbl, row_id, changed_at) '
+      "SELECT '$t', id, $_nowMs FROM $t",
+    );
+  }
+}

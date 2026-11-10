@@ -73,6 +73,15 @@ class HttpAuthApi implements AuthApi {
     }
   }
 
+  /// Llamada a cualquier ruta de la API (la usa la sincronización).
+  Future<Map<String, Object?>> request(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+    String? token,
+  }) =>
+      _call(method, path, body: body, token: token);
+
   /// Guarda el código si el servidor está en modo de pruebas.
   void _keepDevCode(Map<String, Object?> data, String email, String purpose) {
     final code = data['devCode'];

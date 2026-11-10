@@ -15,6 +15,7 @@ import '../../core/license/license_service.dart';
 import '../../core/auth/auth_providers.dart';
 import '../account/account_section.dart';
 import '../account/server_section.dart';
+import '../account/sync_section.dart';
 import '../decklists/presentation/card_data_section.dart';
 import '../license/license_widgets.dart';
 import 'merge_preview_page.dart';
@@ -209,6 +210,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const AccountSection(),
               const SectionLabel('Servidor'),
               const ServerSection(),
+              const SectionLabel('Sincronización'),
+              const SyncSection(),
               const SectionLabel('Licencia'),
               NeonCard(
                 child: AsyncView(

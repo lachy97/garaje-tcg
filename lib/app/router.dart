@@ -14,6 +14,7 @@ import '../features/tournaments/presentation/create_tournament_page.dart';
 import '../features/tournaments/presentation/tournament_detail_page.dart';
 import '../features/tournaments/presentation/tournaments_page.dart';
 import '../core/auth/auth_providers.dart';
+import '../core/sync/sync_service.dart';
 import 'theme.dart';
 
 /// Navigator raíz (también lo usa el aviso de licencia por vencer).
@@ -109,6 +110,8 @@ class HomeShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final perms = ref.watch(permissionsProvider);
     final preview = ref.watch(rolePreviewProvider);
+    // Mantiene viva la subida automática de datos al servidor.
+    ref.listen(syncControllerProvider, (_, _) {});
     final allPlayers = perms.canSeeAllPlayers;
     return Scaffold(
       body: Column(

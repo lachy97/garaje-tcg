@@ -1,8 +1,9 @@
 // Garage TCG · API (Cloudflare Workers + D1).
 // Rutas en /v1. Cuerpos y respuestas en JSON. Errores: { error, code? }.
 import { ApiError, AuthService } from './auth.js';
+import { SyncService } from './sync.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -31,6 +32,7 @@ export async function handle(request, env, opts) {
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const m = request.method;
   const auth = new AuthService(env, opts);
+  const sync = new SyncService(env, auth);
   try {
     // Fase 0: prueba de conexión desde Cuba.
     if (path === '/v1/health' && m === 'GET') {
@@ -50,6 +52,7 @@ export async function handle(request, env, opts) {
         case '/v1/auth/password/request': return json(await auth.requestPasswordReset(body));
         case '/v1/auth/password/reset': return json(await auth.resetPassword(body));
         case '/v1/auth/logout': return json(await auth.logout(token));
+        case '/v1/sync/push': return json(await sync.push(token, body));
       }
       const admin = path.match(/^\/v1\/admin\/accounts\/([^/]+)\/(role|player|verify)$/);
       if (admin) {
@@ -62,6 +65,8 @@ export async function handle(request, env, opts) {
     if (m === 'GET') {
       if (path === '/v1/me') return json(await auth.me(token));
       if (path === '/v1/admin/accounts') return json(await auth.listAccounts(token));
+      if (path === '/v1/sync/pull') return json(await sync.pull(token, url.searchParams));
+      if (path === '/v1/sync/status') return json(await sync.status(token));
     }
     return json({ error: 'Ruta no encontrada.' }, 404);
   } catch (e) {

@@ -136,6 +136,22 @@ Los correos que se envían desde un Gmail a través de Brevo pueden caer en
 **Spam** más a menudo; la app ya avisa de mirar ahí. Con un dominio propio
 (más adelante) llegan mejor.
 
+## 10 · Sincronización (fase 2)
+
+Los teléfonos de los organizadores suben sus datos (jugadores, mazos,
+temporadas, torneos, resultados, listas…) al servidor. Para activarla en
+un servidor ya publicado (una vez):
+
+```powershell
+npm run db:sync
+npm run deploy
+```
+
+Luego, en la app (con sesión de organizador o administrador): **Ajustes →
+Sincronización**. La primera vez sube todo; después, cada 30 s y al
+volver a la app, solo lo que cambió. Sin conexión los cambios esperan en
+la cola.
+
 ## Útil
 
 | Para | Comando |
@@ -159,6 +175,9 @@ Los correos que se envían desde un Gmail a través de Brevo pueden caer en
 | POST | `/v1/auth/logout` | `Authorization: Bearer <token>` |
 | GET | `/v1/me` | `Authorization` |
 | GET | `/v1/admin/accounts` | `Authorization` (admin) |
+| POST | `/v1/sync/push` | `rows: [{t, id, changedAt, deleted?, data?}]` (organizador/admin) |
+| GET | `/v1/sync/pull?since=&limit=` | (organizador/admin) |
+| GET | `/v1/sync/status` | (organizador/admin) |
 | POST | `/v1/admin/accounts/:id/role` | `role` (admin) |
 | POST | `/v1/admin/accounts/:id/player` | `playerId` o `null` (admin) |
 | POST | `/v1/admin/accounts/:id/verify` | (admin) |
