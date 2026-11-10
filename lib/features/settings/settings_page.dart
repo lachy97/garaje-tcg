@@ -12,6 +12,9 @@ import '../../app/widgets/common.dart';
 import '../../core/backup/backup_codec.dart';
 import '../../core/backup/backup_service.dart';
 import '../../core/license/license_service.dart';
+import '../../core/auth/auth_providers.dart';
+import '../account/account_section.dart';
+import '../account/server_section.dart';
 import '../decklists/presentation/card_data_section.dart';
 import '../license/license_widgets.dart';
 import 'merge_preview_page.dart';
@@ -193,6 +196,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final license = ref.watch(licenseProvider);
     final info = ref.watch(_packageInfoProvider).value;
+    final perms = ref.watch(permissionsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('AJUSTES')),
@@ -201,6 +205,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ListView(
             padding: const EdgeInsets.only(bottom: 40),
             children: [
+              const SectionLabel('Cuenta'),
+              const AccountSection(),
+              const SectionLabel('Servidor'),
+              const ServerSection(),
               const SectionLabel('Licencia'),
               NeonCard(
                 child: AsyncView(
@@ -230,6 +238,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   },
                 ),
               ),
+              if (perms.canBackup) ...[
               const SectionLabel('Copia de seguridad'),
               NeonCard(
                 child: Column(
@@ -263,6 +272,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ],
                 ),
               ),
+              ],
               const SectionLabel('Cartas'),
               const CardDataSection(),
               if (_adminUnlocked ?? false) ...[

@@ -12,6 +12,8 @@ import '../domain/deck_stats.dart';
 import 'deck_picker.dart' show sortDecks;
 import '../domain/tier_style.dart';
 import 'deck_matrix.dart';
+import '../../account/locked.dart';
+import '../../../core/auth/auth_providers.dart';
 import 'deck_tier_table.dart';
 import 'tier_board.dart';
 
@@ -74,6 +76,8 @@ class _DecksPageState extends ConsumerState<DecksPage> {
     final current = list == null || list.isEmpty ? null : pickSeason(list, _seasonId);
     final scopeId = _all ? kAllSeasons : current?.id;
     final shareable = scopeId == null ? null : ref.watch(seasonDecksProvider(scopeId)).value;
+    final perms = ref.watch(permissionsProvider);
+    final stats = perms.canSeeDeckStats;
     return Scaffold(
       appBar: AppBar(
         title: const Text('MAZOS'),
@@ -87,11 +91,12 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                       width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.share),
             ),
-          IconButton(
-            tooltip: 'Gestionar mazos',
-            onPressed: () => context.push('/mazos/gestionar'),
-            icon: const Icon(Icons.edit_note),
-          ),
+          if (perms.canCreateTournaments)
+            IconButton(
+              tooltip: 'Gestionar mazos',
+              onPressed: () => context.push('/mazos/gestionar'),
+              icon: const Icon(Icons.edit_note),
+            ),
         ],
       ),
       body: AsyncView(
@@ -166,6 +171,9 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                   children: [
                     ...header,
                     const SectionLabel('Matriz de enfrentamientos'),
+                    if (!stats)
+                      const Expanded(child: LockedFeature.license())
+                    else
                     Expanded(
                       child: DeckMatrixView(
                         seasonId: scope,
@@ -185,6 +193,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: TierBoardView(decks: decks),
                   ),
+                  if (perms.canCreateTournaments)
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Text(
@@ -193,6 +202,12 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     ),
                   ),
                   const SectionLabel('Tabla de mazos'),
+                  if (!stats)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: LockedFeature.license(),
+                    )
+                  else
                   DeckTierTable(decks: decks, onTapDeck: (d) => _openDeck(scope, d)),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 0),

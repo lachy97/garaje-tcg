@@ -11,6 +11,7 @@ import '../data/card_images.dart';
 import '../data/deck_lists_provider.dart';
 import '../domain/card_db.dart';
 import '../domain/deck_list.dart';
+import '../../../core/auth/auth_providers.dart';
 import 'card_image.dart';
 import 'deck_list_editor_page.dart';
 import 'deck_list_export.dart';
@@ -30,6 +31,8 @@ class DeckListPage extends ConsumerWidget {
     final saved = lists.value?[target.playerId];
     final cards = saved == null ? null : cardsOf(saved);
     final cardDb = db.value;
+    // Subir, editar y borrar listas: quien lleva el torneo.
+    final canEdit = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
     return Scaffold(
       appBar: AppBar(
         title: Text('LISTA · ${target.playerName.toUpperCase()}',
@@ -51,6 +54,7 @@ class DeckListPage extends ConsumerWidget {
                 );
               },
             ),
+            if (canEdit)
             PopupMenuButton<String>(
               onSelected: (v) => switch (v) {
                 'edit' => _edit(context, cards, saved),
@@ -72,12 +76,16 @@ class DeckListPage extends ConsumerWidget {
             return EmptyState(
               icon: Icons.style_outlined,
               title: 'Sin lista todavía',
-              subtitle: 'Importa el .ydk del jugador o escribe la lista a mano.',
-              action: FilledButton.icon(
-                onPressed: () => _edit(context, null, null),
-                icon: const Icon(Icons.add),
-                label: const Text('Subir lista'),
-              ),
+              subtitle: canEdit
+                  ? 'Importa el .ydk del jugador o escribe la lista a mano.'
+                  : 'El organizador todavía no subió esta lista.',
+              action: canEdit
+                  ? FilledButton.icon(
+                      onPressed: () => _edit(context, null, null),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Subir lista'),
+                    )
+                  : null,
             );
           }
           if (cardDb == null) {

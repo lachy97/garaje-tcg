@@ -1,0 +1,76 @@
+// Garage TCG · API (Cloudflare Workers + D1).
+// Rutas en /v1. Cuerpos y respuestas en JSON. Errores: { error, code? }.
+import { ApiError, AuthService } from './auth.js';
+
+export const VERSION = '1.0.0';
+
+const json = (data, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  });
+
+async function readBody(request) {
+  if (request.method !== 'POST') return {};
+  try {
+    const text = await request.text();
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw new ApiError(400, 'Petición mal formada.');
+  }
+}
+
+const bearer = (request) => {
+  const h = request.headers.get('authorization') ?? '';
+  return h.startsWith('Bearer ') ? h.slice(7).trim() : null;
+};
+
+/** Atiende una petición. [opts] solo para tests (reloj, códigos, correo). */
+export async function handle(request, env, opts) {
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+  const m = request.method;
+  const auth = new AuthService(env, opts);
+  try {
+    // Fase 0: prueba de conexión desde Cuba.
+    if (path === '/v1/health' && m === 'GET') {
+      const db = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts').first();
+      return json({ ok: true, service: 'garage-tcg', version: VERSION, time: new Date().toISOString(), db: db ? 'ok' : 'error' });
+    }
+
+    const body = await readBody(request);
+    const token = bearer(request);
+
+    if (m === 'POST') {
+      switch (path) {
+        case '/v1/auth/register': return json(await auth.register(body));
+        case '/v1/auth/resend': return json(await auth.resendVerification(body));
+        case '/v1/auth/verify': return json(await auth.verifyEmail(body));
+        case '/v1/auth/login': return json(await auth.login(body));
+        case '/v1/auth/password/request': return json(await auth.requestPasswordReset(body));
+        case '/v1/auth/password/reset': return json(await auth.resetPassword(body));
+        case '/v1/auth/logout': return json(await auth.logout(token));
+      }
+      const admin = path.match(/^\/v1\/admin\/accounts\/([^/]+)\/(role|player|verify)$/);
+      if (admin) {
+        const [, id, what] = admin;
+        if (what === 'role') return json(await auth.setRole(token, id, body));
+        if (what === 'player') return json(await auth.linkPlayer(token, id, body));
+        return json(await auth.verifyManually(token, id));
+      }
+    }
+    if (m === 'GET') {
+      if (path === '/v1/me') return json(await auth.me(token));
+      if (path === '/v1/admin/accounts') return json(await auth.listAccounts(token));
+    }
+    return json({ error: 'Ruta no encontrada.' }, 404);
+  } catch (e) {
+    if (e instanceof ApiError) return json({ error: e.message, ...e.extra }, e.status);
+    console.error(e);
+    return json({ error: 'Error del servidor. Inténtalo de nuevo.' }, 500);
+  }
+}
+
+export default {
+  fetch: (request, env) => handle(request, env),
+};

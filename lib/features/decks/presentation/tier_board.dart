@@ -8,6 +8,7 @@ import '../../../app/widgets/brand.dart';
 import '../domain/deck_stats.dart';
 import '../domain/tier_style.dart';
 import 'deck_image.dart';
+import '../../../core/auth/auth_providers.dart';
 
 /// Colores del diseño (fondo oscuro como la tier list de referencia).
 const _kBoardBg = Color(0xFF111111);
@@ -263,7 +264,10 @@ class TierBoardView extends ConsumerWidget {
         decks: decks,
         styles: styles,
         metrics: TierBoardMetrics.forWidth(c.maxWidth),
-        onEditTier: (t) => showTierStyleDialog(context, ref, t),
+        // Cambiar texto y color de los tiers: quien lleva los torneos.
+        onEditTier: ref.watch(permissionsProvider).canCreateTournaments
+            ? (t) => showTierStyleDialog(context, ref, t)
+            : null,
       ),
     );
   }

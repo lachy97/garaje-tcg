@@ -15,6 +15,8 @@ import 'deck_image.dart';
 import 'deck_matrix.dart';
 import 'deck_tier_table.dart' show TierBadge;
 import 'decks_page.dart' show seasonDecksProvider;
+import '../../../core/auth/auth_providers.dart';
+import '../../account/locked.dart';
 
 final _deckEntriesProvider = StreamProvider.autoDispose
     .family<List<DeckTournamentEntry>, (String, String)>((ref, key) {
@@ -31,6 +33,9 @@ class DeckDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(permissionsProvider).canSeeDeckStats) {
+      return Scaffold(appBar: AppBar(), body: const LockedFeature.license());
+    }
     final stats = ref.watch(seasonDecksProvider(seasonId));
     final season = (ref.watch(seasonListProvider).value ?? const [])
         .where((s) => s.id == seasonId)

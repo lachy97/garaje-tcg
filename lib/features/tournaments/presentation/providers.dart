@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/db/app_database.dart';
@@ -6,6 +7,21 @@ import '../../../core/db/database_provider.dart';
 
 final tournamentsProvider = StreamProvider.autoDispose<List<Tournament>>((ref) {
   return ref.watch(tournamentsDaoProvider).watchAll();
+});
+
+/// Torneos en los que está (o estuvo) inscrito un jugador.
+final playerTournamentIdsProvider =
+    StreamProvider.autoDispose.family<Set<String>, String>((ref, playerId) {
+  final db = ref.watch(databaseProvider);
+  return db
+      .customSelect(
+        'SELECT DISTINCT tournament_id FROM tournament_players '
+        'WHERE player_id = ? AND deleted_at IS NULL',
+        variables: [Variable.withString(playerId)],
+        readsFrom: {db.tournamentPlayers},
+      )
+      .watch()
+      .map((rows) => {for (final r in rows) r.read<String>('tournament_id')});
 });
 
 final tournamentProvider =

@@ -12,6 +12,8 @@ import '../../../core/db/database_provider.dart';
 import '../../../core/utils/season_utils.dart';
 import '../data/player_profile_repository.dart';
 import '../domain/player_profile.dart';
+import '../../account/locked.dart';
+import '../../../core/auth/auth_providers.dart';
 import 'players_page.dart' show showPlayerForm;
 
 /// Perfil del jugador en tres pestañas: Resumen (datos, estadísticas, mazos
@@ -34,6 +36,17 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
   @override
   Widget build(BuildContext context) {
     final playerId = widget.playerId;
+    final perms = ref.watch(permissionsProvider);
+    if (!perms.canSeePlayerProfile(playerId)) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const LockedFeature(
+          title: 'Ficha privada',
+          subtitle: 'Cada jugador ve solo su propia ficha. Las de todos son '
+              'exclusivas del administrador.',
+        ),
+      );
+    }
     final player = ref.watch(playerByIdProvider(playerId));
     final profile = ref.watch(playerProfileProvider(playerId));
 
@@ -52,11 +65,12 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
             appBar: AppBar(
               title: Text(p.nickname.toUpperCase(), overflow: TextOverflow.ellipsis),
               actions: [
-                IconButton(
-                  tooltip: 'Editar datos',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => showPlayerForm(context, ref, player: p),
-                ),
+                if (perms.isAdmin)
+                  IconButton(
+                    tooltip: 'Editar datos',
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => showPlayerForm(context, ref, player: p),
+                  ),
               ],
               bottom: const TabBar(
                 labelColor: AppColors.neon,

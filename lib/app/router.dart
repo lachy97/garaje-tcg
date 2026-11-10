@@ -13,6 +13,7 @@ import '../features/settings/settings_page.dart';
 import '../features/tournaments/presentation/create_tournament_page.dart';
 import '../features/tournaments/presentation/tournament_detail_page.dart';
 import '../features/tournaments/presentation/tournaments_page.dart';
+import '../core/auth/auth_providers.dart';
 import 'theme.dart';
 
 /// Navigator raíz (también lo usa el aviso de licencia por vencer).
@@ -99,15 +100,52 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class HomeShell extends StatelessWidget {
+class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
 
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final perms = ref.watch(permissionsProvider);
+    final preview = ref.watch(rolePreviewProvider);
+    final allPlayers = perms.canSeeAllPlayers;
     return Scaffold(
-      body: shell,
+      body: Column(
+        children: [
+          // "Ver la app como…" activo: aviso fijo arriba para volver.
+          if (preview != null)
+            Material(
+              color: AppColors.draw.withValues(alpha: 0.18),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.visibility_outlined, size: 18, color: AppColors.draw),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('Viendo la app como ${preview.label}',
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.draw)),
+                      ),
+                      TextButton(
+                        onPressed: () => ref.read(rolePreviewProvider.notifier).set(null),
+                        child: const Text('Volver'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Expanded(
+            child: preview == null
+                ? shell
+                : MediaQuery.removePadding(context: context, removeTop: true, child: shell),
+          ),
+        ],
+      ),
       bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.outline, width: 0.6)),
@@ -116,23 +154,24 @@ class HomeShell extends StatelessWidget {
           selectedIndex: shell.currentIndex,
           onDestinationSelected: (i) =>
               shell.goBranch(i, initialLocation: i == shell.currentIndex),
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
                 icon: Icon(Icons.emoji_events_outlined),
                 selectedIcon: Icon(Icons.emoji_events),
                 label: 'Torneos'),
-            NavigationDestination(
+            const NavigationDestination(
                 icon: Icon(Icons.leaderboard_outlined),
                 selectedIcon: Icon(Icons.leaderboard),
                 label: 'Ranking'),
-            NavigationDestination(
+            const NavigationDestination(
                 icon: Icon(Icons.style_outlined),
                 selectedIcon: Icon(Icons.style),
                 label: 'Mazos'),
+            // Sin permiso para ver a todos, la pestaña es la ficha propia.
             NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: 'Jugadores'),
+                icon: Icon(allPlayers ? Icons.people_outline : Icons.person_outline),
+                selectedIcon: Icon(allPlayers ? Icons.people : Icons.person),
+                label: allPlayers ? 'Jugadores' : 'Mi ficha'),
           ],
         ),
       ),

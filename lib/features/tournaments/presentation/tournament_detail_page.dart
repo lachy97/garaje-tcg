@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
+import '../../../core/auth/auth_providers.dart';
 import 'providers.dart';
 import 'tabs/registration_tab.dart';
 import 'tabs/rounds_tab.dart';
@@ -43,18 +44,35 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
         }
         final finished = t.status == TournamentStatus.finished;
         final title = Text(t.name.toUpperCase(), overflow: TextOverflow.ellipsis);
+        // Los torneos de este teléfono los creó su organizador (hasta que
+        // haya sincronización no hay torneos de otros).
+        final canManage = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
+
+        // En juego y sin permiso para llevarlo: lo verá en vivo cuando haya servidor.
+        if (!finished && !canManage) {
+          return Scaffold(
+            appBar: AppBar(title: title),
+            body: const EmptyState(
+              icon: Icons.wifi_tethering,
+              title: 'Torneo en juego',
+              subtitle: 'Los cruces y la clasificación en vivo llegarán a tu '
+                  'teléfono cuando la app se conecte al servidor.',
+            ),
+          );
+        }
 
         // Terminado: solo el resumen.
-        if (finished && !_editing) {
+        if (finished && (!_editing || !canManage)) {
           return Scaffold(
             appBar: AppBar(
               title: title,
               actions: [
-                IconButton(
-                  tooltip: 'Editar torneo (jugadores, rondas, clasificación)',
-                  icon: const Icon(Icons.tune),
-                  onPressed: () => setState(() => _editing = true),
-                ),
+                if (canManage)
+                  IconButton(
+                    tooltip: 'Editar torneo (jugadores, rondas, clasificación)',
+                    icon: const Icon(Icons.tune),
+                    onPressed: () => setState(() => _editing = true),
+                  ),
               ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(36),

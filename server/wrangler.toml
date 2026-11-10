@@ -1,0 +1,29 @@
+# Garage TCG · API de cuentas (Cloudflare Workers + D1)
+# Guía completa: server/LEEME.md
+name = "garage-tcg-api"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Dirección pública: https://garage-tcg-api.<tu-subdominio>.workers.dev
+workers_dev = true
+
+[vars]
+# Nombre del remitente de los correos.
+MAIL_FROM_NAME = "Garage TCG"
+# "1" = los códigos se devuelven en la respuesta y la app los muestra
+# (solo para pruebas, mientras Brevo no esté configurado). En producción "0".
+DEV_CODES = "1"
+
+# Secretos (NO van aquí; se ponen con `npx wrangler secret put NOMBRE`):
+#   ADMIN_EMAIL    tu Gmail: la cuenta con ese correo nace como Administrador
+#   BREVO_API_KEY  clave de la API de Brevo
+#   MAIL_FROM      Gmail remitente verificado en Brevo
+
+[[d1_databases]]
+binding = "DB"
+database_name = "garage-tcg"
+# Lo da `npx wrangler d1 create garage-tcg` (paso 4 de LEEME.md):
+database_id = "77ceb43d-70bd-4f26-abcf-48cbcf5e128b"
+
+[observability]
+enabled = true

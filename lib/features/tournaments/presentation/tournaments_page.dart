@@ -8,6 +8,7 @@ import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
+import '../../../core/auth/auth_providers.dart';
 import 'providers.dart';
 
 class TournamentsPage extends ConsumerWidget {
@@ -15,7 +16,15 @@ class TournamentsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tournaments = ref.watch(tournamentsProvider);
+    final perms = ref.watch(permissionsProvider);
+    final all = ref.watch(tournamentsProvider);
+    // Quien no lleva torneos ve solo aquellos en los que está inscrito.
+    final mine = perms.canCreateTournaments || perms.playerId == null
+        ? null
+        : ref.watch(playerTournamentIdsProvider(perms.playerId!)).value;
+    final tournaments = perms.canCreateTournaments
+        ? all
+        : all.whenData((list) => [for (final t in list) if (mine?.contains(t.id) ?? false) t]);
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
@@ -57,12 +66,14 @@ class TournamentsPage extends ConsumerWidget {
               error: (e, _) => [SliverFillRemaining(child: Center(child: Text('$e')))],
               data: (list) => list.isEmpty
                   ? [
-                      const SliverFillRemaining(
+                      SliverFillRemaining(
                         hasScrollBody: false,
                         child: EmptyState(
                           icon: Icons.emoji_events_outlined,
                           title: 'Aún no hay torneos',
-                          subtitle: 'Crea el primero con "Nuevo torneo".',
+                          subtitle: perms.canCreateTournaments
+                              ? 'Crea el primero con "Nuevo torneo".'
+                              : 'Aquí verás los torneos en los que estés inscrito.',
                         ),
                       ),
                     ]
@@ -77,11 +88,13 @@ class TournamentsPage extends ConsumerWidget {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/torneos/nuevo'),
-        icon: const Icon(Icons.add),
-        label: const Text('Nuevo torneo'),
-      ),
+      floatingActionButton: perms.canCreateTournaments
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push('/torneos/nuevo'),
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo torneo'),
+            )
+          : null,
     );
   }
 }
@@ -122,6 +135,7 @@ class _TournamentTile extends ConsumerWidget {
               ],
             ),
           ),
+          if (ref.watch(permissionsProvider).canManageTournament(isOwner: true))
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
             onSelected: (_) => runGuarded(context, () async {

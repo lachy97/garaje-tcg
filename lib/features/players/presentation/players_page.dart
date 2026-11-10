@@ -7,7 +7,9 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
+import '../../../core/auth/auth_providers.dart';
 import '../../../core/db/database_provider.dart';
+import 'player_profile_page.dart';
 
 /// Jugadores activos filtrados por texto ('' = todos).
 final playersProvider =
@@ -27,6 +29,21 @@ class _PlayersPageState extends ConsumerState<PlayersPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Sin permiso para ver a todos: la pestaña es "Mi ficha".
+    final perms = ref.watch(permissionsProvider);
+    if (!perms.canSeeAllPlayers) {
+      final mine = perms.playerId;
+      if (mine != null) return PlayerProfilePage(playerId: mine);
+      return Scaffold(
+        appBar: AppBar(title: const Text('MI FICHA')),
+        body: const EmptyState(
+          icon: Icons.link_off,
+          title: 'Tu cuenta aún no tiene ficha',
+          subtitle: 'El administrador la vincula con tu ficha de jugador '
+              '(torneos, mazos y ranking).',
+        ),
+      );
+    }
     final players = ref.watch(playersProvider(_query));
     // Total sin filtrar (para el contador aunque se esté buscando).
     final total = ref.watch(playersProvider('')).value?.length;
