@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
-import '../../core/auth/auth_api.dart';
+import '../../core/auth/account.dart';
 import '../../core/auth/auth_providers.dart';
 import '../../core/auth/http_auth_api.dart';
 import '../../core/auth/server_config.dart';
