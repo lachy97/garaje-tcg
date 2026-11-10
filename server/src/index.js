@@ -3,7 +3,7 @@
 import { ApiError, AuthService } from './auth.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {

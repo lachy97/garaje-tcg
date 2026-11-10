@@ -6,7 +6,10 @@ import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
 import '../../core/backup/backup_service.dart';
+import '../../core/auth/account.dart';
+import '../../core/auth/auth_providers.dart';
 import '../../core/license/license_service.dart';
+import '../account/auth_pages.dart';
 import 'admin_page.dart';
 import 'license_widgets.dart';
 
@@ -71,6 +74,7 @@ class _LicenseGateState extends ConsumerState<LicenseGate> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     final status = ref.watch(licenseProvider);
+    final session = ref.watch(sessionProvider);
     return status.when(
       // Si algo inesperado falla al comprobar, no se bloquea a nadie en medio
       // de un torneo; se volverá a comprobar al regresar a la app.
@@ -83,6 +87,11 @@ class _LicenseGateState extends ConsumerState<LicenseGate> with WidgetsBindingOb
           _maybeWarn(s);
           return widget.child;
         }
+        // Jugadores y jueces con cuenta entran sin licencia: lo suyo es gratis
+        // (la licencia da las estadísticas de mazos y llevar torneos).
+        if (session.isLoading && !session.hasValue) return const _Splash();
+        final role = session.value?.account.role;
+        if (role == AppRole.player || role == AppRole.judge) return widget.child;
         // Navigator propio para poder abrir diálogos y el modo administrador.
         return Navigator(
           onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const LockScreen()),
@@ -174,6 +183,34 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('Volver a comprobar'),
             ),
+            const SizedBox(height: 28),
+            const Divider(),
+            const SizedBox(height: 12),
+            const Text(
+              '¿Eres jugador? Entra con tu cuenta para ver el ranking, la tier list, '
+              'tus torneos y tu ficha (no necesitas licencia).',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            if (ref.watch(sessionProvider).value case final session?)
+              Text(
+                'Sesión iniciada como @${session.account.username} '
+                '(${session.account.role.label}): este rol necesita licencia.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.draw, fontSize: 12),
+              )
+            else ...[
+              FilledButton.tonalIcon(
+                onPressed: () => openAuthPage<bool>(context, const LoginPage()),
+                icon: const Icon(Icons.login),
+                label: const Text('Iniciar sesión'),
+              ),
+              TextButton(
+                onPressed: () => openAuthPage<bool>(context, const RegisterPage()),
+                child: const Text('Crear cuenta'),
+              ),
+            ],
             const SizedBox(height: 28),
             const Text('Tus datos siguen guardados en el teléfono. Puedes sacar una copia:',
                 textAlign: TextAlign.center,

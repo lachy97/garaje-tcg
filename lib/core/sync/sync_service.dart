@@ -16,6 +16,7 @@ import 'sync_schema.dart';
 class SyncStatus {
   const SyncStatus({
     this.enabled = false,
+    this.download = false,
     this.reason,
     this.pending = 0,
     this.running = false,
@@ -27,6 +28,9 @@ class SyncStatus {
 
   /// Este teléfono sube datos (organizador/administrador con servidor real).
   final bool enabled;
+
+  /// Teléfono de jugador o juez: baja datos del servidor (no sube).
+  final bool download;
 
   /// Por qué no está activa (para mostrarlo en Ajustes).
   final String? reason;
@@ -56,6 +60,7 @@ class SyncStatus {
   }) =>
       SyncStatus(
         enabled: enabled ?? this.enabled,
+        download: download,
         reason: reason ?? this.reason,
         pending: pending ?? this.pending,
         running: running ?? this.running,
@@ -91,19 +96,19 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       reason = 'La app aún no está conectada al servidor.';
     } else if (session == null) {
       reason = 'Inicia sesión con una cuenta de organizador.';
-    } else if (session.account.role != AppRole.admin && session.account.role != AppRole.organizer) {
-      reason = 'Solo los organizadores suben datos de torneos.';
     } else {
       reason = null;
     }
     if (reason != null) return SyncStatus(reason: reason);
+    final role = session!.account.role;
+    final download = role != AppRole.admin && role != AppRole.organizer;
 
     _timer = Timer.periodic(interval, (_) => sync());
     WidgetsBinding.instance.addObserver(this);
     // Primera subida al poco de abrir (Timer cancelable: si el proveedor se
     // reconstruye o se descarta antes, no queda una llamada suelta).
     _first = Timer(const Duration(seconds: 3), sync);
-    return const SyncStatus(enabled: true);
+    return SyncStatus(enabled: true, download: download);
   }
 
   void _stop() {
@@ -146,6 +151,16 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
   Future<void> _setState(String k, String v) => _db.customStatement(
       'INSERT OR REPLACE INTO sync_state (k, v) VALUES (?, ?)', [k, v]);
 
+  /// Teléfono de jugador: vuelve a bajar todo desde el principio.
+  Future<void> redownloadAll() async {
+    if (!ref.mounted) return;
+    final id = ref.read(sessionProvider).value?.account.id;
+    if (id == null) return;
+    await _db.customStatement('DELETE FROM sync_state WHERE k = ?', ['pull_seq:$id']);
+    if (!ref.mounted) return;
+    await sync();
+  }
+
   /// Vuelve a poner en cola todas las filas (por si el servidor perdió algo).
   Future<void> resendAll() async {
     if (!ref.mounted) return;
@@ -167,6 +182,18 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     var sent = 0;
     var rejected = 0;
     try {
+      if (state.download) {
+        final got = await _pull(session, api);
+        if (!ref.mounted) return;
+        state = state.copyWith(
+          running: false,
+          pending: 0,
+          lastSync: DateTime.now(),
+          lastSent: got,
+          clearError: true,
+        );
+        return;
+      }
       // Primera vez que esta cuenta sube desde este teléfono: todo.
       const key = 'all_enqueued_for';
       if (await _state(key) != session.account.id) {
@@ -222,6 +249,80 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     } finally {
       _busy = false;
     }
+  }
+
+  // ───────────────────── Bajar (jugadores y jueces) ─────────────────────
+
+  final Map<String, Set<String>> _columns = {};
+
+  /// Columnas de una tabla local (para ignorar las que no existan aquí).
+  Future<Set<String>> _cols(String t) async => _columns[t] ??= {
+        for (final r in await _db.customSelect('PRAGMA table_info($t)').get())
+          r.read<String>('name'),
+      };
+
+  /// Baja los cambios que esta cuenta puede ver y los guarda en la base
+  /// local (sin volver a ponerlos en la cola de subida). Devuelve cuántas
+  /// filas llegaron.
+  Future<int> _pull(Session session, HttpAuthApi api) async {
+    final account = session.account;
+    // Si cambia la ficha vinculada, se baja todo de nuevo.
+    final seqKey = 'pull_seq:${account.id}';
+    final playerKey = 'pull_player:${account.id}';
+    final player = account.playerId ?? '';
+    var since = int.tryParse(await _state(seqKey) ?? '') ?? 0;
+    if ((await _state(playerKey) ?? '') != player) since = 0;
+    var total = 0;
+    while (ref.mounted) {
+      final res = await api.request('GET', 'v1/sync/pull?since=$since', token: session.token);
+      final rows = [
+        for (final r in (res['rows'] as List?) ?? const []) (r as Map).cast<String, Object?>(),
+      ];
+      if (rows.isNotEmpty) await _apply(rows);
+      total += rows.length;
+      since = (res['seq'] as num?)?.toInt() ?? since;
+      await _setState(seqKey, '$since');
+      await _setState(playerKey, player);
+      if (res['more'] != true) break;
+    }
+    return total;
+  }
+
+  Future<void> _apply(List<Map<String, Object?>> rows) async {
+    // Con las claves foráneas desactivadas: las filas pueden llegar en
+    // cualquier orden (p. ej. una partida antes que su ronda).
+    await _db.customStatement('PRAGMA foreign_keys = OFF');
+    try {
+      await _db.transaction(() async {
+        await _db.customStatement("INSERT OR REPLACE INTO sync_state (k, v) VALUES ('applying', '1')");
+        for (final r in rows) {
+          final t = r['t'];
+          final id = r['id'];
+          if (t is! String || id is! String || !kSyncTables.contains(t)) continue;
+          final data = r['data'];
+          if (r['deleted'] == true || data is! Map) {
+            await _db.customStatement('DELETE FROM $t WHERE id = ?', [id]);
+            continue;
+          }
+          final cols = await _cols(t);
+          final entries = [
+            for (final e in data.entries)
+              if (e.key is String && cols.contains(e.key)) MapEntry(e.key as String, e.value),
+          ];
+          if (entries.isEmpty) continue;
+          await _db.customStatement(
+            'INSERT OR REPLACE INTO $t (${entries.map((e) => e.key).join(', ')}) '
+            'VALUES (${List.filled(entries.length, '?').join(', ')})',
+            [for (final e in entries) e.value],
+          );
+        }
+        await _db.customStatement("DELETE FROM sync_state WHERE k = 'applying'");
+      });
+    } finally {
+      await _db.customStatement('PRAGMA foreign_keys = ON');
+    }
+    // Avisar a las pantallas de que cambiaron los datos.
+    _db.markTablesUpdated(_db.allTables);
   }
 
   /// Filas actuales de la cola (o "borrada" si ya no existe).

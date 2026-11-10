@@ -9,6 +9,7 @@
     "dev": "wrangler dev",
     "db:init": "wrangler d1 execute garage-tcg --remote --file=migrations/0001_init.sql",
     "db:sync": "wrangler d1 execute garage-tcg --remote --file=migrations/0002_sync.sql",
+    "db:fase3": "wrangler d1 execute garage-tcg --remote --file=migrations/0003_pull_filters.sql",
     "deploy": "wrangler deploy",
     "logs": "wrangler tail"
   },

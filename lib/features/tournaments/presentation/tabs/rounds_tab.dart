@@ -19,9 +19,12 @@ import 'round_timer.dart';
 /// Rondas: configuración (rondas Swiss / Top Cut), pairings, reporte de
 /// resultados y botón para avanzar el torneo.
 class RoundsTab extends ConsumerStatefulWidget {
-  const RoundsTab({super.key, required this.tournament});
+  const RoundsTab({super.key, required this.tournament, this.readOnly = false});
 
   final Tournament tournament;
+
+  /// Solo consulta (jugadores): sin configurar, reportar ni avanzar.
+  final bool readOnly;
 
   @override
   ConsumerState<RoundsTab> createState() => _RoundsTabState();
@@ -66,12 +69,13 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                         child: RoundTimer(
                             key: ValueKey(timerRound.id),
                             round: timerRound,
-                            minutes: t.roundMinutes),
+                            minutes: t.roundMinutes,
+                            readOnly: widget.readOnly),
                       ),
                     Expanded(
                       child: CustomScrollView(
                   slivers: [
-                    if (t.status != TournamentStatus.finished)
+                    if (t.status != TournamentStatus.finished && !widget.readOnly)
                       SliverToBoxAdapter(
                         child: _ConfigCard(tournament: t, players: players),
                       ),
@@ -115,6 +119,7 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                             t.status != TournamentStatus.finished,
                         names: names,
                         deckNames: deckNames,
+                        readOnly: widget.readOnly,
                       ),
                     // espacio para que el botón flotante no tape la última tarjeta
                     const SliverToBoxAdapter(child: SizedBox(height: 104)),
@@ -124,6 +129,7 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                   ],
                 ),
               ),
+              if (!widget.readOnly)
               Positioned(
                 right: 20,
                 bottom: 20,
@@ -298,10 +304,14 @@ class _MatchesSliver extends ConsumerWidget {
     required this.isCurrent,
     required this.names,
     required this.deckNames,
+    this.readOnly = false,
   });
 
   final Tournament tournament;
   final Round round;
+  final bool readOnly;
+
+  /// Ronda en juego y se puede llevar el torneo desde este teléfono.
   final bool isCurrent;
   final Map<String, String> names;
   final Map<String, String> deckNames;
@@ -312,7 +322,8 @@ class _MatchesSliver extends ConsumerWidget {
     final title = round.phase == RoundPhase.swiss
         ? 'Ronda ${round.number}'
         : roundLabel(round);
-    final editable = TournamentService.canEditResults(tournament, round, isCurrent: isCurrent);
+    final editable = !readOnly &&
+        TournamentService.canEditResults(tournament, round, isCurrent: isCurrent);
     return matches.when(
       loading: () => const SliverToBoxAdapter(
           child: Padding(
@@ -357,6 +368,7 @@ class _MatchesSliver extends ConsumerWidget {
             ),
           ),
           if (isCurrent &&
+              !readOnly &&
               round.phase == RoundPhase.swiss &&
               tournament.status == TournamentStatus.swiss)
             Center(
@@ -387,7 +399,7 @@ class _MatchesSliver extends ConsumerWidget {
               editable: editable && !m.isBye,
               canClear: isCurrent,
             ),
-          if (isCurrent)
+          if (isCurrent && !readOnly)
             Center(
               child: TextButton.icon(
                 onPressed: () => _undoRound(context, ref),

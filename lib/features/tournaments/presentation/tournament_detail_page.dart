@@ -48,15 +48,36 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
         // haya sincronización no hay torneos de otros).
         final canManage = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
 
-        // En juego y sin permiso para llevarlo: lo verá en vivo cuando haya servidor.
+        // En juego y sin permiso para llevarlo (jugadores): cruces y
+        // clasificación en vivo, solo para consultar (llegan del servidor).
         if (!finished && !canManage) {
-          return Scaffold(
-            appBar: AppBar(title: title),
-            body: const EmptyState(
-              icon: Icons.wifi_tethering,
-              title: 'Torneo en juego',
-              subtitle: 'Los cruces y la clasificación en vivo llegarán a tu '
-                  'teléfono cuando la app se conecte al servidor.',
+          return DefaultTabController(
+            length: 2,
+            child: Scaffold(
+              appBar: AppBar(
+                title: title,
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(84),
+                  child: Column(
+                    children: [
+                      _Header(t: t),
+                      const TabBar(
+                        labelColor: AppColors.neon,
+                        unselectedLabelColor: AppColors.textSecondary,
+                        indicatorColor: AppColors.neon,
+                        dividerColor: Colors.transparent,
+                        tabs: [Tab(text: 'Rondas'), Tab(text: 'Clasificación')],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              body: TabBarView(
+                children: [
+                  RoundsTab(tournament: t, readOnly: true),
+                  StandingsTab(tournament: t),
+                ],
+              ),
             ),
           );
         }

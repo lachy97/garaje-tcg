@@ -152,6 +152,20 @@ Sincronización**. La primera vez sube todo; después, cada 30 s y al
 volver a la app, solo lo que cambió. Sin conexión los cambios esperan en
 la cola.
 
+## 11 · Fase 3: datos en los teléfonos de los jugadores
+
+Una vez, en el PC:
+
+```powershell
+npm run db:fase3
+npm run deploy
+```
+
+Los jugadores y jueces que inician sesión bajan del servidor lo que pueden
+ver: catálogo de mazos, temporadas, ranking y tier list, los torneos
+terminados y aquellos en los que están inscritos (en vivo), y su propia
+ficha. De los demás jugadores solo llega el apodo.
+
 ## Útil
 
 | Para | Comando |

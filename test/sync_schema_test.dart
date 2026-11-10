@@ -43,6 +43,13 @@ void main() {
     await db.customStatement('DELETE FROM players WHERE id = ?', [id]);
     expect(await queued('players'), [id]);
 
+    // Lo que llega del servidor (marca 'applying') no se vuelve a subir.
+    await db.customStatement('DELETE FROM sync_outbox');
+    await db.customStatement("INSERT INTO sync_state (k, v) VALUES ('applying', '1')");
+    await db.playersDao.create(nickname: 'Del servidor');
+    expect(await queued('players'), isEmpty);
+    await db.customStatement("DELETE FROM sync_state WHERE k = 'applying'");
+
     // Subir todo: todas las filas de todas las tablas.
     await db.customStatement('DELETE FROM sync_outbox');
     await enqueueAllRows(db);

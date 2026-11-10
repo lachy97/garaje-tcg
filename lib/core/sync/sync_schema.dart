@@ -34,6 +34,8 @@ Future<void> installSyncSchema(GeneratedDatabase db) async {
   await db.customStatement(
     'CREATE TABLE IF NOT EXISTS sync_state (k TEXT PRIMARY KEY, v TEXT)',
   );
+  // Si la app se cerró a mitad de aplicar datos del servidor, la marca quedó.
+  await db.customStatement("DELETE FROM sync_state WHERE k = 'applying'");
   // Evento → fila que se anota (NEW al insertar/cambiar, OLD al borrar).
   const events = {'INSERT': 'NEW', 'UPDATE': 'NEW', 'DELETE': 'OLD'};
   for (final t in kSyncTables) {
@@ -41,13 +43,18 @@ Future<void> installSyncSchema(GeneratedDatabase db) async {
       final event = e.key;
       final row = e.value;
       final name = '${t}_${event.toLowerCase()}';
-      // Versión anterior (usaba INSERT OR REPLACE, que falla cuando la
-      // sentencia que dispara es un "upsert": manda su ON CONFLICT).
+      // Versiones anteriores: v1 usaba INSERT OR REPLACE (falla cuando la
+      // sentencia que dispara es un "upsert"); v2 no ignoraba lo que llega
+      // del servidor.
       await db.customStatement('DROP TRIGGER IF EXISTS sync_$name');
+      await db.customStatement('DROP TRIGGER IF EXISTS sync2_$name');
       // Borrar y volver a insertar: no depende de la resolución de conflictos.
+      // No se anota lo que llega del servidor (mientras exista la marca
+      // 'applying' en sync_state).
       await db.customStatement(
-        'CREATE TRIGGER IF NOT EXISTS sync2_$name '
-        'AFTER $event ON $t BEGIN '
+        'CREATE TRIGGER IF NOT EXISTS sync3_$name '
+        'AFTER $event ON $t '
+        "WHEN NOT EXISTS (SELECT 1 FROM sync_state WHERE k = 'applying') BEGIN "
         "DELETE FROM sync_outbox WHERE tbl = '$t' AND row_id = $row.id; "
         "INSERT INTO sync_outbox (tbl, row_id, changed_at) VALUES ('$t', $row.id, $_nowMs); "
         'END',

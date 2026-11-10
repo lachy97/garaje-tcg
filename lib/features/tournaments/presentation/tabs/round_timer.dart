@@ -18,7 +18,10 @@ import '../../application/tournament_service.dart';
 /// La hora de inicio se guarda en la BD, así que el reloj sigue bien aunque
 /// se cierre la app o se apague la pantalla.
 class RoundTimer extends ConsumerStatefulWidget {
-  const RoundTimer({super.key, required this.round, required this.minutes});
+  const RoundTimer({super.key, required this.round, required this.minutes, this.readOnly = false});
+
+  /// Solo ver el tiempo (teléfonos de jugadores): sin iniciar ni detener.
+  final bool readOnly;
 
   final Round round;
   final int minutes;
@@ -66,7 +69,12 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
     final before = _lastRemaining;
     _lastRemaining = now;
     // Aviso solo al cruzar el 0 con la app abierta (no al volver a entrar).
-    if (before != null && now != null && before > Duration.zero && now <= Duration.zero) {
+    // Los teléfonos de solo consulta (jugadores) no avisan: no ponen resultados.
+    if (!widget.readOnly &&
+        before != null &&
+        now != null &&
+        before > Duration.zero &&
+        now <= Duration.zero) {
       _timeUp();
     }
     setState(() {});
@@ -133,6 +141,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
     final remaining = _remaining;
 
     if (remaining == null) {
+      if (widget.readOnly) return const SizedBox.shrink();
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
         child: OutlinedButton.icon(
@@ -191,6 +200,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
                   ],
                 ),
               ),
+              if (!widget.readOnly) ...[
               IconButton(
                 tooltip: 'Reiniciar tiempo',
                 onPressed: () => _start(restart: true),
@@ -201,6 +211,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
                 onPressed: _stop,
                 icon: const Icon(Icons.stop_circle_outlined),
               ),
+              ],
             ],
           ),
           const SizedBox(height: 8),

@@ -225,3 +225,17 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Servidor** (`server/src/sync.js`, tabla `sync_rows`, migración `0002_sync.sql`): solo organizadores y administrador suben; gana el cambio más reciente; una fila solo la cambia quien la subió primero (o el administrador). `/v1/sync/pull` (por número de llegada) y `/v1/sync/status` quedan listos para la fase 3 (bajar datos a los jugadores según permisos) y para restaurar.
 - **Ajustes → Sincronización**: pendientes, última subida, "Sincronizar ahora" y "Volver a subir todo".
 - Límites conocidos: las fotos propias de jugadores y mazos no se suben (solo su ruta). "Volver a subir todo" marca las filas con la hora actual (si se usa desde un teléfono con datos viejos, pisaría datos más nuevos del servidor). Por ahora solo un teléfono organizador (el de Lachy).
+
+## Fase 0: resultado (10/11)
+- `https://garage-tcg-api.garagetcg.workers.dev/v1/health` desde Cuba con datos de Etecsa: **sin VPN no responde; con VPN sí**. Se sigue con Cloudflare y los teléfonos usan **VPN** para conectarse (decidido). Los torneos siguen funcionando sin conexión y los cambios esperan en la cola hasta que haya VPN.
+- La app ya avisa "El servidor no responde. Revisa la conexión (o prueba con VPN)" cuando no llega.
+- Si más adelante se quiere evitar la VPN, opciones a estudiar: dominio propio delante del Worker o un reenvío desde un proveedor accesible desde Cuba (no implementado).
+
+## Fase 3: app del jugador (10/11)
+- **Sin licencia con cuenta**: los jugadores y jueces que inician sesión entran a la app sin licencia (lo suyo es gratis). La pantalla de licencia tiene ahora "¿Eres jugador? Iniciar sesión / Crear cuenta". Sin cuenta, o con cuenta de organizador, sigue haciendo falta la licencia.
+- **Bajar datos** (teléfonos de jugadores y jueces): cada 30 s, al volver a la app y en Ajustes → Sincronización ("Actualizar ahora", "Volver a bajar todo"). Se guardan en la base local, así se ven sin conexión y las pantallas de siempre funcionan igual (ranking, tier list, Mi ficha, torneos).
+- **Qué baja** (`/v1/sync/pull` filtra en el servidor, migración `0003_pull_filters.sql`): catálogo de mazos, temporadas, escalas de puntos, fotos de ranking y tier list; torneos **terminados** completos (hacen falta para calcular ranking y tier list) y los **en juego donde está inscrito**; de los demás jugadores **solo el apodo** (sin nombre, teléfono, Konami ID ni notas); solo **sus** penalizaciones. Cuando un torneo pasa a ser visible (termina o lo inscriben) llega entero.
+- Decisión práctica: los resultados de los torneos terminados llegan a todos los teléfonos porque el ranking y la tier list (gratis) se calculan con ellos; la app solo deja ver la ficha propia. Los datos personales nunca salen del servidor.
+- **Torneo en juego en el teléfono del jugador**: pestañas Rondas (con el tiempo de la ronda) y Clasificación, solo consulta (sin reportar, avanzar ni cambiar cruces).
+- Lo que llega del servidor no se vuelve a poner en la cola de subida (los disparadores se saltan mientras hay la marca `applying`).
+- Si el administrador vincula la ficha más tarde, el teléfono vuelve a bajar todo.

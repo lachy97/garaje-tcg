@@ -91,3 +91,52 @@ test('validación', async () => {
   const big = await call('POST', '/v1/sync/push', { rows: Array.from({ length: 501 }, (_, i) => row('players', `p${i}`, 1)) }, admin.token);
   assert.equal(big.status, 400);
 });
+
+test('jugador: baja solo lo que puede ver', async () => {
+  const { call, admin, player } = await setup();
+  // Vincular la cuenta del jugador con su ficha p1.
+  await call('POST', `/v1/admin/accounts/${player.account.id}/player`, { playerId: 'p1' }, admin.token);
+  const T = (id, status) => ({ t: 'tournaments', id, changedAt: 1, data: { id, status } });
+  await call('POST', '/v1/sync/push', {
+    rows: [
+      { t: 'players', id: 'p1', changedAt: 1, data: { id: 'p1', nickname: 'Yo', phone: '555', full_name: 'Mi Nombre' } },
+      { t: 'players', id: 'p2', changedAt: 1, data: { id: 'p2', nickname: 'Otro', phone: '666', full_name: 'Otro Nombre' } },
+      { t: 'decks', id: 'd1', changedAt: 1, data: { id: 'd1', name: 'Goat' } },
+      T('fin', 'finished'),
+      T('vivo', 'swiss'),
+      T('ajeno', 'swiss'),
+      { t: 'tournament_players', id: 'tp1', changedAt: 1, data: { id: 'tp1', tournament_id: 'vivo', player_id: 'p1' } },
+      { t: 'matches', id: 'm-fin', changedAt: 1, data: { id: 'm-fin', tournament_id: 'fin' } },
+      { t: 'matches', id: 'm-vivo', changedAt: 1, data: { id: 'm-vivo', tournament_id: 'vivo' } },
+      { t: 'matches', id: 'm-ajeno', changedAt: 1, data: { id: 'm-ajeno', tournament_id: 'ajeno' } },
+      { t: 'penalties', id: 'pen-mia', changedAt: 1, data: { id: 'pen-mia', tournament_id: 'fin', player_id: 'p1' } },
+      { t: 'penalties', id: 'pen-otro', changedAt: 1, data: { id: 'pen-otro', tournament_id: 'fin', player_id: 'p2' } },
+    ],
+  }, admin.token);
+
+  // El jugador recarga su cuenta (ahora con ficha) y baja.
+  let r = await call('GET', '/v1/sync/pull?since=0', null, player.token);
+  assert.equal(r.status, 200);
+  const ids = r.data.rows.map((x) => x.id).sort();
+  assert.deepEqual(ids, ['d1', 'fin', 'm-fin', 'm-vivo', 'p1', 'p2', 'pen-mia', 'tp1', 'vivo'].sort());
+  const p2 = r.data.rows.find((x) => x.id === 'p2');
+  assert.equal(p2.data.nickname, 'Otro');
+  assert.equal(p2.data.phone, null);
+  assert.equal(p2.data.full_name, null);
+  assert.equal(r.data.rows.find((x) => x.id === 'p1').data.phone, '555');
+
+  // Sin cambios: nada.
+  const since = r.data.seq;
+  r = await call('GET', `/v1/sync/pull?since=${since}`, null, player.token);
+  assert.equal(r.data.rows.length, 0);
+
+  // El torneo ajeno termina: llega entero (aunque sus filas sean anteriores).
+  await call('POST', '/v1/sync/push', { rows: [T('ajeno', 'finished')].map((x) => ({ ...x, changedAt: 5 })) }, admin.token);
+  r = await call('GET', `/v1/sync/pull?since=${since}`, null, player.token);
+  assert.deepEqual(r.data.rows.map((x) => x.id).sort(), ['ajeno', 'm-ajeno']);
+
+  // El administrador baja todo sin filtrar.
+  const all = await call('GET', '/v1/sync/pull?since=0', null, admin.token);
+  assert.equal(all.data.rows.length, 12);
+  assert.equal(all.data.rows.find((x) => x.id === 'p2').data.phone, '666');
+});

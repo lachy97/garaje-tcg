@@ -53,9 +53,11 @@ class _SyncSectionState extends ConsumerState<SyncSection> {
                 child: Text(
                   !s.enabled
                       ? 'Sin sincronizar'
-                      : s.pending == 0
-                          ? 'Todo subido al servidor'
-                          : '${s.pending} cambio(s) por subir',
+                      : s.download
+                          ? (s.lastSync == null ? 'Bajando datos…' : 'Datos al día')
+                          : s.pending == 0
+                              ? 'Todo subido al servidor'
+                              : '${s.pending} cambio(s) por subir',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -65,13 +67,20 @@ class _SyncSectionState extends ConsumerState<SyncSection> {
           Text(
             !s.enabled
                 ? s.reason ?? ''
-                : [
-                    'Los torneos se siguen jugando sin conexión; los cambios suben solos '
-                        'cada 30 s cuando hay internet.',
-                    if (last != null) 'Última subida: $last (${s.lastSent} fila(s)).',
-                    if (s.rejected > 0)
-                      '${s.rejected} fila(s) no aceptadas (son de otro organizador).',
-                  ].join('\n'),
+                : s.download
+                    ? [
+                        'Ranking, tier list, tus torneos y tu ficha llegan del servidor '
+                            'cada 30 s cuando hay internet (con VPN si hace falta). Sin '
+                            'conexión ves lo último que bajó.',
+                        if (last != null) 'Última actualización: $last (${s.lastSent} fila(s)).',
+                      ].join('\n')
+                    : [
+                        'Los torneos se siguen jugando sin conexión; los cambios suben solos '
+                            'cada 30 s cuando hay internet.',
+                        if (last != null) 'Última subida: $last (${s.lastSent} fila(s)).',
+                        if (s.rejected > 0)
+                          '${s.rejected} fila(s) no aceptadas (son de otro organizador).',
+                      ].join('\n'),
             style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
           if (s.enabled && s.lastError != null) ...[
@@ -85,12 +94,14 @@ class _SyncSectionState extends ConsumerState<SyncSection> {
               icon: s.running
                   ? const SizedBox(
                       width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.cloud_upload),
-              label: Text(s.running ? 'Subiendo…' : 'Sincronizar ahora'),
+                  : Icon(s.download ? Icons.cloud_download : Icons.cloud_upload),
+              label: Text(s.running
+                  ? (s.download ? 'Actualizando…' : 'Subiendo…')
+                  : (s.download ? 'Actualizar ahora' : 'Sincronizar ahora')),
             ),
             TextButton(
-              onPressed: s.running ? null : ctrl.resendAll,
-              child: const Text('Volver a subir todo'),
+              onPressed: s.running ? null : (s.download ? ctrl.redownloadAll : ctrl.resendAll),
+              child: Text(s.download ? 'Volver a bajar todo' : 'Volver a subir todo'),
             ),
           ],
         ],
