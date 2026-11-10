@@ -25,7 +25,7 @@ const _nowMs = "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)";
 /// Cola de cambios pendientes de subir + disparadores que la llenan solos al
 /// insertar, cambiar o borrar cualquier fila. Así no hace falta tocar cada
 /// pantalla ni cada consulta. Idempotente: se ejecuta en cada apertura.
-Future<void> installSyncSchema(DatabaseConnectionUser db) async {
+Future<void> installSyncSchema(GeneratedDatabase db) async {
   await db.customStatement(
     'CREATE TABLE IF NOT EXISTS sync_outbox ('
     'tbl TEXT NOT NULL, row_id TEXT NOT NULL, changed_at INTEGER NOT NULL, '
@@ -34,12 +34,16 @@ Future<void> installSyncSchema(DatabaseConnectionUser db) async {
   await db.customStatement(
     'CREATE TABLE IF NOT EXISTS sync_state (k TEXT PRIMARY KEY, v TEXT)',
   );
+  // Evento → fila que se anota (NEW al insertar/cambiar, OLD al borrar).
+  const events = {'INSERT': 'NEW', 'UPDATE': 'NEW', 'DELETE': 'OLD'};
   for (final t in kSyncTables) {
-    for (final (when, ref) in [('INSERT', 'NEW'), ('UPDATE', 'NEW'), ('DELETE', 'OLD')]) {
+    for (final e in events.entries) {
+      final event = e.key;
+      final row = e.value;
       await db.customStatement(
-        'CREATE TRIGGER IF NOT EXISTS sync_${t}_${when.toLowerCase()} '
-        'AFTER $when ON $t BEGIN '
-        "INSERT OR REPLACE INTO sync_outbox (tbl, row_id, changed_at) VALUES ('$t', $ref.id, $_nowMs); "
+        'CREATE TRIGGER IF NOT EXISTS sync_${t}_${event.toLowerCase()} '
+        'AFTER $event ON $t BEGIN '
+        "INSERT OR REPLACE INTO sync_outbox (tbl, row_id, changed_at) VALUES ('$t', $row.id, $_nowMs); "
         'END',
       );
     }
@@ -48,7 +52,7 @@ Future<void> installSyncSchema(DatabaseConnectionUser db) async {
 
 /// Pone en la cola TODAS las filas (primera subida de un teléfono, o para
 /// volver a subir todo). No toca lo que ya estaba en cola.
-Future<void> enqueueAllRows(DatabaseConnectionUser db) async {
+Future<void> enqueueAllRows(GeneratedDatabase db) async {
   for (final t in kSyncTables) {
     await db.customStatement(
       'INSERT OR IGNORE INTO sync_outbox (tbl, row_id, changed_at) '
