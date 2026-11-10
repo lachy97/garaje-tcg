@@ -40,10 +40,16 @@ Future<void> installSyncSchema(GeneratedDatabase db) async {
     for (final e in events.entries) {
       final event = e.key;
       final row = e.value;
+      final name = '${t}_${event.toLowerCase()}';
+      // Versión anterior (usaba INSERT OR REPLACE, que falla cuando la
+      // sentencia que dispara es un "upsert": manda su ON CONFLICT).
+      await db.customStatement('DROP TRIGGER IF EXISTS sync_$name');
+      // Borrar y volver a insertar: no depende de la resolución de conflictos.
       await db.customStatement(
-        'CREATE TRIGGER IF NOT EXISTS sync_${t}_${event.toLowerCase()} '
+        'CREATE TRIGGER IF NOT EXISTS sync2_$name '
         'AFTER $event ON $t BEGIN '
-        "INSERT OR REPLACE INTO sync_outbox (tbl, row_id, changed_at) VALUES ('$t', $row.id, $_nowMs); "
+        "DELETE FROM sync_outbox WHERE tbl = '$t' AND row_id = $row.id; "
+        "INSERT INTO sync_outbox (tbl, row_id, changed_at) VALUES ('$t', $row.id, $_nowMs); "
         'END',
       );
     }
