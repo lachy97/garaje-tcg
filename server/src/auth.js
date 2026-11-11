@@ -6,7 +6,7 @@ import {
   safeEqual,
   sha256,
 } from './crypto.js';
-import { mailConfigured, sendCode } from './mail.js';
+import { mailConfigured, mailProvider, sendCode } from './mail.js';
 import * as R from './rules.js';
 
 /** Error para mostrar al usuario tal cual. */
@@ -373,6 +373,28 @@ export class AuthService {
       .bind(pid, this.iso(), id)
       .run();
     return { account: publicAccount(await this.byId(id)) };
+  }
+
+  /** Diagnóstico: envía un correo de prueba al Gmail del administrador y
+   *  devuelve el error exacto si falla. */
+  async mailTest(token) {
+    const me = await this.requireAdmin(token);
+    const provider = mailProvider(this.env);
+    if (!provider) {
+      return {
+        ok: false,
+        provider: null,
+        error:
+          'No hay correo configurado: faltan GMAIL_USER y GMAIL_APP_PASSWORD ' +
+          '(o SendPulse/Brevo con MAIL_FROM).',
+      };
+    }
+    try {
+      await this.send(me.email, this.newCode(), 'test');
+      return { ok: true, provider, to: me.email };
+    } catch (e) {
+      return { ok: false, provider, to: me.email, error: String(e?.message ?? e).slice(0, 300) };
+    }
   }
 
   /** Código para poner contraseña nueva, para mandarlo por WhatsApp

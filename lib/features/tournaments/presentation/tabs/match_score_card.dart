@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme.dart';
@@ -96,6 +97,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
     if (_saving || pick == _saved) return;
     final matchId = m.id;
     final service = ref.read(tournamentServiceProvider);
+    HapticFeedback.selectionClick();
     setState(() => _saving = true);
     await runGuarded(context, () async {
       switch (pick) {

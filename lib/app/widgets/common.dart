@@ -15,12 +15,14 @@ class AsyncView<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return value.when(
       data: builder,
+      // Mientras recarga se siguen viendo los datos anteriores (sin parpadeo).
+      skipLoadingOnReload: true,
+      skipLoadingOnRefresh: true,
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('Error: $e', style: const TextStyle(color: AppColors.loss)),
-        ),
+      error: (e, _) => EmptyState(
+        icon: Icons.error_outline,
+        title: 'No se pudo cargar',
+        subtitle: '$e',
       ),
     );
   }
@@ -48,7 +50,7 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: AppColors.moss),
+            Icon(icon, size: 56, color: AppColors.leaf),
             const SizedBox(height: 12),
             Text(title,
                 textAlign: TextAlign.center,
@@ -145,12 +147,31 @@ class NumberStepper extends StatelessWidget {
   }
 }
 
+/// Aviso breve abajo. Los errores llevan icono y fondo rojizo, y duran más
+/// para que dé tiempo a leerlos.
 void showMessage(BuildContext context, String message, {bool error = false}) {
+  final color = error ? AppColors.loss : AppColors.neon;
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
-      content: Text(message,
-          style: TextStyle(color: error ? AppColors.loss : AppColors.textPrimary)),
+      duration: Duration(seconds: error ? 6 : 3),
+      backgroundColor: error ? const Color(0xFF2A0F0F) : AppColors.surfaceHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withValues(alpha: 0.6)),
+      ),
+      content: Row(
+        children: [
+          Icon(error ? Icons.error_outline : Icons.info_outline, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message,
+                style: TextStyle(
+                    color: error ? const Color(0xFFFFD6D6) : AppColors.textPrimary,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
     ));
 }
 

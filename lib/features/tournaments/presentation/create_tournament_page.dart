@@ -55,6 +55,8 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
             roundMinutes: _minutes,
           );
       if (mounted) context.pushReplacement('/torneos/${t.id}');
+    } catch (e) {
+      if (mounted) showMessage(context, 'No se pudo crear el torneo: $e', error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -124,24 +126,42 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
                 ),
               ),
             ),
-            const SectionLabel('Sugerencia (solo orientativa)'),
-            const NeonCard(child: _SuggestionTable()),
+            const SectionLabel('Sugerencia según asistencia'),
+            NeonCard(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: _SuggestionTable(
+                rounds: _rounds,
+                topCut: _topCut,
+                onPick: (rounds, top) => setState(() {
+                  _rounds = rounds;
+                  _topCut = top;
+                }),
+              ),
+            ),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
-                'Se usa exactamente lo que elijas (rondas, Top Cut y tiempo). '
-                'Puedes cambiarlo mientras inscribes '
-                'jugadores; al generar la ronda 1 queda fijo.',
+                'Toca una fila para usar esa configuración. Se puede cambiar mientras '
+                'inscribes jugadores; al generar la ronda 1 queda fija.',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: const Icon(Icons.check),
-              label: const Text('CREAR TORNEO'),
-            ),
           ],
+        ),
+      ),
+      // Botón siempre visible (sin tener que bajar hasta el final).
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.check),
+            label: const Text('CREAR TORNEO'),
+          ),
         ),
       ),
     );
@@ -149,17 +169,22 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
 }
 
 /// Tabla de referencia: rondas y Top Cut sugeridos según asistencia.
+/// Tocar una fila aplica esa configuración; la que coincide se resalta.
 class _SuggestionTable extends StatelessWidget {
-  const _SuggestionTable();
+  const _SuggestionTable({required this.rounds, required this.topCut, required this.onPick});
+
+  final int rounds;
+  final int topCut;
+  final void Function(int rounds, int topCut) onPick;
 
   static const _rows = [
-    ('6 – 8', 3, 'Top 4'),
-    ('9 – 14', 4, 'Top 4'),
-    ('15 – 16', 4, 'Top 8'),
-    ('17 – 23', 5, 'Top 8'),
-    ('24 – 32', 5, 'Top 16'),
-    ('33 – 47', 6, 'Top 16'),
-    ('48 – 64', 6, 'Top 32'),
+    ('6 – 8', 3, 4),
+    ('9 – 14', 4, 4),
+    ('15 – 16', 4, 8),
+    ('17 – 23', 5, 8),
+    ('24 – 32', 5, 16),
+    ('33 – 47', 6, 16),
+    ('48 – 64', 6, 32),
   ];
 
   @override
@@ -168,20 +193,33 @@ class _SuggestionTable extends StatelessWidget {
         fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary);
     return Column(
       children: [
-        const Row(children: [
-          Expanded(child: Text('JUGADORES', style: head)),
-          Expanded(child: Text('RONDAS', style: head, textAlign: TextAlign.center)),
-          Expanded(child: Text('TOP CUT', style: head, textAlign: TextAlign.end)),
-        ]),
-        const SizedBox(height: 6),
-        for (final (players, rounds, top) in _rows)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(children: [
-              Expanded(child: Text(players)),
-              Expanded(child: Text('$rounds', textAlign: TextAlign.center)),
-              Expanded(child: Text(top, textAlign: TextAlign.end)),
-            ]),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Row(children: [
+            Expanded(child: Text('JUGADORES', style: head)),
+            Expanded(child: Text('RONDAS', style: head, textAlign: TextAlign.center)),
+            Expanded(child: Text('TOP CUT', style: head, textAlign: TextAlign.end)),
+          ]),
+        ),
+        const SizedBox(height: 4),
+        for (final (players, r, top) in _rows)
+          Material(
+            color: r == rounds && top == topCut
+                ? AppColors.forest.withValues(alpha: 0.6)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => onPick(r, top),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(children: [
+                  Expanded(child: Text(players)),
+                  Expanded(child: Text('$r', textAlign: TextAlign.center)),
+                  Expanded(child: Text('Top $top', textAlign: TextAlign.end)),
+                ]),
+              ),
+            ),
           ),
       ],
     );

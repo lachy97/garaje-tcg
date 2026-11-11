@@ -118,11 +118,14 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
+        // Un poco menos de espaciado y brillo: los nombres largos de torneos
+        // y mazos caben mejor y se leen más fácil.
         titleTextStyle: text.titleLarge?.copyWith(
           color: AppColors.neon,
+          fontSize: 20,
           fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
-          shadows: AppColors.textGlow(blur: 10),
+          letterSpacing: 1.0,
+          shadows: AppColors.textGlow(blur: 6),
         ),
         shape: const Border(bottom: BorderSide(color: AppColors.outline, width: 0.6)),
       ),

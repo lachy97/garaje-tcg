@@ -202,3 +202,13 @@ test('si el correo falla la cuenta se crea igual; el admin la confirma y da cód
   assert.equal(ok.status, 200);
   assert.equal((await call('POST', '/v1/auth/login', { identifier: 'leo', password: 'nueva9876' })).status, 200);
 });
+
+test('prueba de correo del administrador devuelve el error exacto', async () => {
+  const { call } = setup();
+  const r = await reg(call, 'lachy', 'lachy@gmail.com');
+  const admin = (await call('POST', '/v1/auth/verify', { email: 'lachy@gmail.com', code: r.data.devCode })).data.session;
+  const t = await call('POST', '/v1/admin/mail-test', {}, admin.token);
+  assert.equal(t.status, 200);
+  assert.equal(t.data.ok, false);
+  assert.match(t.data.error, /GMAIL_USER/);
+});

@@ -42,6 +42,37 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
     if (mounted) setState(() => _busy = false);
   }
 
+  /// Administrador: manda un correo de prueba a su Gmail y muestra el error
+  /// exacto si falla (para configurar el envío de códigos).
+  Future<void> _mailTest(HttpAuthApi api) async {
+    final session = ref.read(sessionProvider).value;
+    if (session == null) return;
+    setState(() {
+      _busy = true;
+      _result = null;
+    });
+    try {
+      final r = await api.request('POST', 'v1/admin/mail-test', body: const {}, token: session.token);
+      _ok = r['ok'] == true;
+      final via = switch (r['provider']) {
+        'gmail' => 'Gmail del club',
+        'sendpulse' => 'SendPulse',
+        'brevo' => 'Brevo',
+        _ => 'sin proveedor',
+      };
+      _result = _ok
+          ? 'Correo de prueba enviado a ${r['to']} ($via). Revisa la bandeja y Spam.'
+          : 'No se pudo enviar ($via): ${r['error']}';
+    } on AuthException catch (e) {
+      _ok = false;
+      _result = e.message;
+    } catch (e) {
+      _ok = false;
+      _result = 'No se pudo conectar: $e';
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
   /// Pide la dirección a probar (para la fase 0, antes de compilarla en la app).
   Future<void> _testOther() async {
     final ctrl = TextEditingController(text: kServerUrl.isEmpty ? 'https://' : kServerUrl);
@@ -104,6 +135,13 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
               icon: const Icon(Icons.wifi_tethering),
               label: const Text('Probar conexión'),
             ),
+          if (real != null &&
+              ref.watch(sessionProvider).value?.account.role == AppRole.admin)
+            OutlinedButton.icon(
+              onPressed: _busy ? null : () => _mailTest(real),
+              icon: const Icon(Icons.mark_email_read_outlined),
+              label: const Text('Enviarme un correo de prueba'),
+            ),
           OutlinedButton.icon(
             onPressed: _busy ? null : _testOther,
             icon: const Icon(Icons.travel_explore),
@@ -122,7 +160,7 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
                   Icon(_ok ? Icons.check_circle : Icons.error_outline,
                       color: _ok ? AppColors.neon : AppColors.loss),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(_result!)),
+                  Expanded(child: SelectableText(_result!)),
                 ],
               ),
             ),

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
+import '../../../app/widgets/sync_widgets.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../../core/auth/auth_providers.dart';
@@ -27,45 +28,59 @@ class TournamentsPage extends ConsumerWidget {
         : all.whenData((list) => [for (final t in list) if (mine?.contains(t.id) ?? false) t]);
     return Scaffold(
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Stack(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 24, bottom: 8),
-                    child: Center(
-                      child: Column(
+        child: SyncRefresh(
+          child: CustomScrollView(
+            // Para poder arrastrar y sincronizar aunque la lista sea corta.
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Stack(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16, bottom: 4),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            GlowLogo(size: 72),
+                            SizedBox(height: 8),
+                            BrandTitle(fontSize: 22),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Row(
                         children: [
-                          GlowLogo(size: 96),
-                          SizedBox(height: 10),
-                          BrandTitle(fontSize: 24),
+                          const SyncStatusIcon(),
+                          IconButton(
+                            tooltip: 'Ajustes',
+                            onPressed: () => context.push('/ajustes'),
+                            icon: const Icon(Icons.settings_outlined,
+                                color: AppColors.textSecondary),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: IconButton(
-                      tooltip: 'Ajustes',
-                      onPressed: () => context.push('/ajustes'),
-                      icon: const Icon(Icons.settings_outlined,
-                          color: AppColors.textSecondary),
-                    ),
+                  ],
+                ),
+              ),
+              ...tournaments.when<List<Widget>>(
+                skipLoadingOnReload: true,
+                loading: () => [
+                  const SliverFillRemaining(child: Center(child: CircularProgressIndicator())),
+                ],
+                error: (e, _) => [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: EmptyState(
+                        icon: Icons.error_outline, title: 'No se pudo cargar', subtitle: '$e'),
                   ),
                 ],
-              ),
-            ),
-            const SliverToBoxAdapter(child: SectionLabel('Torneos')),
-            ...tournaments.when<List<Widget>>(
-              loading: () => [
-                const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator())),
-              ],
-              error: (e, _) => [SliverFillRemaining(child: Center(child: Text('$e')))],
-              data: (list) => list.isEmpty
-                  ? [
+                data: (list) {
+                  if (list.isEmpty) {
+                    return [
                       SliverFillRemaining(
                         hasScrollBody: false,
                         child: EmptyState(
@@ -76,16 +91,34 @@ class TournamentsPage extends ConsumerWidget {
                               : 'Aquí verás los torneos en los que estés inscrito.',
                         ),
                       ),
-                    ]
-                  : [
-                      SliverList.builder(
-                        itemCount: list.length,
-                        itemBuilder: (_, i) => _TournamentTile(t: list[i]),
-                      ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 96)),
-                    ],
-            ),
-          ],
+                    ];
+                  }
+                  // Agrupados: en juego primero, luego inscripción y terminados.
+                  final live = [
+                    for (final t in list)
+                      if (t.status == TournamentStatus.swiss || t.status == TournamentStatus.topCut) t,
+                  ];
+                  final draft = [for (final t in list) if (t.status == TournamentStatus.draft) t];
+                  final done = [for (final t in list) if (t.status == TournamentStatus.finished) t];
+                  List<Widget> group(String label, List<Tournament> items) => [
+                        if (items.isNotEmpty) ...[
+                          SliverToBoxAdapter(child: SectionLabel('$label (${items.length})')),
+                          SliverList.builder(
+                            itemCount: items.length,
+                            itemBuilder: (_, i) => _TournamentTile(t: items[i]),
+                          ),
+                        ],
+                      ];
+                  return [
+                    ...group('En juego', live),
+                    ...group('Inscripción abierta', draft),
+                    ...group('Terminados', done),
+                    const SliverToBoxAdapter(child: SizedBox(height: 96)),
+                  ];
+                },
+              ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: perms.canCreateTournaments
@@ -120,7 +153,11 @@ class _TournamentTile extends ConsumerWidget {
       child: Row(
         children: [
           Icon(
-            t.status == TournamentStatus.finished ? Icons.emoji_events : Icons.bolt,
+            switch (t.status) {
+              TournamentStatus.finished => Icons.emoji_events,
+              TournamentStatus.draft => Icons.how_to_reg,
+              _ => Icons.bolt,
+            },
             color: live ? AppColors.neon : AppColors.leaf,
           ),
           const SizedBox(width: 12),
@@ -128,7 +165,10 @@ class _TournamentTile extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t.name, style: Theme.of(context).textTheme.titleMedium),
+                Text(t.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 2),
                 Text('$date · $detail',
                     style: const TextStyle(color: AppColors.textSecondary)),

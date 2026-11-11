@@ -208,8 +208,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               const SectionLabel('Cuenta'),
               const AccountSection(),
-              const SectionLabel('Servidor'),
-              const ServerSection(),
               const SectionLabel('Sincronización'),
               const SyncSection(),
               const SectionLabel('Licencia'),
@@ -278,6 +276,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
               const SectionLabel('Cartas'),
               const CardDataSection(),
+              // Conexión con el servidor y diagnóstico: solo administración.
+              if (perms.isAdmin) ...[
+                const SectionLabel('Servidor'),
+                const ServerSection(),
+              ],
               if (_adminUnlocked ?? false) ...[
                 const SectionLabel('Administrador'),
                 NeonCard(

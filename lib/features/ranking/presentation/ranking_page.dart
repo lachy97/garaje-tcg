@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
+import '../../../app/widgets/sync_widgets.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../../core/utils/season_utils.dart';
@@ -70,7 +71,9 @@ class _RankingPageState extends ConsumerState<RankingPage> {
           final ranking = ref.watch(seasonRankingProvider(season.id));
           return AsyncView(
             value: ranking,
-            builder: (list) => ListView(
+            builder: (list) => SyncRefresh(
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(bottom: 32),
               children: [
                 SeasonPicker(
@@ -101,6 +104,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                   ),
                 ],
               ],
+            ),
             ),
           );
         },

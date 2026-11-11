@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../../features/decks/domain/deck_matchups.dart';
+import '../../../features/decks/domain/deck_profile.dart';
 import '../../../features/decks/domain/deck_stats.dart';
 import '../../../features/ranking/domain/points_scale.dart';
 import '../../../features/ranking/domain/ranking_row.dart';
@@ -311,6 +312,91 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
               finalPosition: r.read<int?>('pos'),
             ),
         ]);
+  }
+
+  /// Ficha completa del mazo en la temporada ([seasonId] '*' = histórico):
+  /// partidas desde el lado del mazo (en un espejo, una por piloto) e
+  /// inscripciones con el mazo.
+  Stream<DeckProfile> watchDeckProfile(String seasonId, String deckId) {
+    final db = attachedDatabase;
+    return customSelect(
+      "SELECT COUNT(*) AS c FROM tournaments WHERE season_id = ?1 OR ?1 = '*'",
+      variables: [Variable.withString(seasonId)],
+      readsFrom: {db.tournaments, db.tournamentPlayers, db.matches, db.players, db.decks},
+    ).watch().asyncMap((_) => deckProfile(seasonId, deckId));
+  }
+
+  Future<DeckProfile> deckProfile(String seasonId, String deckId) async {
+    final vars = [Variable.withString(seasonId), Variable.withString(deckId)];
+    final rows = await customSelect(
+      'SELECT t.id AS tid, t.name AS tname, t.date AS tdate, rd.number AS rn, rd.phase AS phase, '
+      'm.result AS r, m.player1_id AS p1, m.player2_id AS p2, m.deck1_id AS d1, m.deck2_id AS d2, '
+      'pl1.nickname AS n1, pl2.nickname AS n2, dk1.name AS dn1, dk2.name AS dn2 '
+      'FROM matches m '
+      'JOIN tournaments t ON t.id = m.tournament_id '
+      'JOIN rounds rd ON rd.id = m.round_id '
+      'JOIN players pl1 ON pl1.id = m.player1_id '
+      'LEFT JOIN players pl2 ON pl2.id = m.player2_id '
+      'LEFT JOIN decks dk1 ON dk1.id = m.deck1_id '
+      'LEFT JOIN decks dk2 ON dk2.id = m.deck2_id '
+      "WHERE (t.season_id = ?1 OR ?1 = '*') AND t.deleted_at IS NULL AND t.status = 'finished' "
+      "AND m.deleted_at IS NULL AND m.is_bye = 0 AND m.result != 'pending' "
+      'AND m.player2_id IS NOT NULL AND (m.deck1_id = ?2 OR m.deck2_id = ?2)',
+      variables: vars,
+    ).get();
+    final games = <DeckGameRow>[];
+    for (final r in rows) {
+      final result = MatchResult.values.byName(r.read<String>('r'));
+      DeckGameRow side(bool asP1) => DeckGameRow(
+            tournamentId: r.read<String>('tid'),
+            tournamentName: r.read<String>('tname'),
+            date: r.read<DateTime>('tdate'),
+            round: r.read<int>('rn'),
+            isTopCut: r.read<String>('phase') == RoundPhase.topCut.name,
+            playerId: r.read<String>(asP1 ? 'p1' : 'p2'),
+            playerName: r.read<String?>(asP1 ? 'n1' : 'n2') ?? '?',
+            opponentId: r.read<String>(asP1 ? 'p2' : 'p1'),
+            opponentName: r.read<String?>(asP1 ? 'n2' : 'n1') ?? '?',
+            opponentDeckId: r.read<String?>(asP1 ? 'd2' : 'd1'),
+            opponentDeckName: r.read<String?>(asP1 ? 'dn2' : 'dn1'),
+            outcome: DeckGameRow.outcomeFor(result, asPlayer1: asP1),
+          );
+      if (r.read<String?>('d1') == deckId) games.add(side(true));
+      if (r.read<String?>('d2') == deckId) games.add(side(false));
+    }
+    final entries = await customSelect(
+      'SELECT t.id AS tid, t.top_cut_size AS top, tp.player_id AS pid, p.nickname AS nick, '
+      'tp.final_position AS pos '
+      'FROM tournament_players tp '
+      'JOIN tournaments t ON t.id = tp.tournament_id '
+      'JOIN players p ON p.id = tp.player_id '
+      "WHERE (t.season_id = ?1 OR ?1 = '*') AND t.deleted_at IS NULL "
+      "AND t.status = 'finished' AND tp.deleted_at IS NULL AND tp.deck_id = ?2",
+      variables: vars,
+    ).get();
+    return DeckProfile.compute(
+      deckId: deckId,
+      games: games,
+      entries: [
+        for (final e in entries)
+          () {
+            final row = DeckEntryRow(
+              deckId: deckId,
+              deckName: '',
+              playerId: e.read<String>('pid'),
+              topCutSize: e.read<int>('top'),
+              finalPosition: e.read<int?>('pos'),
+            );
+            return DeckEntryResult(
+              tournamentId: e.read<String>('tid'),
+              playerId: row.playerId,
+              playerName: e.read<String>('nick'),
+              finalPosition: row.finalPosition,
+              madeTop: row.madeTop,
+            );
+          }(),
+      ],
+    );
   }
 
   // ───────────────────────── Cierre de temporada ─────────────────────────

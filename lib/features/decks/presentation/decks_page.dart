@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
+import '../../../app/widgets/sync_widgets.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../../core/utils/season_utils.dart';
@@ -184,7 +185,9 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                   ],
                 );
               }
-              return ListView(
+              return SyncRefresh(
+                child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(bottom: 32),
                 children: [
                   ...header,
@@ -223,6 +226,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     ),
                   ),
                 ],
+              ),
               );
             },
           );

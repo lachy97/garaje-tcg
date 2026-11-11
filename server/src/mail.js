@@ -7,10 +7,16 @@ import { buildMessage, cloudflareConnect, sendSmtp } from './smtp.js';
 const SUBJECTS = {
   verify: 'Tu código para confirmar la cuenta de Garage TCG',
   reset: 'Tu código para cambiar la contraseña de Garage TCG',
+  test: 'Correo de prueba de Garage TCG',
 };
 
 function body(code, purpose) {
-  const what = purpose === 'verify' ? 'confirmar tu cuenta' : 'poner una contraseña nueva';
+  const what =
+    purpose === 'verify'
+      ? 'confirmar tu cuenta'
+      : purpose === 'reset'
+        ? 'poner una contraseña nueva'
+        : 'probar el envío de correos (no hace falta usarlo)';
   return {
     subject: SUBJECTS[purpose],
     text:
@@ -26,6 +32,10 @@ function body(code, purpose) {
 
 const usesGmail = (env) => Boolean(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
 const usesSendPulse = (env) => Boolean(env.SENDPULSE_ID && env.SENDPULSE_SECRET);
+
+/** Qué proveedor se usaría (para el diagnóstico del administrador). */
+export const mailProvider = (env) =>
+  usesGmail(env) ? 'gmail' : !env.MAIL_FROM ? null : usesSendPulse(env) ? 'sendpulse' : env.BREVO_API_KEY ? 'brevo' : null;
 
 /** true si el envío de correos está configurado. */
 export const mailConfigured = (env) =>

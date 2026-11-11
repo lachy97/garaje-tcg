@@ -131,17 +131,25 @@ class _PlayerTile extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(player.nickname, style: Theme.of(context).textTheme.titleMedium),
+                Text(player.nickname,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium),
                 if (player.fullName != null)
                   Text(player.fullName!,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: AppColors.textSecondary)),
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Eliminar',
-            icon: const Icon(Icons.delete_outline, color: AppColors.textSecondary),
-            onPressed: () async {
+          // Acciones en un menú (borrar no queda a un toque por accidente).
+          PopupMenuButton<String>(
+            tooltip: 'Opciones',
+            icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+            onSelected: (v) async {
+              if (v == 'edit') {
+                await showPlayerForm(context, ref, player: player);
+                return;
+              }
               final ok = await confirmDialog(
                 context,
                 title: 'Eliminar jugador',
@@ -152,6 +160,19 @@ class _PlayerTile extends ConsumerWidget {
               );
               if (ok) await ref.read(playersDaoProvider).softDelete(player.id);
             },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Editar')),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline, color: AppColors.loss),
+                  title: Text('Eliminar', style: TextStyle(color: AppColors.loss)),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -23,10 +23,20 @@ final _lastDecksProvider = FutureProvider.autoDispose.family<Map<String, Deck>, 
 /// inscribe normal (con el último mazo de cada jugador, cambiable); durante el
 /// Swiss se puede inscribir tarde (las rondas perdidas cuentan como derrotas)
 /// y retirar (drop) jugadores. Penalizaciones: menú de cada jugador.
-class RegistrationTab extends ConsumerWidget {
+class RegistrationTab extends ConsumerStatefulWidget {
   const RegistrationTab({super.key, required this.tournament});
 
   final Tournament tournament;
+
+  @override
+  ConsumerState<RegistrationTab> createState() => _RegistrationTabState();
+}
+
+class _RegistrationTabState extends ConsumerState<RegistrationTab> {
+  /// Filtro de la lista (con muchos inscritos cuesta encontrar a alguien).
+  String _query = '';
+
+  Tournament get tournament => widget.tournament;
 
   bool get _open => tournament.status == TournamentStatus.draft;
 
@@ -36,11 +46,15 @@ class RegistrationTab extends ConsumerWidget {
       tournament.currentRound < tournament.swissRounds;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final registered = ref.watch(registeredProvider(tournament.id));
     return AsyncView(
       value: registered,
       builder: (list) {
+        final q = _query.trim().toLowerCase();
+        final shown = q.isEmpty
+            ? list
+            : [for (final r in list) if (r.player.nickname.toLowerCase().contains(q)) r];
         final noDeck = list.where((r) => r.deck == null).length;
         final unpaid = list.where((r) => !r.entry.dropped && !r.entry.paid).length;
         return Column(
@@ -83,6 +97,18 @@ class RegistrationTab extends ConsumerWidget {
               tournament: tournament,
               names: {for (final r in list) r.player.id: r.player.nickname},
             ),
+            if (list.length > 8)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Buscar inscrito',
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
+              ),
             Expanded(
               child: list.isEmpty
                   ? const EmptyState(
@@ -90,12 +116,15 @@ class RegistrationTab extends ConsumerWidget {
                       title: 'Nadie inscrito todavía',
                       subtitle: 'Pulsa "Inscribir" y elige a los jugadores.',
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 32),
-                      itemCount: list.length,
-                      itemBuilder: (_, i) =>
-                          _RegisteredTile(tournament: tournament, item: list[i]),
-                    ),
+                  : shown.isEmpty
+                      ? const EmptyState(icon: Icons.search_off, title: 'Nadie coincide')
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 32),
+                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                          itemCount: shown.length,
+                          itemBuilder: (_, i) =>
+                              _RegisteredTile(tournament: tournament, item: shown[i]),
+                        ),
             ),
           ],
         );
