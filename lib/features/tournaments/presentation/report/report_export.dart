@@ -29,7 +29,7 @@ Future<void> exportParticipants(
   required TournamentReport report,
   Map<String, int>? points,
 }) {
-  return runExport<ParticipantLine>(
+  return AppColors.runDark(() => runExport<ParticipantLine>(
     context,
     ExportSpec(
       heading: '${tournament.name.toUpperCase()} · PARTICIPANTES',
@@ -38,7 +38,7 @@ Future<void> exportParticipants(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(tournamentInfoLine(tournament, report),
-              style: const TextStyle(fontSize: 17, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 17, color: AppColors.textSecondary)),
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
@@ -68,7 +68,7 @@ Future<void> exportParticipants(
       rowHeightEstimate: 52,
       preload: _deckImages(report),
     ),
-  );
+  ));
 }
 
 // ───────────────────────── Póster de metagame ─────────────────────────
@@ -103,7 +103,7 @@ Future<void> exportMetagame(
   }
   final legendRows = (metaLegendRows(report).length / 2).ceil();
   try {
-    await runExport<DeckShare>(
+    await AppColors.runDark(() => runExport<DeckShare>(
       context,
       ExportSpec(
         heading: 'DECK BREAKDOWN · ${tournament.name.toUpperCase()}',
@@ -125,7 +125,7 @@ Future<void> exportMetagame(
         shareText: '${tournament.name} · ${topCut ? 'Top Cut' : 'Tournament'} Deck Breakdown',
         preload: [const AssetImage(_kBg), ..._deckImages(report)],
       ),
-    );
+    ));
   } finally {
     disposeChartImages(images);
   }

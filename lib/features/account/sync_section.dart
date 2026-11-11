@@ -81,11 +81,11 @@ class _SyncSectionState extends ConsumerState<SyncSection> {
                         if (s.rejected > 0)
                           '${s.rejected} fila(s) no aceptadas (son de otro organizador).',
                       ].join('\n'),
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
           if (s.enabled && s.lastError != null) ...[
             const SizedBox(height: 6),
-            Text(s.lastError!, style: const TextStyle(color: AppColors.draw, fontSize: 12)),
+            Text(s.lastError!, style: TextStyle(color: AppColors.draw, fontSize: 12)),
           ],
           if (s.enabled) ...[
             const SizedBox(height: 12),

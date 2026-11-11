@@ -105,7 +105,7 @@ Future<void> shareRound(
     );
     return;
   }
-  await runExport<ShareMatchLine>(
+  await AppColors.runDark(() => runExport<ShareMatchLine>(
     context,
     ExportSpec(
       heading: '${tournament.name.toUpperCase()} · ${roundTitle.toUpperCase()}',
@@ -116,7 +116,7 @@ Future<void> shareRound(
       shareText: '${tournament.name} · $roundTitle',
       rowHeightEstimate: 46,
     ),
-  );
+  ));
 }
 
 class _RoundTable extends StatelessWidget {
@@ -210,7 +210,7 @@ Future<void> shareStandings(
   }
   final activeIds = [for (final s in standings) if (!s.dropped) s.playerId];
   final qualified = activeIds.take(cut).toSet();
-  await runExport<Standing>(
+  await AppColors.runDark(() => runExport<Standing>(
     context,
     ExportSpec(
       heading: '${tournament.name.toUpperCase()} · ${subtitle.toUpperCase()}',
@@ -223,7 +223,7 @@ Future<void> shareStandings(
       shareText: '${tournament.name} · $subtitle',
       rowHeightEstimate: 46,
     ),
-  );
+  ));
 }
 
 class _StandingsTable extends StatelessWidget {
@@ -279,7 +279,7 @@ class _StandingsTable extends StatelessWidget {
                   style: const TextStyle(fontSize: kExportFontSize - 2)),
               Text('${s.wins}-${s.losses}-${s.draws}'),
               Text('${s.points}',
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
+                  style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
               Text(pct(s.omw)),
               Text(pct(s.oomw)),
               Text(s.gwp == 0 ? '-' : pct(s.gwp)),

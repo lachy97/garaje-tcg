@@ -15,6 +15,7 @@ import '../features/tournaments/presentation/tournament_detail_page.dart';
 import '../features/tournaments/presentation/tournaments_page.dart';
 import '../core/auth/auth_providers.dart';
 import '../core/sync/sync_service.dart';
+import '../features/account/welcome.dart';
 import 'theme.dart';
 
 /// Navigator raíz (también lo usa el aviso de licencia por vencer).
@@ -126,11 +127,11 @@ class HomeShell extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.visibility_outlined, size: 18, color: AppColors.draw),
+                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.draw),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text('Viendo la app como ${preview.label}',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.draw)),
                       ),
                       TextButton(
@@ -143,14 +144,16 @@ class HomeShell extends ConsumerWidget {
               ),
             ),
           Expanded(
-            child: preview == null
-                ? shell
-                : MediaQuery.removePadding(context: context, removeTop: true, child: shell),
+            child: WelcomeGate(
+              child: preview == null
+                  ? shell
+                  : MediaQuery.removePadding(context: context, removeTop: true, child: shell),
+            ),
           ),
         ],
       ),
       bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.outline, width: 0.6)),
         ),
         child: NavigationBar(

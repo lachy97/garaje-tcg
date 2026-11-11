@@ -116,18 +116,18 @@ class DeckListPage extends ConsumerWidget {
                         children: [
                           if (target.position != null)
                             Text('${target.position}º lugar',
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontWeight: FontWeight.w900, color: AppColors.neon)),
                           Text(target.playerName,
                               style: const TextStyle(
                                   fontSize: 16, fontWeight: FontWeight.w800)),
                           Text(target.deckName ?? 'Sin mazo',
-                              style: const TextStyle(color: AppColors.textSecondary)),
+                              style: TextStyle(color: AppColors.textSecondary)),
                           const SizedBox(height: 6),
                           Text(
                             'Main ${cards.main.length} · Extra ${cards.extra.length} · '
                             'Side ${cards.side.length}',
-                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                           ),
                         ],
                       ),
@@ -139,7 +139,7 @@ class DeckListPage extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
                   child: Text('⚠ $w',
-                      style: const TextStyle(fontSize: 12, color: AppColors.draw)),
+                      style: TextStyle(fontSize: 12, color: AppColors.draw)),
                 ),
               for (final s in DeckSection.values)
                 if (cards.of(s).isNotEmpty) ...[
@@ -209,7 +209,7 @@ class _Grid extends StatelessWidget {
                           border: Border.all(color: AppColors.neon),
                         ),
                         child: Text('×$n',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.neon)),
                       ),
                     ),

@@ -83,7 +83,7 @@ class _MergePreviewPageState extends State<_MergePreviewPage> {
           Text(
             'Copia del ${DateFormat('dd/MM/yyyy HH:mm').format(h.exportedAt)} · '
             '${h.players} jugadores · ${h.tournaments} torneos · ${h.decks} mazos',
-            style: const TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -111,7 +111,7 @@ class _MergePreviewPageState extends State<_MergePreviewPage> {
               Text(
                 '${count[MergeAction.add]} añadir · ${count[MergeAction.replace]} reemplazar · '
                 '${count[MergeAction.skip]} sin importar',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 8),
               Row(
@@ -155,7 +155,7 @@ class _MergePreviewPageState extends State<_MergePreviewPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(i.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          Text(_date(i.date), style: const TextStyle(color: AppColors.textSecondary)),
+          Text(_date(i.date), style: TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           Text(text, style: TextStyle(fontSize: 12, color: color)),
           const SizedBox(height: 8),

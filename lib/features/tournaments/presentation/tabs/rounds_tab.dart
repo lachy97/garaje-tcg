@@ -185,13 +185,13 @@ class _ConfigCard extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            const Icon(Icons.lock_outline, size: 20, color: AppColors.textSecondary),
+            Icon(Icons.lock_outline, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 10),
             Expanded(
               child: Text('${t.swissRounds} rondas Swiss · $topLabel · ${t.roundMinutes} min/ronda',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
-            const Text('Fijado',
+            Text('Fijado',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
         ),
@@ -208,7 +208,7 @@ class _ConfigCard extends ConsumerWidget {
         children: [
           const Text('Configuración del torneo',
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          const Text('Se puede cambiar hasta generar la ronda 1.',
+          Text('Se puede cambiar hasta generar la ronda 1.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 10),
           Row(
@@ -255,14 +255,14 @@ class _ConfigCard extends ConsumerWidget {
           if (topTooBig) ...[
             const SizedBox(height: 6),
             Text('Hay $active jugadores: no alcanzan para un Top ${t.topCutSize}.',
-                style: const TextStyle(color: AppColors.loss, fontSize: 12)),
+                style: TextStyle(color: AppColors.loss, fontSize: 12)),
           ],
           if (active > 0) ...[
             const SizedBox(height: 10),
             Text(
               'Sugerencia para $active jugadores: $sugRounds rondas · '
               '${sugTop == 0 ? 'sin Top' : 'Top $sugTop'} (solo orientativa)',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
           ],
         ],
@@ -380,7 +380,7 @@ class _MatchesSliver extends ConsumerWidget {
             ),
           const SizedBox(height: 8),
           if (!isCurrent && editable)
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(24, 4, 24, 4),
               child: Text(
                 'Ronda cerrada: puedes corregir resultados mientras dure el Swiss. '
@@ -403,9 +403,9 @@ class _MatchesSliver extends ConsumerWidget {
             Center(
               child: TextButton.icon(
                 onPressed: () => _undoRound(context, ref),
-                icon: const Icon(Icons.undo, size: 20, color: AppColors.loss),
+                icon: Icon(Icons.undo, size: 20, color: AppColors.loss),
                 label: Text('Deshacer ${title.toLowerCase()}',
-                    style: const TextStyle(color: AppColors.loss)),
+                    style: TextStyle(color: AppColors.loss)),
               ),
             ),
         ]);
@@ -566,10 +566,10 @@ class _AdvanceFab extends ConsumerWidget {
                 await step(fixed, tables);
               }, success: success),
       icon: busy
-          ? const SizedBox(
+          ? SizedBox(
               width: 22,
               height: 22,
-              child: CircularProgressIndicator(strokeWidth: 3, color: Colors.black))
+              child: CircularProgressIndicator(strokeWidth: 3, color: Theme.of(context).colorScheme.onPrimary))
           : Icon(icon, size: 28),
       label: Text(title,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),

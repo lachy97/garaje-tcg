@@ -59,7 +59,7 @@ class EmptyState extends StatelessWidget {
               const SizedBox(height: 6),
               Text(subtitle!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.textSecondary)),
+                  style: TextStyle(color: AppColors.textSecondary)),
             ],
             if (action != null) ...[const SizedBox(height: 16), action!],
           ],
@@ -82,7 +82,7 @@ class SectionLabel extends StatelessWidget {
       padding: padding ?? const EdgeInsets.fromLTRB(16, 16, 16, 6),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.1,
@@ -130,11 +130,11 @@ class NumberStepper extends StatelessWidget {
             children: [
               Text('$value',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.neon)),
               if (suffix != null)
                 Text(suffix!,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
         ),
@@ -149,13 +149,24 @@ class NumberStepper extends StatelessWidget {
 
 /// Aviso breve abajo. Los errores llevan icono y fondo rojizo, y duran más
 /// para que dé tiempo a leerlos.
-void showMessage(BuildContext context, String message, {bool error = false}) {
+void showMessage(
+  BuildContext context,
+  String message, {
+  bool error = false,
+  String? actionLabel,
+  VoidCallback? onAction,
+}) {
   final color = error ? AppColors.loss : AppColors.neon;
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
-      duration: Duration(seconds: error ? 6 : 3),
-      backgroundColor: error ? const Color(0xFF2A0F0F) : AppColors.surfaceHighest,
+      duration: Duration(seconds: error || onAction != null ? 6 : 3),
+      action: actionLabel != null && onAction != null
+          ? SnackBarAction(label: actionLabel, onPressed: onAction)
+          : null,
+      backgroundColor: error
+          ? (AppColors.isDark ? const Color(0xFF2A0F0F) : const Color(0xFFFDECEC))
+          : AppColors.surfaceHighest,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: color.withValues(alpha: 0.6)),
@@ -167,7 +178,9 @@ void showMessage(BuildContext context, String message, {bool error = false}) {
           Expanded(
             child: Text(message,
                 style: TextStyle(
-                    color: error ? const Color(0xFFFFD6D6) : AppColors.textPrimary,
+                    color: error
+                        ? (AppColors.isDark ? const Color(0xFFFFD6D6) : const Color(0xFF7A1212))
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.w600)),
           ),
         ],

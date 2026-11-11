@@ -114,7 +114,7 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 16),
                   children: [
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                       child: Text(
                         'Toca un jugador y después su rival. Toca "Mesa" para elegir en qué '
@@ -173,7 +173,7 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
                       ),
                     for (final r in shown) _playerTile(r),
                     if (free.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(16),
                         child: Text('Todos los jugadores tienen enfrentamiento.',
                             style: TextStyle(color: AppColors.textSecondary)),
@@ -262,7 +262,7 @@ class _FirstRoundPairingPageState extends ConsumerState<FirstRoundPairingPage> {
       title: Text(r.player.nickname,
           style: TextStyle(fontWeight: FontWeight.w700, color: selected ? AppColors.neon : null)),
       subtitle: Text(r.deck?.name ?? 'Sin mazo'),
-      trailing: selected ? const Icon(Icons.check_circle, color: AppColors.neon) : null,
+      trailing: selected ? Icon(Icons.check_circle, color: AppColors.neon) : null,
       onTap: () => _tap(r.player.id),
     );
   }
@@ -309,7 +309,7 @@ class _PairTile extends StatelessWidget {
                             color: chosen ? AppColors.neonBright : AppColors.neon)),
                   ),
                   if (onTable != null)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.only(left: 2),
                       child: Icon(Icons.edit, size: 14, color: AppColors.textSecondary),
                     ),
@@ -321,7 +321,7 @@ class _PairTile extends StatelessWidget {
             child: Text.rich(
               TextSpan(children: [
                 TextSpan(text: a, style: const TextStyle(fontWeight: FontWeight.w700)),
-                const TextSpan(text: '  vs  ', style: TextStyle(color: AppColors.textSecondary)),
+                TextSpan(text: '  vs  ', style: TextStyle(color: AppColors.textSecondary)),
                 TextSpan(text: b, style: const TextStyle(fontWeight: FontWeight.w700)),
               ]),
               overflow: TextOverflow.ellipsis,
@@ -329,7 +329,7 @@ class _PairTile extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Quitar',
-            icon: const Icon(Icons.close, color: AppColors.textSecondary),
+            icon: Icon(Icons.close, color: AppColors.textSecondary),
             onPressed: onRemove,
           ),
         ],

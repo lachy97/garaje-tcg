@@ -162,6 +162,22 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
+  /// Deshace [softDelete]: el torneo y los puntos que se borraron con él.
+  Future<void> restore(String id) {
+    return transaction(() async {
+      final t = await (select(tournaments)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final when = t?.deletedAt;
+      if (when == null) return;
+      final now = DateTime.now();
+      await (update(attachedDatabase.seasonResults)
+            ..where((r) => r.tournamentId.equals(id) & r.deletedAt.equals(when)))
+          .write(SeasonResultsCompanion(deletedAt: const Value(null), updatedAt: Value(now)));
+      await (update(tournaments)..where((t) => t.id.equals(id))).write(
+        TournamentsCompanion(deletedAt: const Value(null), updatedAt: Value(now)),
+      );
+    });
+  }
+
   Future<void> setStatus(String id, TournamentStatus status) {
     return (update(tournaments)..where((t) => t.id.equals(id))).write(
       TournamentsCompanion(status: Value(status), updatedAt: Value(DateTime.now())),

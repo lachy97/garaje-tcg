@@ -84,7 +84,7 @@ class SummaryTab extends ConsumerWidget {
             length: 3,
             child: Column(
               children: [
-                const TabBar(
+                TabBar(
                   labelColor: AppColors.neon,
                   unselectedLabelColor: AppColors.textSecondary,
                   indicatorColor: AppColors.neon,
@@ -121,7 +121,7 @@ class SummaryTab extends ConsumerWidget {
                               'victoria; las rondas perdidas por inscribirse tarde, como derrota. '
                               'Pts = puntos de ranking.'
                               '${cut > 0 ? ' Con franja verde, el Top $cut.' : ''}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
                           ),
                         ],
@@ -216,7 +216,7 @@ class _BreakdownState extends State<_Breakdown> {
               const SizedBox(height: 16),
               ...metaLegendRows(report),
               if (report.chart.any((d) => d.isOthers))
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: Text('En OTROS, los mazos que jugó un solo jugador.',
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),

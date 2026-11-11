@@ -85,7 +85,7 @@ class _DeckManagePageState extends ConsumerState<DeckManagePage> {
                           children: [
                             Text('No hay ningún mazo llamado "${_query.trim()}".',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(color: AppColors.textSecondary)),
+                                style: TextStyle(color: AppColors.textSecondary)),
                             const SizedBox(height: 12),
                             OutlinedButton.icon(
                               onPressed: () async {
@@ -141,12 +141,12 @@ class _DeckTile extends ConsumerWidget {
               children: [
                 Text(deck.name, style: Theme.of(context).textTheme.titleMedium),
                 Text(deckCategoryOf(deck).label,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+            icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
             onSelected: (v) => switch (v) {
               'rename' => _rename(context, ref),
               'image' => _changeImage(context, ref),

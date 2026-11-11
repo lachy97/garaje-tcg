@@ -413,7 +413,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
                 'Compartir el ranking y la tier list sigue funcionando.'
             : 'Desactivado en este teléfono: se pueden hacer capturas. '
                 'Vuelve a activarlo cuando termines.',
-        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
     );
   }
@@ -422,7 +422,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.lock, size: 40, color: AppColors.neon),
+        Icon(Icons.lock, size: 40, color: AppColors.neon),
         const SizedBox(height: 8),
         const Text('Introduce tu PIN de administrador',
             textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700)),
@@ -450,7 +450,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.shield_outlined, size: 40, color: AppColors.draw),
+        Icon(Icons.shield_outlined, size: 40, color: AppColors.draw),
         const SizedBox(height: 8),
         const Text(
           'Tu clave privada está guardada sin protección. Crea un PIN: la clave '
@@ -510,7 +510,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
             style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         SelectableText(pub,
-            style: const TextStyle(fontSize: 12, color: AppColors.neon)),
+            style: TextStyle(fontSize: 12, color: AppColors.neon)),
         const SizedBox(height: 6),
         Text(status, style: TextStyle(fontSize: 12, color: color)),
         const SizedBox(height: 8),
@@ -538,8 +538,8 @@ class _AdminPageState extends ConsumerState<AdminPage> {
             ),
             TextButton.icon(
               onPressed: _deleteKey,
-              icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.loss),
-              label: const Text('Borrar de este teléfono',
+              icon: Icon(Icons.delete_outline, size: 18, color: AppColors.loss),
+              label: Text('Borrar de este teléfono',
                   style: TextStyle(color: AppColors.loss)),
             ),
           ],
@@ -613,7 +613,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
         ),
         Text(
           'Válida desde hoy hasta el ${formatDate(LicenseCodec.addMonths(DateTime.now(), _months))}',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
@@ -682,7 +682,7 @@ class _ClosedSeasons extends ConsumerWidget {
     final seasons = ref.watch(seasonListProvider).value ?? const <Season>[];
     final closed = seasons.where((s) => s.status == SeasonStatus.closed).toList();
     if (closed.isEmpty) {
-      return const Text('No hay temporadas cerradas. Se cierran desde la pantalla de Ranking.',
+      return Text('No hay temporadas cerradas. Se cierran desde la pantalla de Ranking.',
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
     }
     return Column(

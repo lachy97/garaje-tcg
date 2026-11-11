@@ -93,7 +93,7 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                   )
                 else ...[
                   RankingTable(rows: list),
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Text(
                       'Desempates: puntos → mejor posición → winrate → menos torneos. '
@@ -133,11 +133,11 @@ class _SeasonStatusBar extends ConsumerWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
+            Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
             const SizedBox(width: 6),
             Flexible(
               child: Text('Temporada cerrada$when · ranking definitivo',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ),
           ],
         ),

@@ -72,7 +72,7 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
                     onPressed: () => showPlayerForm(context, ref, player: p),
                   ),
               ],
-              bottom: const TabBar(
+              bottom: TabBar(
                 labelColor: AppColors.neon,
                 unselectedLabelColor: AppColors.textSecondary,
                 indicatorColor: AppColors.neon,
@@ -104,6 +104,7 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
                         _Header(player: p),
                         picker,
                         _StatsGrid(totals: data.totals),
+                        _ProfileHighlights(decks: data.decks, rivals: data.rivals),
                         const SectionLabel('Mazos usados'),
                         if (data.decks.isEmpty)
                           const _Empty('Todavía no ha jugado con ningún mazo.')
@@ -178,11 +179,11 @@ class _SeasonFilter extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.calendar_month, size: 18, color: AppColors.neon),
+              Icon(Icons.calendar_month, size: 18, color: AppColors.neon),
               const SizedBox(width: 6),
               Text(_label(selected),
-                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.neon)),
-              const Icon(Icons.arrow_drop_down, color: AppColors.neon),
+                  style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.neon)),
+              Icon(Icons.arrow_drop_down, color: AppColors.neon),
             ],
           ),
         ),
@@ -231,7 +232,7 @@ class _Header extends StatelessWidget {
                     if (p.fullName != null)
                       Text(p.fullName!, style: const TextStyle(fontSize: 14)),
                     Text('Registrado desde $since',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -313,11 +314,11 @@ class _StatsGrid extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(value,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.neon)),
                   const SizedBox(height: 2),
                   Text(label.toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.6,
@@ -358,14 +359,14 @@ class _DecksTable extends StatelessWidget {
             Text(d.deck,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w700)),
-            Text('${d.tournaments}×', style: const TextStyle(color: AppColors.neon)),
+            Text('${d.tournaments}×', style: TextStyle(color: AppColors.neon)),
             Text('${d.played}'),
-            Text('${d.wins}', style: const TextStyle(color: AppColors.win)),
-            Text('${d.losses}', style: const TextStyle(color: AppColors.loss)),
-            Text('${d.draws}', style: const TextStyle(color: AppColors.draw)),
+            Text('${d.wins}', style: TextStyle(color: AppColors.win)),
+            Text('${d.losses}', style: TextStyle(color: AppColors.loss)),
+            Text('${d.draws}', style: TextStyle(color: AppColors.draw)),
             Text(d.played == 0 ? '—' : '${(d.winrate * 100).toStringAsFixed(0)}%'),
             Text(d.lastUsed == null ? '—' : fmt.format(d.lastUsed!),
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ]),
       ],
     );
@@ -419,9 +420,9 @@ class _RivalsTableState extends State<_RivalsTable> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700)),
                   Text('${r.played}'),
-                  Text('${r.wins}', style: const TextStyle(color: AppColors.win)),
-                  Text('${r.losses}', style: const TextStyle(color: AppColors.loss)),
-                  Text('${r.draws}', style: const TextStyle(color: AppColors.draw)),
+                  Text('${r.wins}', style: TextStyle(color: AppColors.win)),
+                  Text('${r.losses}', style: TextStyle(color: AppColors.loss)),
+                  Text('${r.draws}', style: TextStyle(color: AppColors.draw)),
                   Text('${(r.winrate * 100).toStringAsFixed(0)}%'),
                 ],
               ),
@@ -432,7 +433,7 @@ class _RivalsTableState extends State<_RivalsTable> {
             onPressed: () => setState(() => _all = !_all),
             child: Text(_all ? 'Ver menos' : 'Ver todos (${widget.rivals.length})'),
           ),
-        const Padding(
+        Padding(
           padding: EdgeInsets.fromLTRB(16, 2, 16, 0),
           child: Text(
             'Todas las partidas contra cada jugador (Swiss y Top Cut). Franja verde: '
@@ -482,7 +483,7 @@ class _TournamentHistory extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                     Text('$date · ${t.deck ?? 'Sin mazo'}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -497,7 +498,7 @@ class _TournamentHistory extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           if (matches.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text('Sin partidas registradas',
                   style: TextStyle(color: AppColors.textSecondary)),
@@ -527,7 +528,7 @@ class _MatchLine extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.outlineVariant, width: 0.6)),
       ),
       child: Row(
@@ -551,7 +552,7 @@ class _MatchLine extends StatelessWidget {
                 if (e.opponentDeck != null)
                   Text(e.opponentDeck!,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -588,7 +589,7 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(text, style: const TextStyle(color: AppColors.textSecondary)),
+      child: Text(text, style: TextStyle(color: AppColors.textSecondary)),
     );
   }
 }
@@ -627,6 +628,94 @@ class _PlayerPenalties extends ConsumerWidget {
               if (p.reason != null) p.reason!,
             ].join(' · ')),
           ),
+      ],
+    );
+  }
+}
+
+// ───────────────────────── Destacados ─────────────────────────
+
+/// Mazo favorito, mejor mazo, rival más difícil y "víctima" favorita (con
+/// un mínimo de partidas para que no salga por una sola).
+class _ProfileHighlights extends StatelessWidget {
+  const _ProfileHighlights({required this.decks, required this.rivals});
+
+  final List<DeckUsage> decks;
+  final List<HeadToHead> rivals;
+
+  static const _minDeckGames = 3;
+  static const _minRivalGames = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    String pct(double v) => '${(v * 100).round()} %';
+    final played = decks.where((d) => d.played > 0).toList();
+    final favorite = played.isEmpty
+        ? null
+        : (played.toList()..sort((a, b) => b.played.compareTo(a.played))).first;
+    final enough = played.where((d) => d.played >= _minDeckGames).toList()
+      ..sort((a, b) {
+        final c = b.winrate.compareTo(a.winrate);
+        return c != 0 ? c : b.played.compareTo(a.played);
+      });
+    final best = enough.isEmpty ? null : enough.first;
+    final faced = rivals.where((r) => r.played >= _minRivalGames).toList();
+    final toughest = faced.isEmpty
+        ? null
+        : (faced.toList()
+              ..sort((a, b) {
+                final c = a.winrate.compareTo(b.winrate);
+                return c != 0 ? c : b.played.compareTo(a.played);
+              }))
+            .first;
+    final victim = faced.isEmpty
+        ? null
+        : (faced.toList()
+              ..sort((a, b) {
+                final c = b.winrate.compareTo(a.winrate);
+                return c != 0 ? c : b.played.compareTo(a.played);
+              }))
+            .first;
+
+    Widget tile(IconData icon, Color color, String title, String name, String detail,
+            {VoidCallback? onTap}) =>
+        ListTile(
+          dense: true,
+          onTap: onTap,
+          leading: Icon(icon, color: color),
+          title: Text(title, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          subtitle: Text(name,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          trailing: Text(detail, style: TextStyle(fontWeight: FontWeight.w800, color: color)),
+        );
+
+    final items = [
+      if (favorite != null)
+        tile(Icons.favorite_border, AppColors.neon, 'Mazo más jugado', favorite.deck,
+            '${favorite.played} PJ'),
+      if (best != null && best.deck != favorite?.deck)
+        tile(Icons.emoji_events_outlined, AppColors.win, 'Mejor mazo', best.deck,
+            '${best.wins}-${best.losses}-${best.draws} · ${pct(best.winrate)}'),
+      if (toughest != null && toughest.wins < toughest.losses)
+        tile(Icons.shield_outlined, AppColors.loss, 'Rival más difícil', toughest.name,
+            '${toughest.wins}-${toughest.losses}-${toughest.draws}',
+            onTap: () => context.push('/jugadores/${toughest.opponentId}')),
+      if (victim != null && victim.wins > victim.losses && victim.opponentId != toughest?.opponentId)
+        tile(Icons.local_fire_department_outlined, AppColors.win, 'Le gana más a',
+            victim.name, '${victim.wins}-${victim.losses}-${victim.draws}',
+            onTap: () => context.push('/jugadores/${victim.opponentId}')),
+    ];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionLabel('Destacados'),
+        NeonCard(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(children: items),
+        ),
       ],
     );
   }

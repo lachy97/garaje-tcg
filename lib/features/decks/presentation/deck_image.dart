@@ -68,7 +68,7 @@ class DeckImage extends StatelessWidget {
     final initials = words.take(2).map((w) => w.characters.first.toUpperCase()).join();
     return Container(
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -92,7 +92,7 @@ class DeckImage extends StatelessWidget {
           : FittedBox(
               child: Text(
                 initials.isEmpty ? '?' : initials,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 40, fontWeight: FontWeight.w900, color: AppColors.neon),
               ),
             ),

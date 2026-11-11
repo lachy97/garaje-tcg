@@ -55,7 +55,7 @@ class NeonTable extends StatelessWidget {
     this.horizontalPadding = 12,
     this.fontSize = 14,
     this.rowPadding = 8,
-    this.headerColor = AppColors.textSecondary,
+    this.headerColor,
   });
 
   final List<NeonColumn> columns;
@@ -67,7 +67,8 @@ class NeonTable extends StatelessWidget {
   /// En las imágenes exportadas se usa más grande para que se lea bien.
   final double fontSize;
   final double rowPadding;
-  final Color headerColor;
+  /// Color de la cabecera (por defecto, el texto secundario del tema).
+  final Color? headerColor;
 
   /// Ancho de la franja de color de la izquierda (todas las filas la llevan).
   static const _stripe = 4.0;
@@ -107,7 +108,7 @@ class NeonTable extends StatelessWidget {
       fontSize: fontSize * 0.8,
       fontWeight: FontWeight.w800,
       letterSpacing: 0.6,
-      color: headerColor,
+      color: headerColor ?? AppColors.textSecondary,
     );
 
     return SizedBox(
@@ -119,7 +120,7 @@ class NeonTable extends StatelessWidget {
           Container(
             padding: EdgeInsets.fromLTRB(
                 horizontalPadding + _stripe, rowPadding, horizontalPadding, rowPadding),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.moss, width: 1)),
             ),
             child: Row(children: [
@@ -143,7 +144,7 @@ class NeonTable extends StatelessWidget {
                   // Todas las filas llevan la franja (transparente si no hay
                   // color) para que las columnas queden alineadas.
                   left: BorderSide(color: r.accent ?? Colors.transparent, width: _stripe),
-                  bottom: const BorderSide(color: AppColors.outlineVariant, width: 0.6),
+                  bottom: BorderSide(color: AppColors.outlineVariant, width: 0.6),
                 ),
               ),
               child: DefaultTextStyle.merge(

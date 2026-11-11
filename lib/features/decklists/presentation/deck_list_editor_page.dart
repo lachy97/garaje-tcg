@@ -116,7 +116,7 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                                   (id) => _featured = id),
                             ),
                             const SizedBox(width: 12),
-                            const Expanded(
+                            Expanded(
                               flex: 2,
                               child: Padding(
                                 padding: EdgeInsets.only(top: 8),
@@ -133,7 +133,7 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                       ),
                     ],
                     if (_cards.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(16),
                         child: Text(
                           'Importa un archivo .ydk (icono de arriba) o añade las cartas '
@@ -151,7 +151,7 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 2),
                                 child: Text('⚠ $w',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.draw)),
+                                    style: TextStyle(fontSize: 12, color: AppColors.draw)),
                               ),
                           ],
                         ),
@@ -407,7 +407,7 @@ class _Header extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Text('${t.position}º',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.neon)),
             ),
           Expanded(
@@ -418,7 +418,7 @@ class _Header extends StatelessWidget {
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 Text('${t.deckName ?? 'Sin mazo'} · ${t.tournamentName}',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.textSecondary)),
+                    style: TextStyle(color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -457,7 +457,7 @@ class _ArtSlot extends StatelessWidget {
                             border: Border.all(color: AppColors.outline),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.add_photo_alternate_outlined,
+                          child: Icon(Icons.add_photo_alternate_outlined,
                               color: AppColors.textSecondary),
                         )
                       : LayoutBuilder(
@@ -474,7 +474,7 @@ class _ArtSlot extends StatelessWidget {
               Text(card?.name ?? 'Elegir',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
         ),
@@ -530,7 +530,7 @@ class _CardRow extends StatelessWidget {
               width: 22,
               child: Text('$count',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
+                  style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.neon)),
             ),
             IconButton(tooltip: 'Añadir una', icon: const Icon(Icons.add), onPressed: onAdd),
           ],
@@ -602,7 +602,7 @@ class _CardSearchState extends State<_CardSearch> {
                   trailing: n == 0
                       ? const Icon(Icons.add_circle_outline)
                       : Text('×$n',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w900, color: AppColors.neon)),
                   onTap: () => setState(() => widget.onPick(c, _section)),
                 );

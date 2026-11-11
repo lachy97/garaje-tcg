@@ -55,7 +55,7 @@ class TopDeckListsSection extends ConsumerWidget {
                 SizedBox(
                   width: 40,
                   child: Text('${t.position ?? '-'}º',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.neon)),
                 ),
                 Expanded(
@@ -64,12 +64,12 @@ class TopDeckListsSection extends ConsumerWidget {
                     children: [
                       Text(t.playerName, style: const TextStyle(fontWeight: FontWeight.w800)),
                       Text(t.deckName ?? 'Sin mazo',
-                          style: const TextStyle(color: AppColors.textSecondary)),
+                          style: TextStyle(color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
                 if (saved.containsKey(t.playerId))
-                  const Chip(
+                  Chip(
                     avatar: Icon(Icons.check, size: 16, color: AppColors.neon),
                     label: Text('Ver lista'),
                   )

@@ -115,7 +115,7 @@ class _DeckPickerState extends ConsumerState<_DeckPicker> {
         const SizedBox(height: 6),
         Expanded(
           child: list.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text('Ningún mazo coincide',
                       style: TextStyle(color: AppColors.textSecondary)))
               : GridView.builder(

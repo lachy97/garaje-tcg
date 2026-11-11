@@ -32,7 +32,7 @@ class DeviceCodeCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('CÓDIGO DE ESTE TELÉFONO',
+                Text('CÓDIGO DE ESTE TELÉFONO',
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -40,7 +40,7 @@ class DeviceCodeCard extends StatelessWidget {
                         color: AppColors.textSecondary)),
                 const SizedBox(height: 4),
                 SelectableText(code,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.5,

@@ -40,14 +40,14 @@ class _LoggedOut extends StatelessWidget {
       children: [
         const Text('Sin cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Este teléfono funciona en modo local, como hasta ahora: todo lo que '
           'hay en él se puede ver y editar.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
         if (simulated) ...[
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Prueba: las cuentas se guardan solo en este teléfono hasta que '
             'exista el servidor.',
             style: TextStyle(color: AppColors.draw, fontSize: 12),
@@ -92,7 +92,7 @@ class _LoggedIn extends ConsumerWidget {
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                   Text('@${account.username} · ${account.email}',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                 ],
               ),
             ),
@@ -104,7 +104,7 @@ class _LoggedIn extends ConsumerWidget {
           account.playerId == null
               ? 'Ficha de jugador: sin vincular (el administrador la vincula).'
               : 'Ficha de jugador vinculada.',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
         if (isAdmin) ...[
           const SizedBox(height: 12),
@@ -114,7 +114,7 @@ class _LoggedIn extends ConsumerWidget {
             label: const Text('Cuentas y roles'),
           ),
           const SizedBox(height: 8),
-          const Text('Ver la app como (para probar qué ve cada rol):',
+          Text('Ver la app como (para probar qué ve cada rol):',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           const SizedBox(height: 6),
           Wrap(
@@ -154,8 +154,8 @@ class _LoggedIn extends ConsumerWidget {
             );
             if (ok && context.mounted) await ref.read(sessionProvider.notifier).logout();
           },
-          icon: const Icon(Icons.logout, color: AppColors.loss),
-          label: const Text('Cerrar sesión', style: TextStyle(color: AppColors.loss)),
+          icon: Icon(Icons.logout, color: AppColors.loss),
+          label: Text('Cerrar sesión', style: TextStyle(color: AppColors.loss)),
         ),
       ],
     );

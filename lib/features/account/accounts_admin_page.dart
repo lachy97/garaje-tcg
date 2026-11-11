@@ -50,7 +50,7 @@ class AccountsAdminPage extends ConsumerWidget {
                                 Text('${a.nickname} · @${a.username}',
                                     style: const TextStyle(fontWeight: FontWeight.w800)),
                                 Text(a.email,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                         color: AppColors.textSecondary, fontSize: 12)),
                                 Text(
                                   [
@@ -160,11 +160,11 @@ class AccountsAdminPage extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               SelectableText(code!,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 6,
                       color: AppColors.neon)),
               const SizedBox(height: 8),
-              const Text('Vale 15 minutos. Mándaselo al jugador por WhatsApp.',
+              Text('Vale 15 minutos. Mándaselo al jugador por WhatsApp.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             ],

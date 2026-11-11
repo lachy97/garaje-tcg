@@ -86,7 +86,7 @@ class _PenaltyDialogState extends State<_PenaltyDialog> {
               decoration: const InputDecoration(labelText: 'Motivo (opcional)'),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Solo queda anotada. Si cambia el resultado de una mesa o el jugador '
               'debe salir del torneo, hazlo a mano (resultado o Drop).',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
@@ -117,7 +117,7 @@ class PenaltiesSection extends ConsumerWidget {
     final list = ref.watch(tournamentPenaltiesProvider(tournament.id)).value ?? const [];
     if (list.isEmpty) return const SizedBox.shrink();
     return ExpansionTile(
-      leading: const Icon(Icons.gavel, color: AppColors.loss),
+      leading: Icon(Icons.gavel, color: AppColors.loss),
       title: Text('Penalizaciones (${list.length})'),
       children: [
         for (final p in list)
@@ -131,7 +131,7 @@ class PenaltiesSection extends ConsumerWidget {
             ].join(' · ')),
             trailing: IconButton(
               tooltip: 'Quitar',
-              icon: const Icon(Icons.delete_outline, color: AppColors.textSecondary),
+              icon: Icon(Icons.delete_outline, color: AppColors.textSecondary),
               onPressed: () => runGuarded(context, () async {
                 final ok = await confirmDialog(context,
                     title: 'Quitar penalización',

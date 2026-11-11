@@ -85,7 +85,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
           child: Scaffold(
             appBar: AppBar(
               title: Text(title.toUpperCase(), overflow: TextOverflow.ellipsis),
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.center,
                 labelColor: AppColors.neon,
@@ -127,7 +127,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
                         _GamesGrid(profile: p),
                         const SectionLabel('Destacados'),
                         _Highlights(profile: p, names: names),
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                           child: Text(
                             'Winrate = victorias ÷ partidas (los empates cuentan como no '
@@ -148,7 +148,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
                           const _Empty('Nadie jugó con este mazo en este periodo.')
                         else
                           _PilotsTable(pilots: p.pilots),
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                           child: Text(
                             'Partidas de cada jugador con el mazo (con espejos). '
@@ -172,7 +172,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
                             child: Text('Espejos: ${p.mirrors} partida(s).',
-                                style: const TextStyle(color: AppColors.textSecondary)),
+                                style: TextStyle(color: AppColors.textSecondary)),
                           ),
                         SectionLabel('Contra cada jugador (${p.opponents.length})'),
                         if (p.opponents.isEmpty)
@@ -214,7 +214,7 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Text(text, style: const TextStyle(color: AppColors.textSecondary)),
+        child: Text(text, style: TextStyle(color: AppColors.textSecondary)),
       );
 }
 
@@ -260,12 +260,12 @@ class _GamesGrid extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(value,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.neon)),
                   ),
                   const SizedBox(height: 2),
                   Text(label,
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -294,9 +294,9 @@ class _Highlights extends StatelessWidget {
           dense: true,
           onTap: onTap,
           leading: Icon(icon, color: color),
-          title: Text(title, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          title: Text(title, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           subtitle: Text(name,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary)),
           trailing: Text(detail, style: TextStyle(fontWeight: FontWeight.w800, color: color)),
         );
@@ -353,11 +353,11 @@ class _PilotsTable extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               Text('${p.tournaments.length}'),
               Text('${p.record.played}'),
-              Text('${p.record.wins}', style: const TextStyle(color: AppColors.win)),
-              Text('${p.record.losses}', style: const TextStyle(color: AppColors.loss)),
-              Text('${p.record.draws}', style: const TextStyle(color: AppColors.draw)),
+              Text('${p.record.wins}', style: TextStyle(color: AppColors.win)),
+              Text('${p.record.losses}', style: TextStyle(color: AppColors.loss)),
+              Text('${p.record.draws}', style: TextStyle(color: AppColors.draw)),
               Text(p.record.played == 0 ? '—' : '${(p.record.winrate * 100).round()}%'),
-              Text('${p.tops}', style: const TextStyle(color: AppColors.neon)),
+              Text('${p.tops}', style: TextStyle(color: AppColors.neon)),
               Text(p.bestPosition == null ? '—' : '${p.bestPosition}º'),
             ],
           ),
@@ -450,7 +450,7 @@ class _OpponentsTableState extends State<_OpponentsTable> {
             onPressed: () => setState(() => _all = !_all),
             child: Text(_all ? 'Ver menos' : 'Ver todos (${widget.opponents.length})'),
           ),
-        const Padding(
+        Padding(
           padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Text('Récord del mazo contra cada jugador (en verde, el mazo le gana).',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
@@ -492,8 +492,9 @@ class _GamesListState extends State<_GamesList> {
                 _ => AppColors.draw,
               },
               child: Text(switch (g.outcome) { 'W' => 'V', 'L' => 'D', _ => 'E' },
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w900, color: Colors.black)),
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w900,
+                      color: Theme.of(context).colorScheme.onPrimary)),
             ),
             title: Text('${g.playerName} vs ${g.opponentName}',
                 overflow: TextOverflow.ellipsis,
@@ -526,9 +527,9 @@ class _Header extends StatelessWidget {
     Widget stat(String label, String value) => Column(
           children: [
             Text(value,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.neon)),
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(label, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
         );
     return NeonCard(
@@ -545,7 +546,7 @@ class _Header extends StatelessWidget {
                     Text(deck.name,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                     Text(season.isEmpty ? 'Puesto ${deck.rank}' : '$season · puesto ${deck.rank}',
-                        style: const TextStyle(color: AppColors.textSecondary)),
+                        style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -575,7 +576,7 @@ class _Header extends StatelessWidget {
           Text(
             'Partidas: ${deck.wins}-${deck.losses}-${deck.swissDraws} '
             '(${deck.played == 0 ? '-' : pct(deck.winrate)} de victorias)',
-            style: const TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -596,7 +597,7 @@ class _Entries extends ConsumerWidget {
       value: ref.watch(_deckEntriesProvider((seasonId, deckId))),
       builder: (list) {
         if (list.isEmpty) {
-          return const Padding(
+          return Padding(
             padding: EdgeInsets.all(16),
             child: Text('Sin torneos terminados con este mazo.',
                 style: TextStyle(color: AppColors.textSecondary)),
@@ -622,7 +623,7 @@ class _Entries extends ConsumerWidget {
                 subtitle: Text('${e.tournamentName} · ${day.format(e.date)}'),
                 trailing: e.power > 0
                     ? Text('+${e.power}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.w900, color: AppColors.neon))
                     : null,
               ),

@@ -120,7 +120,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                   }),
                 ),
                 if (!_all && season.status == SeasonStatus.closed)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -197,7 +197,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     child: TierBoardView(decks: decks),
                   ),
                   if (perms.canCreateTournaments)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Text(
                       'Toca el cuadro de color de un tier para cambiar su texto o su color.',
@@ -212,7 +212,7 @@ class _DecksPageState extends ConsumerState<DecksPage> {
                     )
                   else
                   DeckTierTable(decks: decks, onTapDeck: (d) => _openDeck(scope, d)),
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Text(
                       '$deckLegend.\n\n'

@@ -156,11 +156,11 @@ class _ExportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const small = TextStyle(fontSize: 13, color: AppColors.textPrimary);
+    final small = TextStyle(fontSize: 13, color: AppColors.textPrimary);
     return Container(
       width: width,
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.background,
         border: Border.fromBorderSide(BorderSide(color: AppColors.moss, width: 2)),
       ),
@@ -171,14 +171,12 @@ class _ExportPage extends StatelessWidget {
           Row(
             children: [
               Image.asset(BrandAssets.logo,
-                  width: 80, height: 80, filterQuality: FilterQuality.high),
+                  width: 96, height: 96, filterQuality: FilterQuality.high),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const BrandTitle(fontSize: 30),
-                    const SizedBox(height: 4),
                     Text(
                       heading,
                       style: TextStyle(
@@ -201,7 +199,7 @@ class _ExportPage extends StatelessWidget {
           const SizedBox(height: 4),
           Text('Actualizado $date',
               textAlign: TextAlign.end,
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         ],
       ),
     );

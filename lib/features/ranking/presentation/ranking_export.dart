@@ -6,6 +6,7 @@ import '../../../core/db/app_database.dart';
 import '../../../core/utils/season_utils.dart';
 import '../domain/ranking_row.dart';
 import 'ranking_table.dart';
+import '../../../app/theme.dart';
 
 /// Exporta el ranking completo como una sola imagen en alta calidad.
 Future<void> exportRankingImage(
@@ -14,7 +15,7 @@ Future<void> exportRankingImage(
   required List<RankingRow> rows,
 }) {
   final label = seasonLabel(season.year, season.quarter);
-  return runExport<RankingRow>(
+  return AppColors.runDark(() => runExport<RankingRow>(
     context,
     ExportSpec(
       heading: 'RANKING · TEMPORADA $label',
@@ -27,5 +28,5 @@ Future<void> exportRankingImage(
       shareText: 'Ranking Garage TCG · Temporada $label',
       rowHeightEstimate: 46,
     ),
-  );
+  ));
 }

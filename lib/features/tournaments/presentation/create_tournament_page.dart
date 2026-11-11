@@ -91,7 +91,7 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
                     child: Text(DateFormat.yMMMMEEEEd('es').format(_date),
                         style: Theme.of(context).textTheme.titleMedium),
                   ),
-                  const Icon(Icons.edit_calendar, color: AppColors.textSecondary),
+                  Icon(Icons.edit_calendar, color: AppColors.textSecondary),
                 ],
               ),
             ),
@@ -138,7 +138,7 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
                 }),
               ),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
                 'Toca una fila para usar esa configuración. Se puede cambiar mientras '
@@ -189,11 +189,11 @@ class _SuggestionTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const head = TextStyle(
+    final head = TextStyle(
         fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary);
     return Column(
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: 8),
           child: Row(children: [
             Expanded(child: Text('JUGADORES', style: head)),

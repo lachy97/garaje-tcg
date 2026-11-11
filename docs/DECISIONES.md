@@ -254,3 +254,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 
 ## Auditoría de diseño (11/11)
 - Ver `docs/DISENO_UX.md`: avisos de error legibles, estados de error/carga sin parpadeo, icono de sincronización y "arrastrar para sincronizar", Torneos agrupados por estado y cabecera compacta, crear torneo con botón fijo y sugerencias aplicables, buscador de inscritos, vibración al marcar resultado, borrar jugador desde menú, Ajustes reordenado (Servidor solo administración).
+
+## Logo nuevo y modo claro/oscuro (11/11)
+- **Logo**: redibujado a partir de las imágenes del club manteniendo el diseño (casa con puerta de garaje, GARAGE, — TCG —). Un solo PNG blanco que la app tiñe (blanco en oscuro, casi negro en claro). Icono de la app y pantalla de inicio regenerados.
+- **Modo de color**: Ajustes → Apariencia: Sistema (por defecto), Claro u Oscuro; se guarda en el teléfono. Los colores de la app (`AppColors`) dependen de la paleta activa; al cambiar se redibuja todo sin perder el estado.
+- Las **imágenes compartidas** (ranking, tier list, torneos, informes, listas) se dibujan **siempre en oscuro**, para que se vean iguales en WhatsApp.
+- **Deshacer** al borrar jugador o torneo; **bienvenida** una vez por cuenta de jugador/juez; **destacados** en la ficha del jugador. Pendiente: primera columna fija, letra grande, pantalla encendida y Semantics (ver `docs/DISENO_UX.md`).

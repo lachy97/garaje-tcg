@@ -5,10 +5,13 @@ import '../theme.dart';
 /// Rutas de los recursos de marca.
 class BrandAssets {
   const BrandAssets._();
-  static const logo = 'assets/logo/logo.png'; // transparente, con glow
+  /// Logo con el nombre (blanco sobre transparente; en la app se tiñe con
+  /// el color del modo: blanco en oscuro, casi negro en claro).
+  static const logo = 'assets/logo/logo.png';
 }
 
-/// Logo con halo verde.
+/// Logo de Garage TCG con el color del modo activo (y un halo verde suave
+/// en modo oscuro).
 class GlowLogo extends StatelessWidget {
   const GlowLogo({super.key, this.size = 120});
 
@@ -21,20 +24,25 @@ class GlowLogo extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.neon.withValues(alpha: 0.18),
-            blurRadius: size * 0.45,
-            spreadRadius: size * 0.02,
-          ),
-        ],
+        boxShadow: AppColors.isDark
+            ? [
+                BoxShadow(
+                  color: AppColors.neon.withValues(alpha: 0.14),
+                  blurRadius: size * 0.45,
+                  spreadRadius: size * 0.02,
+                ),
+              ]
+            : null,
       ),
       child: Image.asset(
         BrandAssets.logo,
         width: size,
         height: size,
+        color: AppColors.logo,
+        colorBlendMode: BlendMode.srcIn,
         filterQuality: FilterQuality.medium,
         cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+        semanticLabel: 'Garage TCG',
       ),
     );
   }

@@ -88,7 +88,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.alarm, color: AppColors.loss, size: 40),
+        icon: Icon(Icons.alarm, color: AppColors.loss, size: 40),
         title: const Text('¡Se acabó el tiempo!'),
         content: const Text(
           'Pon los resultados de cada mesa. Si un match no terminó y '
@@ -195,7 +195,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
                       over
                           ? 'Se acabó el tiempo: pon los resultados'
                           : 'Tiempo restante de ${widget.minutes} min',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ],
                 ),

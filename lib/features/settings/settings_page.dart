@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/restartable_app.dart';
 import '../../app/theme.dart';
+import '../../app/theme_mode.dart';
 import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
 import '../../core/backup/backup_codec.dart';
@@ -69,13 +70,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.share, color: AppColors.neon),
+              leading: Icon(Icons.share, color: AppColors.neon),
               title: const Text('Compartir'),
               subtitle: const Text('WhatsApp, Telegram, Bluetooth, Drive…'),
               onTap: () => Navigator.pop(ctx, 'share'),
             ),
             ListTile(
-              leading: const Icon(Icons.save_alt, color: AppColors.neon),
+              leading: Icon(Icons.save_alt, color: AppColors.neon),
               title: const Text('Guardar en el teléfono'),
               subtitle: const Text('Elige una carpeta (p. ej. Descargas)'),
               onTap: () => Navigator.pop(ctx, 'save'),
@@ -118,7 +119,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       builder: (ctx) => SimpleDialog(
         title: const Text('Copias automáticas'),
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
             child: Text('Se guardan solas antes de cada importación (las 5 últimas).',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
@@ -210,6 +211,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const AccountSection(),
               const SectionLabel('Sincronización'),
               const SyncSection(),
+              const SectionLabel('Apariencia'),
+              NeonCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<ThemeMode>(
+                      segments: const [
+                        ButtonSegment(
+                            value: ThemeMode.system,
+                            icon: Icon(Icons.brightness_auto),
+                            label: Text('Sistema')),
+                        ButtonSegment(
+                            value: ThemeMode.light,
+                            icon: Icon(Icons.light_mode_outlined),
+                            label: Text('Claro')),
+                        ButtonSegment(
+                            value: ThemeMode.dark,
+                            icon: Icon(Icons.dark_mode_outlined),
+                            label: Text('Oscuro')),
+                      ],
+                      selected: {ref.watch(themeModeProvider)},
+                      onSelectionChanged: (v) =>
+                          ref.read(themeModeProvider.notifier).set(v.first),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sistema: sigue el modo del teléfono. Las imágenes que se comparten '
+                      'son siempre oscuras.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
               const SectionLabel('Licencia'),
               NeonCard(
                 child: AsyncView(
@@ -245,7 +279,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       'Guarda todos los datos (jugadores, mazos, torneos, ranking) en un '
                       'archivo .gtcg. Se puede cargar en cualquier teléfono con Garage TCG. '
                       'Al importar se integra con lo que ya hay: los torneos con el mismo '
@@ -285,7 +319,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 const SectionLabel('Administrador'),
                 NeonCard(
                   onTap: () => context.push('/ajustes/admin'),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(Icons.admin_panel_settings, color: AppColors.neon),
                       SizedBox(width: 12),
@@ -311,7 +345,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             info == null
                                 ? 'Versión…'
                                 : 'Versión ${info.version} (${info.buildNumber})',
-                            style: const TextStyle(color: AppColors.textSecondary),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                         ],
                       ),

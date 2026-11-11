@@ -54,12 +54,19 @@ real (torneo en marcha, jugadores nuevos), **B** = fricción notable, **C** = pu
 | Papelera visible en cada fila: fácil borrar a alguien por accidente al hacer scroll. | A | **Hecho**: menú ⋮ con Editar / Eliminar (con confirmación). |
 | Nombres largos desbordaban. | C | **Hecho**: se cortan con "…". |
 
-## 7. Propuestas para la siguiente iteración (no aplicadas)
+## 7. Segunda tanda (11/11)
 
-1. **Deshacer** tras eliminar un jugador o torneo (aviso con "Deshacer" en vez de solo confirmar) · B.
-2. **Pantalla de bienvenida** para jugadores nuevos (qué ver, cómo vincular su ficha, por qué hace falta la VPN) · B.
-3. **Ficha del jugador**: mismo diseño de cuadrícula y "destacados" que la nueva ficha del mazo (mejor mazo, rival más difícil) · B.
-4. **Tablas**: fijar la primera columna al desplazar horizontalmente (como la matriz) en ranking y tablas largas · B.
-5. **Tamaño de letra del sistema**: probar con letra grande del teléfono y ajustar anchos fijos de las tablas · C.
-6. **Modo torneo**: mantener la pantalla encendida mientras corre el tiempo de ronda · C.
-7. **Accesibilidad**: etiquetas de lectura (Semantics) en botones de resultado y tablas · C.
+| Mejora | Estado |
+|---|---|
+| **Logo nuevo** (casa con puerta de garaje, "GARAGE", "— TCG —"), redibujado en vectores con trazos limpios a partir de las imágenes del club. | **Hecho**: `assets/logo/logo.png` (blanco sobre transparente, la app lo tiñe según el modo), icono de la app (casa blanca sobre negro, también icono adaptable) y pantalla de inicio (normal y Android 12, claro y oscuro) regenerados en `android/app/src/main/res`. El logo sustituye al título de texto en Torneos, bloqueo de licencia e imágenes compartidas. |
+| **Modo claro y modo oscuro**. | **Hecho**: Ajustes → Apariencia (Sistema / Claro / Oscuro; por defecto el del teléfono). Paleta clara propia (fondo `#F4F7F2`, verde `#2E7D1F`, texto `#13261A`), sombras suaves en vez de brillo neón. Las **imágenes que se comparten salen siempre en oscuro**. |
+| Deshacer tras eliminar jugador o torneo. | **Hecho**: aviso con "Deshacer" (6 s). Jugador: sin confirmación previa. Torneo: confirmación + Deshacer (restaura también sus resultados de temporada). |
+| Pantalla de bienvenida para jugadores y jueces. | **Hecho**: hoja de bienvenida la primera vez que entra cada cuenta (qué ver, vincular la ficha, VPN). |
+| Ficha del jugador con destacados. | **Hecho**: tarjeta con mazo más jugado, mejor mazo (≥3 partidas), rival más difícil y "le gana más a" (≥2 partidas). |
+
+## 8. Pendiente
+
+1. **Tablas**: fijar la primera columna al desplazar horizontalmente en ranking y tablas largas · B.
+2. **Tamaño de letra del sistema**: probar con letra grande y ajustar anchos fijos · C.
+3. **Pantalla encendida** durante el tiempo de ronda: necesita el plugin `wakelock_plus` o un cambio en `MainActivity.kt` · C.
+4. **Accesibilidad**: etiquetas Semantics en botones de resultado y tablas · C.

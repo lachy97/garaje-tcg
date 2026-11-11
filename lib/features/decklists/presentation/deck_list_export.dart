@@ -202,10 +202,13 @@ Future<void> shareDeckLists(
           lists.length == 1
               ? 'Preparando la imagen…'
               : 'Preparando imagen ${i + 1} de ${lists.length}…');
-      final (spec, faltan) = await _deckListSpec(lists[i], db: db, store: store, wide: wide);
-      missing += faltan;
-      if (!context.mounted) return;
-      final file = await renderExportImage(context, spec);
+      // Las imágenes compartidas siempre se dibujan en oscuro.
+      final file = await AppColors.runDark(() async {
+        final (spec, faltan) = await _deckListSpec(lists[i], db: db, store: store, wide: wide);
+        missing += faltan;
+        if (!context.mounted) return null;
+        return renderExportImage(context, spec);
+      });
       if (file != null) files.add(file);
     }
     if (!context.mounted || files.isEmpty) return;

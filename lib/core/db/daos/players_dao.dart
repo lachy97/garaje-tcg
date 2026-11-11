@@ -74,6 +74,13 @@ class PlayersDao extends DatabaseAccessor<AppDatabase> with _$PlayersDaoMixin {
     );
   }
 
+  /// Deshace [softDelete].
+  Future<void> restore(String id) {
+    return (update(players)..where((p) => p.id.equals(id))).write(
+      PlayersCompanion(deletedAt: const Value(null), updatedAt: Value(DateTime.now())),
+    );
+  }
+
   String? _blankToNull(String? s) =>
       (s == null || s.trim().isEmpty) ? null : s.trim();
 }

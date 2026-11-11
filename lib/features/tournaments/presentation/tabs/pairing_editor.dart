@@ -85,7 +85,7 @@ class _PairingEditorPageState extends ConsumerState<_PairingEditorPage> {
         builder: (list) => ListView(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(4, 0, 4, 12),
               child: Text(
                 'Toca un jugador y luego otro de otra mesa para intercambiarlos. '
@@ -127,7 +127,7 @@ class _PairingEditorPageState extends ConsumerState<_PairingEditorPage> {
                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
           ),
           Expanded(child: player(1)),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 6),
             child: Text('vs', style: TextStyle(color: AppColors.textSecondary)),
           ),
@@ -135,7 +135,7 @@ class _PairingEditorPageState extends ConsumerState<_PairingEditorPage> {
           SizedBox(
             width: 28,
             child: locked
-                ? const Icon(Icons.lock_outline, size: 18, color: AppColors.textDisabled)
+                ? Icon(Icons.lock_outline, size: 18, color: AppColors.textDisabled)
                 : null,
           ),
         ],

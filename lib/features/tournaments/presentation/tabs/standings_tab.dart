@@ -80,7 +80,7 @@ class FinalResults extends ConsumerWidget {
                         Text(names[r.playerId] ?? '?',
                             style: Theme.of(context).textTheme.titleMedium),
                         Text(decks[r.playerId] ?? 'Sin mazo',
-                            style: const TextStyle(color: AppColors.textSecondary)),
+                            style: TextStyle(color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -93,7 +93,7 @@ class FinalResults extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Text('pts', style: TextStyle(color: AppColors.textSecondary)),
+                  Text('pts', style: TextStyle(color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -184,7 +184,7 @@ class _SwissStandings extends ConsumerWidget {
                       ),
                       Text('${s.wins}-${s.losses}-${s.draws}'),
                       Text('${s.points}',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w900, color: AppColors.neon)),
                       Text(pct(s.omw)),
                       Text(pct(s.oomw)),
@@ -193,7 +193,7 @@ class _SwissStandings extends ConsumerWidget {
                   ),
               ],
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: Text(
                 'Desempates en orden: Puntos → OMW% (rivales) → OOMW% (rivales de los '
@@ -228,7 +228,7 @@ class _NameCell extends StatelessWidget {
         if (deck != null)
           Text(deck!,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       ],
     );
   }
@@ -254,7 +254,7 @@ class _CutLine extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text('CORTE TOP $cut',
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.neon)),
           ),
           Expanded(

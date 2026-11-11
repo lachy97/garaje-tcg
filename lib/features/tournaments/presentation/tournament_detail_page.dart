@@ -61,7 +61,7 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
                   child: Column(
                     children: [
                       _Header(t: t),
-                      const TabBar(
+                      TabBar(
                         labelColor: AppColors.neon,
                         unselectedLabelColor: AppColors.textSecondary,
                         indicatorColor: AppColors.neon,
@@ -130,7 +130,7 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
                 child: Column(
                   children: [
                     _Header(t: t),
-                    const TabBar(
+                    TabBar(
                       labelColor: AppColors.neon,
                       unselectedLabelColor: AppColors.textSecondary,
                       indicatorColor: AppColors.neon,
@@ -184,12 +184,12 @@ class _Header extends ConsumerWidget {
               border: Border.all(color: AppColors.neon, width: 0.8),
             ),
             child: Text(statusLabel(t.status),
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.neon, fontWeight: FontWeight.w700, fontSize: 12)),
           ),
           if (locked) ...[
             const SizedBox(width: 6),
-            const Tooltip(
+            Tooltip(
               message: 'Temporada cerrada: solo lectura',
               child: Icon(Icons.lock_outline, size: 18, color: AppColors.textSecondary),
             ),
@@ -198,7 +198,7 @@ class _Header extends ConsumerWidget {
           Expanded(
             child: Text(parts.join(' · '),
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.textSecondary)),
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
         ],
       ),

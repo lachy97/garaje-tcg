@@ -59,7 +59,7 @@ class _LicenseGateState extends ConsumerState<LicenseGate> with WidgetsBindingOb
       await showDialog<void>(
         context: ctx,
         builder: (dctx) => AlertDialog(
-          icon: const Icon(Icons.event_busy, color: AppColors.draw, size: 36),
+          icon: Icon(Icons.event_busy, color: AppColors.draw, size: 36),
           title: const Text('Licencia por vencer'),
           content: Text('$text\n\nEnvía el código de este teléfono al administrador '
               'para renovarla: ${s.deviceCode}'),
@@ -151,7 +151,6 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               child: GestureDetector(onTap: _onLogoTap, child: const GlowLogo(size: 110)),
             ),
             const SizedBox(height: 12),
-            const Center(child: BrandTitle(fontSize: 24)),
             const SizedBox(height: 24),
             Text(title,
                 textAlign: TextAlign.center,
@@ -167,7 +166,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                   : 'Envía el código de este teléfono al administrador. Te devolverá una '
                       'licencia; tócala para copiarla y pégala aquí.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
             DeviceCodeCard(code: s.deviceCode),
@@ -186,7 +185,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
             const SizedBox(height: 28),
             const Divider(),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               '¿Eres jugador? Entra con tu cuenta para ver el ranking, la tier list, '
               'tus torneos y tu ficha (no necesitas licencia).',
               textAlign: TextAlign.center,
@@ -198,7 +197,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                 'Sesión iniciada como @${session.account.username} '
                 '(${session.account.role.label}): este rol necesita licencia.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.draw, fontSize: 12),
+                style: TextStyle(color: AppColors.draw, fontSize: 12),
               )
             else ...[
               FilledButton.tonalIcon(
@@ -212,7 +211,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               ),
             ],
             const SizedBox(height: 28),
-            const Text('Tus datos siguen guardados en el teléfono. Puedes sacar una copia:',
+            Text('Tus datos siguen guardados en el teléfono. Puedes sacar una copia:',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             TextButton.icon(

@@ -126,7 +126,7 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
             real == null
                 ? 'Las cuentas se guardan solo aquí hasta conectar la app con el servidor.'
                 : 'Cuentas en el servidor de Garage TCG (Cloudflare).',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 12),
           if (real != null)

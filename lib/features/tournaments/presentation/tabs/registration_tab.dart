@@ -71,10 +71,10 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
                             style: Theme.of(context).textTheme.titleMedium),
                         if (noDeck > 0)
                           Text('$noDeck sin mazo asignado',
-                              style: const TextStyle(color: AppColors.draw, fontSize: 12)),
+                              style: TextStyle(color: AppColors.draw, fontSize: 12)),
                         if (unpaid > 0)
                           Text('$unpaid sin pagar el cover',
-                              style: const TextStyle(color: AppColors.draw, fontSize: 12)),
+                              style: TextStyle(color: AppColors.draw, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -203,7 +203,7 @@ class _RegisteredTile extends ConsumerWidget {
                 ),
                 if (late > 0)
                   Text('Inscripción tardía · entró en la ronda ${late + 1}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -215,7 +215,7 @@ class _RegisteredTile extends ConsumerWidget {
           if (draft)
             IconButton(
               tooltip: 'Quitar',
-              icon: const Icon(Icons.close, color: AppColors.textSecondary),
+              icon: Icon(Icons.close, color: AppColors.textSecondary),
               onPressed: () async {
                 final ok = await confirmDialog(
                   context,
@@ -245,12 +245,12 @@ class _RegisteredTile extends ConsumerWidget {
                 if (!ok) throw const ActionCancelled();
                 await dao.dropPlayer(tournament.id, item.player.id, tournament.currentRound);
               }),
-              child: const Text('Drop', style: TextStyle(color: AppColors.loss)),
+              child: Text('Drop', style: TextStyle(color: AppColors.loss)),
             ),
           if (!draft)
             IconButton(
               tooltip: 'Penalización',
-              icon: const Icon(Icons.gavel, size: 20, color: AppColors.textSecondary),
+              icon: Icon(Icons.gavel, size: 20, color: AppColors.textSecondary),
               onPressed: () => addPenaltyDialog(context, ref,
                   tournament: tournament, player: item.player),
             ),
@@ -297,7 +297,7 @@ class _PaidCheck extends StatelessWidget {
                   value: paid,
                   onChanged: (v) => onChanged(v ?? false),
                   activeColor: AppColors.neon,
-                  checkColor: Colors.black,
+                  checkColor: Theme.of(context).colorScheme.onPrimary,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -452,7 +452,7 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
                       return CheckboxListTile(
                         value: _selected.contains(p.id),
                         activeColor: AppColors.neon,
-                        checkColor: Colors.black,
+                        checkColor: Theme.of(context).colorScheme.onPrimary,
                         controlAffinity: ListTileControlAffinity.leading,
                         title: Text(p.nickname),
                         subtitle: Text(
@@ -464,7 +464,7 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
                                     ? 'Mazo: $deck'
                                     : 'Último mazo: $deck',
                           ].join('\n'),
-                          style: const TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(color: AppColors.textSecondary),
                         ),
                         isThreeLine: p.fullName != null,
                         secondary: IconButton(

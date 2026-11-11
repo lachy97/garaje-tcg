@@ -67,17 +67,17 @@ class _PlayersPageState extends ConsumerState<PlayersPage> {
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
               child: Row(
                 children: [
-                  const Icon(Icons.people, size: 18, color: AppColors.neon),
+                  Icon(Icons.people, size: 18, color: AppColors.neon),
                   const SizedBox(width: 8),
                   Text(
                     total == 1 ? '1 jugador registrado' : '$total jugadores registrados',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w700, color: AppColors.neon),
                   ),
                   if (_query.isNotEmpty && found != null) ...[
                     const Spacer(),
                     Text('$found encontrado(s)',
-                        style: const TextStyle(color: AppColors.textSecondary)),
+                        style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ],
               ),
@@ -137,30 +137,31 @@ class _PlayerTile extends ConsumerWidget {
                 if (player.fullName != null)
                   Text(player.fullName!,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textSecondary)),
+                      style: TextStyle(color: AppColors.textSecondary)),
               ],
             ),
           ),
           // Acciones en un menú (borrar no queda a un toque por accidente).
           PopupMenuButton<String>(
             tooltip: 'Opciones',
-            icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+            icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
             onSelected: (v) async {
               if (v == 'edit') {
                 await showPlayerForm(context, ref, player: player);
                 return;
               }
-              final ok = await confirmDialog(
+              // Sin confirmación: se puede deshacer desde el aviso.
+              final dao = ref.read(playersDaoProvider);
+              await dao.softDelete(player.id);
+              if (!context.mounted) return;
+              showMessage(
                 context,
-                title: 'Eliminar jugador',
-                message:
-                    '¿Eliminar a ${player.nickname}? Su historial de partidas se conserva.',
-                confirm: 'Eliminar',
-                danger: true,
+                '${player.nickname} eliminado (su historial se conserva)',
+                actionLabel: 'Deshacer',
+                onAction: () => dao.restore(player.id),
               );
-              if (ok) await ref.read(playersDaoProvider).softDelete(player.id);
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'edit',
                 child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Editar')),

@@ -35,9 +35,9 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
           db.when(
             loading: () => const Text('Cargando base de cartas…'),
             error: (e, _) =>
-                Text('Error al leer la base de cartas: $e', style: const TextStyle(color: AppColors.loss)),
+                Text('Error al leer la base de cartas: $e', style: TextStyle(color: AppColors.loss)),
             data: (d) => d.isEmpty
-                ? const Text(
+                ? Text(
                     'La base de cartas aún no está en esta versión de la app.',
                     style: TextStyle(color: AppColors.draw, fontWeight: FontWeight.w600),
                   )
@@ -45,7 +45,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
                     style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Se usan para las listas de mazos del Top 4. Las imágenes se descargan '
             'solo la primera vez que se ven y quedan guardadas en el teléfono.',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
@@ -53,7 +53,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
           if (usage != null && usage.$2 > 0) ...[
             const SizedBox(height: 6),
             Text('Imágenes guardadas: ${usage.$2} (${_mb(usage.$1)})',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -110,7 +110,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
                               r.ok
                                   ? '${r.millis} ms · ${(r.bytes! / 1024).toStringAsFixed(0)} KB'
                                   : r.error!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 12, color: AppColors.textSecondary),
                             ),
                           ],

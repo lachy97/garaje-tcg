@@ -117,7 +117,7 @@ class _SimulatedMailBoxState extends ConsumerState<SimulatedMailBox> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.science_outlined, color: AppColors.draw),
+              Icon(Icons.science_outlined, color: AppColors.draw),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -312,7 +312,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       title: 'CREAR CUENTA',
       busy: _busy,
       children: [
-        const Text(
+        Text(
           'Con tu cuenta podrás preinscribirte en los torneos y ver tu ficha. '
           'Te enviaremos un código a tu Gmail para confirmarla.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
@@ -512,7 +512,7 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
         FilledButton(onPressed: _busy ? null : _verify, child: const Text('Confirmar')),
         TextButton(onPressed: _busy ? null : _resend, child: const Text('Reenviar código')),
         const Divider(height: 32),
-        const Text(
+        Text(
           '¿No te llega? El administrador también puede confirmar tu cuenta '
           '(en persona o por WhatsApp).',
           textAlign: TextAlign.center,
@@ -652,7 +652,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
                         ? 'Escribe el código que te dio el administrador (vale 15 minutos).'
                         : 'Te enviamos un código a $sent. Si no llega, el administrador '
                             'puede darte uno.',
-                    style: const TextStyle(color: AppColors.textSecondary)),
+                    style: TextStyle(color: AppColors.textSecondary)),
                 const SizedBox(height: 12),
                 SimulatedMailBox(email: sent, purpose: 'reset', refresh: _refresh),
                 TextFormField(

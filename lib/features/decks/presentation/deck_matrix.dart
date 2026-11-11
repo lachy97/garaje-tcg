@@ -50,7 +50,7 @@ class DeckMatrixView extends ConsumerWidget {
       builder: (m) {
         final shown = decks.where((d) => m.table.containsKey(d.deckId)).take(maxDecks).toList();
         if (shown.isEmpty) {
-          return const Padding(
+          return Padding(
             padding: EdgeInsets.all(24),
             child: Text('Aún no hay partidas entre mazos esta temporada.',
                 textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
@@ -60,7 +60,7 @@ class DeckMatrixView extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(child: _StickyMatrix(matchups: m, decks: shown, onTapDeck: onTapDeck)),
-            const Padding(
+            Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Text(
                 'Celda: victorias-derrotas(-empates) del mazo de la FILA contra el de la '
@@ -136,7 +136,7 @@ class _StickyMatrixState extends State<_StickyMatrix> {
           // Fila fija de arriba: imágenes de los mazos de las columnas.
           Row(
             children: [
-              const SizedBox(
+              SizedBox(
                 width: _head,
                 height: _cell,
                 child: Align(

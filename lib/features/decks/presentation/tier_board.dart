@@ -9,6 +9,7 @@ import '../domain/deck_stats.dart';
 import '../domain/tier_style.dart';
 import 'deck_image.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../app/theme.dart';
 
 /// Colores del diseño (fondo oscuro como la tier list de referencia).
 const _kBoardBg = Color(0xFF111111);
@@ -536,7 +537,7 @@ Future<void> exportDeckTierImages(
   required Map<DeckTier, TierStyle> styles,
 }) {
   final date = DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now());
-  return runExport<DeckSeasonStats>(
+  return AppColors.runDark(() => runExport<DeckSeasonStats>(
     context,
     ExportSpec(
       heading: 'TIER LIST DE MAZOS · $label',
@@ -553,5 +554,5 @@ Future<void> exportDeckTierImages(
           if (deckImageProvider(d.imagePath) case final p?) p,
       ],
     ),
-  );
+  ));
 }

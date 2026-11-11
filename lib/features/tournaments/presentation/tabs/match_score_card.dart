@@ -189,7 +189,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
       child: Column(
         children: [
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.1,
@@ -205,7 +205,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                   highlight: p1Wins,
                 ),
               ),
-              const SizedBox(
+              SizedBox(
                 width: 36,
                 child: Text('vs',
                     textAlign: TextAlign.center,
@@ -264,14 +264,14 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                 'En la clasificación del torneo cuenta: '
                 '${_overrideLabel(m.standingsResult!, p1, p2 ?? '')}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.draw),
+                style: TextStyle(fontSize: 12, color: AppColors.draw),
               ),
             ),
           if (widget.editable && widget.canClear && reported)
             TextButton.icon(
               onPressed: enabled ? _clear : null,
-              icon: const Icon(Icons.undo, size: 18, color: AppColors.loss),
-              label: const Text('Borrar resultado',
+              icon: Icon(Icons.undo, size: 18, color: AppColors.loss),
+              label: Text('Borrar resultado',
                   style: TextStyle(color: AppColors.loss, fontSize: 12)),
             ),
         ],
@@ -377,7 +377,7 @@ class _PlayerHeader extends StatelessWidget {
           deck ?? 'Sin mazo',
           overflow: TextOverflow.ellipsis,
           textAlign: alignEnd ? TextAlign.end : TextAlign.start,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -403,7 +403,7 @@ class _ByeCard extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: _PlayerHeader(name: name, deck: deck, highlight: true)),
-          const Text('BYE · 2-0-0',
+          Text('BYE · 2-0-0',
               style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.neon)),
         ],
       ),

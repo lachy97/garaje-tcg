@@ -41,9 +41,8 @@ class TournamentsPage extends ConsumerWidget {
                       child: Center(
                         child: Column(
                           children: [
-                            GlowLogo(size: 72),
-                            SizedBox(height: 8),
-                            BrandTitle(fontSize: 22),
+                            // El logo ya lleva el nombre.
+                            GlowLogo(size: 120),
                           ],
                         ),
                       ),
@@ -57,7 +56,7 @@ class TournamentsPage extends ConsumerWidget {
                           IconButton(
                             tooltip: 'Ajustes',
                             onPressed: () => context.push('/ajustes'),
-                            icon: const Icon(Icons.settings_outlined,
+                            icon: Icon(Icons.settings_outlined,
                                 color: AppColors.textSecondary),
                           ),
                         ],
@@ -171,13 +170,13 @@ class _TournamentTile extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 2),
                 Text('$date · $detail',
-                    style: const TextStyle(color: AppColors.textSecondary)),
+                    style: TextStyle(color: AppColors.textSecondary)),
               ],
             ),
           ),
           if (ref.watch(permissionsProvider).canManageTournament(isOwner: true))
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+            icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
             onSelected: (_) => runGuarded(context, () async {
               final ok = await confirmDialog(
                 context,
@@ -186,7 +185,16 @@ class _TournamentTile extends ConsumerWidget {
                 confirm: 'Eliminar',
                 danger: true,
               );
-              if (ok) await ref.read(tournamentsDaoProvider).softDelete(t.id);
+              if (!ok) return;
+              final dao = ref.read(tournamentsDaoProvider);
+              await dao.softDelete(t.id);
+              if (!context.mounted) return;
+              showMessage(
+                context,
+                '"${t.name}" eliminado',
+                actionLabel: 'Deshacer',
+                onAction: () => dao.restore(t.id),
+              );
             }),
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'delete', child: Text('Eliminar')),
