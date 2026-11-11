@@ -1,37 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
 import '../../core/auth/auth_providers.dart';
 import 'auth_pages.dart';
 
-/// "Continuar sin cuenta" elegido en la pantalla de inicio. null = aún se lee.
-/// Al cerrar sesión se vuelve a mostrar la pantalla de inicio.
-class StartSkippedController extends Notifier<bool?> {
-  static const _key = 'start.skipped';
-
-  @override
-  bool? build() {
-    SharedPreferences.getInstance().then((prefs) {
-      if (ref.mounted) state = prefs.getBool(_key) ?? false;
-    });
-    return null;
-  }
-
-  Future<void> set(bool value) async {
-    state = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_key, value);
-  }
-}
-
-final startSkippedProvider =
-    NotifierProvider<StartSkippedController, bool?>(StartSkippedController.new);
-
-/// Al abrir la app sin sesión: pantalla de inicio con Iniciar sesión / Crear
-/// cuenta / Continuar sin cuenta (modo local, como hasta ahora).
+/// La app solo se usa con sesión iniciada: sin sesión se muestra la pantalla
+/// de inicio (Iniciar sesión / Crear cuenta) y no se puede entrar a nada más.
+/// La sesión se guarda en el teléfono y funciona sin conexión.
 class StartGate extends ConsumerWidget {
   const StartGate({super.key, required this.child});
 
@@ -40,13 +17,11 @@ class StartGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final skipped = ref.watch(startSkippedProvider);
     // Mientras se lee la sesión guardada: el logo.
-    if ((session.isLoading && !session.hasValue) || skipped == null) {
+    if (session.isLoading && !session.hasValue) {
       return const Scaffold(body: Center(child: GlowLogo(size: 120)));
     }
-    // Si falla al leer la sesión no se bloquea a nadie.
-    if (session.hasError || session.value != null || skipped) return child;
+    if (session.value != null) return child;
     // Navigator propio: las pantallas de iniciar sesión se abren encima.
     return Navigator(
       onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const StartScreen()),
@@ -54,11 +29,11 @@ class StartGate extends ConsumerWidget {
   }
 }
 
-class StartScreen extends ConsumerWidget {
+class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
@@ -101,16 +76,10 @@ class StartScreen extends ConsumerWidget {
                     icon: const Icon(Icons.person_add_alt),
                     label: const Text('Crear cuenta'),
                   ),
-                  const SizedBox(height: 28),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => ref.read(startSkippedProvider.notifier).set(true),
-                    child: const Text('Continuar sin cuenta'),
-                  ),
+                  const SizedBox(height: 24),
                   Text(
-                    'Para organizar torneos en este teléfono (con licencia). '
-                    'Puedes iniciar sesión cuando quieras en Ajustes → Cuenta.',
+                    'Necesitas una cuenta para usar la app. Para crearla o iniciar sesión '
+                    'hace falta conexión (con VPN); después funciona sin conexión.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),

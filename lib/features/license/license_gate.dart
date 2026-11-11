@@ -9,7 +9,6 @@ import '../../core/backup/backup_service.dart';
 import '../../core/auth/account.dart';
 import '../../core/auth/auth_providers.dart';
 import '../../core/license/license_service.dart';
-import '../account/auth_pages.dart';
 import 'admin_page.dart';
 import 'license_widgets.dart';
 
@@ -186,29 +185,28 @@ class _LockScreenState extends ConsumerState<LockScreen> {
             const SizedBox(height: 28),
             const Divider(),
             const SizedBox(height: 12),
-            Text(
-              '¿Eres jugador? Entra con tu cuenta para ver el ranking, la tier list, '
-              'tus torneos y tu ficha (no necesitas licencia).',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            if (ref.watch(sessionProvider).value case final session?)
+            if (ref.watch(sessionProvider).value case final session?) ...[
               Text(
                 'Sesión iniciada como @${session.account.username} '
-                '(${session.account.role.label}): este rol necesita licencia.',
+                '(${session.account.role.label}): este rol necesita licencia para llevar '
+                'torneos. Los jugadores y jueces no la necesitan.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.draw, fontSize: 12),
-              )
-            else ...[
-              FilledButton.tonalIcon(
-                onPressed: () => openAuthPage<bool>(context, const LoginPage()),
-                icon: const Icon(Icons.login),
-                label: const Text('Iniciar sesión'),
+                style: TextStyle(color: AppColors.textSecondary),
               ),
-              TextButton(
-                onPressed: () => openAuthPage<bool>(context, const RegisterPage()),
-                child: const Text('Crear cuenta'),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                onPressed: () async {
+                  final ok = await confirmDialog(
+                    context,
+                    title: 'Cerrar sesión',
+                    message: 'Podrás entrar con otra cuenta. Los datos de este teléfono '
+                        'no se borran.',
+                    confirm: 'Cerrar sesión',
+                  );
+                  if (ok && context.mounted) await ref.read(sessionProvider.notifier).logout();
+                },
+                icon: Icon(Icons.logout, color: AppColors.loss),
+                label: Text('Cerrar sesión', style: TextStyle(color: AppColors.loss)),
               ),
             ],
             const SizedBox(height: 28),
