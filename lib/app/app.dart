@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/account/start_screen.dart';
 import '../features/license/license_gate.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -60,7 +61,9 @@ class GarajeTcgApp extends ConsumerWidget {
       // no se rompan con la letra más grande.
       builder: (context, child) => MediaQuery.withClampedTextScaling(
         maxScaleFactor: 1.3,
-        child: LicenseGate(child: child ?? const SizedBox()),
+        // Sin sesión: primero la pantalla de inicio (iniciar sesión, crear
+        // cuenta o seguir sin cuenta); después, la licencia.
+        child: StartGate(child: LicenseGate(child: child ?? const SizedBox())),
       ),
     );
   }

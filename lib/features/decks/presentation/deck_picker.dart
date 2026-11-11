@@ -202,6 +202,7 @@ Future<String?> showNewDeckDialog(BuildContext context, WidgetRef ref,
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setState) => AlertDialog(
+        actionsOverflowButtonSpacing: 10,
         title: const Text('Nuevo mazo'),
         content: Column(
           mainAxisSize: MainAxisSize.min,

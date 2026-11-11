@@ -79,6 +79,7 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
     final url = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        actionsOverflowButtonSpacing: 10,
         title: const Text('Probar servidor'),
         content: TextField(
           controller: ctrl,
@@ -135,13 +136,16 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
               icon: const Icon(Icons.wifi_tethering),
               label: const Text('Probar conexión'),
             ),
+          if (real != null) const SizedBox(height: 10),
           if (real != null &&
-              ref.watch(sessionProvider).value?.account.role == AppRole.admin)
+              ref.watch(sessionProvider).value?.account.role == AppRole.admin) ...[
             OutlinedButton.icon(
               onPressed: _busy ? null : () => _mailTest(real),
               icon: const Icon(Icons.mark_email_read_outlined),
               label: const Text('Enviarme un correo de prueba'),
             ),
+            const SizedBox(height: 10),
+          ],
           OutlinedButton.icon(
             onPressed: _busy ? null : _testOther,
             icon: const Icon(Icons.travel_explore),

@@ -246,6 +246,7 @@ class _PlayerFormDialogState extends ConsumerState<_PlayerFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      actionsOverflowButtonSpacing: 10,
       title: Text(widget.player == null ? 'Nuevo jugador' : 'Editar jugador'),
       content: Form(
         key: _formKey,

@@ -127,6 +127,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          actionsOverflowButtonSpacing: 10,
           title: Text(title),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -516,7 +517,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
-          runSpacing: 4,
+          runSpacing: 10,
           children: [
             OutlinedButton.icon(
               onPressed: () async {
@@ -589,7 +590,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
-          runSpacing: 4,
+          runSpacing: 10,
           children: [
             for (final m in const [1, 2, 3, 6, 12, 24])
               ChoiceChip(
@@ -635,7 +636,7 @@ class _AdminPageState extends ConsumerState<AdminPage> {
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            runSpacing: 4,
+            runSpacing: 10,
             children: [
               FilledButton.icon(
                 onPressed: () => SharePlus.instance.share(ShareParams(text: _shareText)),

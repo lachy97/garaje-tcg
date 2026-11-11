@@ -298,6 +298,7 @@ Future<void> showTierStyleDialog(BuildContext context, WidgetRef ref, DeckTier t
       builder: (ctx, setState) {
         final preview = TierStyle(text.text.trim().isEmpty ? tier.label : text.text.trim(), color);
         return AlertDialog(
+          actionsOverflowButtonSpacing: 10,
           title: Text(tier == DeckTier.rogue
               ? 'Etiqueta de Rogue/Local'
               : 'Etiqueta del tier ${tier.label}'),

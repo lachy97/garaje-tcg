@@ -85,6 +85,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
+        actionsOverflowButtonSpacing: 10,
         title: Text(anyOk ? 'Descarga OK' : 'No se pudo descargar'),
         content: SingleChildScrollView(
           child: Column(

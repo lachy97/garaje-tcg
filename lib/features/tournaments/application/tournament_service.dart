@@ -347,6 +347,27 @@ class TournamentService {
   /// Deshace la ronda actual: borra sus cruces y resultados y vuelve a abrir
   /// la anterior. Si era la 1ª del Top Cut, el torneo vuelve al Swiss; si era
   /// la ronda 1, vuelve a la inscripción. No se puede en un torneo terminado.
+  /// Cambia los cruces de la ronda 1 (aún sin resultados) por [fixedPairs]
+  /// (p. ej. importados desde texto): se deshace la ronda y se vuelve a
+  /// generar, todo junto (si algo falla, queda como estaba).
+  Future<PairingOutcome> replaceFirstRound(String tournamentId,
+      {required List<(String, String?)> fixedPairs, Map<String, int> fixedTables = const {}}) async {
+    final ctx = await _load(tournamentId);
+    final current = ctx.currentRound;
+    if (ctx.tournament.status != TournamentStatus.swiss || current == null || current.number != 1) {
+      throw const TournamentException('Solo se pueden importar los cruces de la ronda 1.');
+    }
+    if (ctx.matchesOf(current).any((m) => !m.isBye && m.result.isReported)) {
+      throw const TournamentException(
+          'La ronda 1 ya tiene resultados: bórralos antes de cambiar los cruces.');
+    }
+    return _db.transaction(() async {
+      await undoLastRound(tournamentId);
+      return generateNextSwissRound(tournamentId,
+          fixedPairs: fixedPairs, fixedTables: fixedTables);
+    });
+  }
+
   Future<void> undoLastRound(String tournamentId) async {
     final ctx = await _load(tournamentId);
     await _dao.ensureEditable(tournamentId);

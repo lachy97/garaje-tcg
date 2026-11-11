@@ -59,6 +59,7 @@ class _LicenseGateState extends ConsumerState<LicenseGate> with WidgetsBindingOb
       await showDialog<void>(
         context: ctx,
         builder: (dctx) => AlertDialog(
+          actionsOverflowButtonSpacing: 10,
           icon: Icon(Icons.event_busy, color: AppColors.draw, size: 36),
           title: const Text('Licencia por vencer'),
           content: Text('$text\n\nEnvía el código de este teléfono al administrador '

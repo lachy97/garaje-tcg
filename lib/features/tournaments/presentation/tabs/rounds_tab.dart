@@ -378,6 +378,20 @@ class _MatchesSliver extends ConsumerWidget {
                 label: const Text('Cambiar cruces'),
               ),
             ),
+          // Ronda 1 sin resultados: rehacer los cruces importándolos de un texto.
+          if (isCurrent &&
+              !readOnly &&
+              round.number == 1 &&
+              round.phase == RoundPhase.swiss &&
+              tournament.status == TournamentStatus.swiss &&
+              list.every((m) => m.isBye || !m.result.isReported))
+            Center(
+              child: TextButton.icon(
+                onPressed: () => _importFirstRound(context, ref),
+                icon: const Icon(Icons.content_paste_go, size: 20),
+                label: const Text('Importar cruces desde texto'),
+              ),
+            ),
           const SizedBox(height: 8),
           if (!isCurrent && editable)
             Padding(
@@ -411,6 +425,34 @@ class _MatchesSliver extends ConsumerWidget {
         ]);
       },
     );
+  }
+
+  /// Reemplaza los cruces de la ronda 1 (aún sin resultados) por los de un
+  /// texto: se deshace la ronda y se vuelve a generar con esos cruces.
+  Future<void> _importFirstRound(BuildContext context, WidgetRef ref) async {
+    final picked = await Navigator.of(context)
+        .push<({List<(String, String?)> pairs, Map<String, int> tables})>(
+      MaterialPageRoute(
+        builder: (_) => FirstRoundPairingPage(
+          tournament: tournament,
+          startWithImport: true,
+          actionLabel: 'REEMPLAZAR CRUCES',
+        ),
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    await runGuarded(context, () async {
+      final ok = await confirmDialog(
+        context,
+        title: 'Reemplazar cruces de la ronda 1',
+        message: 'Los cruces actuales de la ronda 1 se cambian por los importados '
+            '(los que falten se emparejan al azar). El tiempo de ronda se reinicia.',
+        confirm: 'Reemplazar',
+      );
+      if (!ok) throw const ActionCancelled();
+      await ref.read(tournamentServiceProvider).replaceFirstRound(tournament.id,
+          fixedPairs: picked.pairs, fixedTables: picked.tables);
+    }, success: 'Cruces de la ronda 1 importados');
   }
 
   Future<void> _undoRound(BuildContext context, WidgetRef ref) async {
@@ -547,12 +589,17 @@ class _AdvanceFab extends ConsumerWidget {
                 var tables = const <String, int>{};
                 if (firstRound) {
                   // Ronda 1: al azar, o definiendo los enfrentamientos a mano.
-                  final define = await _askFirstRound(context, title, message);
-                  if (define == null || !context.mounted) throw const ActionCancelled();
-                  if (define) {
+                  final mode = await _askFirstRound(context, title, message);
+                  if (mode == null || !context.mounted) throw const ActionCancelled();
+                  if (mode != _FirstRoundMode.random) {
                     final pairs = await Navigator.of(context)
                         .push<({List<(String, String?)> pairs, Map<String, int> tables})>(
-                      MaterialPageRoute(builder: (_) => FirstRoundPairingPage(tournament: t)),
+                      MaterialPageRoute(
+                        builder: (_) => FirstRoundPairingPage(
+                          tournament: t,
+                          startWithImport: mode == _FirstRoundMode.paste,
+                        ),
+                      ),
                     );
                     if (pairs == null) throw const ActionCancelled();
                     fixed = pairs.pairs;
@@ -577,27 +624,63 @@ class _AdvanceFab extends ConsumerWidget {
   }
 }
 
-/// Antes de la ronda 1: true = definir enfrentamientos, false = al azar,
-/// null = cancelar.
-Future<bool?> _askFirstRound(BuildContext context, String title, String message) {
-  return showDialog<bool>(
+/// Cómo hacer los cruces de la ronda 1.
+enum _FirstRoundMode { random, define, paste }
+
+/// Antes de la ronda 1: al azar, definir a mano o importar desde texto
+/// (null = cancelar).
+Future<_FirstRoundMode?> _askFirstRound(BuildContext context, String title, String message) {
+  Widget option(_FirstRoundMode mode, IconData icon, String label, String hint,
+      {bool primary = false}) {
+    final button = primary
+        ? FilledButton.icon(
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(mode),
+            icon: Icon(icon),
+            label: Text(label),
+          )
+        : OutlinedButton.icon(
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(mode),
+            icon: Icon(icon),
+            label: Text(label),
+          );
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          button,
+          const SizedBox(height: 4),
+          Text(hint,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  return showDialog<_FirstRoundMode>(
     context: context,
     builder: (ctx) => AlertDialog(
+      actionsOverflowButtonSpacing: 10,
       title: Text(title),
       content: SingleChildScrollView(
-        child: Text('$message\n\nPuedes definir algunos enfrentamientos a mano; '
-            'los demás se emparejan al azar.'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(message),
+            const SizedBox(height: 6),
+            option(_FirstRoundMode.random, Icons.shuffle, 'Al azar',
+                'Todos los cruces al azar.', primary: true),
+            option(_FirstRoundMode.define, Icons.touch_app_outlined, 'Definir cruces',
+                'Eliges algunos enfrentamientos; el resto, al azar.'),
+            option(_FirstRoundMode.paste, Icons.content_paste_go, 'Importar texto',
+                'Pegas los cruces (p. ej. de WhatsApp) y los revisas.'),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-        OutlinedButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Definir cruces'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Al azar'),
-        ),
       ],
     ),
   );

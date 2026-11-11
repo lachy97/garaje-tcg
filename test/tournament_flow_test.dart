@@ -410,4 +410,33 @@ void main() {
     expect(real.result, MatchResult.p2Win, reason: 'el resultado real no cambia');
     await db.close();
   });
+
+  test('Reemplazar los cruces de la ronda 1 (importados desde texto)', () async {
+    final db = await open();
+    if (db == null) return;
+    final s = TournamentService(db);
+    final dao = db.tournamentsDao;
+    final t = await create(db, 4);
+    final ids = [for (final r in await dao.registeredPlayers(t.id)) r.player.id];
+    await s.generateNextSwissRound(t.id);
+
+    await s.replaceFirstRound(t.id,
+        fixedPairs: [(ids[0], ids[1]), (ids[2], ids[3])], fixedTables: {ids[2]: 1});
+    final rounds = await dao.roundsOf(t.id);
+    expect(rounds.length, 1);
+    final ms = (await dao.matchesOfTournament(t.id))
+      ..sort((a, b) => (a.tableNumber ?? 99).compareTo(b.tableNumber ?? 99));
+    expect(ms.length, 2);
+    expect((ms[0].player1Id, ms[0].player2Id), (ids[2], ids[3]));
+    expect((ms[1].player1Id, ms[1].player2Id), (ids[0], ids[1]));
+    expect((await reload(db, t.id)).status, TournamentStatus.swiss);
+
+    // Con resultados ya no se puede.
+    await s.reportScore(ms[0].id, const GameScore(2, 0, 0));
+    await expectLater(
+      s.replaceFirstRound(t.id, fixedPairs: [(ids[0], ids[2])]),
+      throwsA(isA<TournamentException>()),
+    );
+    await db.close();
+  });
 }

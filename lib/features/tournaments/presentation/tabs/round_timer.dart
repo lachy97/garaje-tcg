@@ -107,6 +107,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
+        actionsOverflowButtonSpacing: 10,
         icon: Icon(Icons.alarm, color: AppColors.loss, size: 40),
         title: const Text('¡Se acabó el tiempo!'),
         content: const Text(

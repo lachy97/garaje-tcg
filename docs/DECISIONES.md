@@ -266,3 +266,13 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Letra del sistema** limitada a 130 % en toda la app; las tablas ensanchan sus columnas con ese factor.
 - **Pantalla encendida** mientras corre el tiempo de ronda, solo en el teléfono que lleva el torneo (no en los de solo consulta). Nueva dependencia: `wakelock_plus`.
 - **Semantics** en botones de resultado, tarjetas de mesa y filas de tablas.
+
+## Importar la ronda 1 desde texto (11/11)
+- Complementa "Compartir ronda → Texto": se pegan los cruces (el mismo texto de WhatsApp o una lista a mano: `Mesa 1: Ana vs Luis`, `3. Ana vs Luis`, `BYE: Pedro`; título, marcadores y asteriscos se ignoran) y se reconocen los apodos de los inscritos (sin importar mayúsculas ni tildes; también el nombre completo).
+- **Solo ronda 1**. Dónde: al generar la ronda 1 (botón "Importar texto", además de "Definir cruces" y "Al azar"), en la pantalla de cruces de la ronda 1 (botón de pegar arriba) y, si la ronda 1 ya está generada y **sin resultados**, "Importar cruces desde texto" en la propia ronda (deshace y vuelve a generar en una sola operación; el tiempo de ronda se reinicia).
+- Siempre se revisa antes de generar: los cruces importados aparecen como "definidos" y se pueden quitar o cambiar; los inscritos que no estén en el texto se emparejan al azar. Avisos: nombres no inscritos, jugadores repetidos, mesas repetidas o inexistentes (toman otra libre), más de un BYE o BYE con número par.
+- Código: `lib/features/tournaments/domain/round_import.dart` (Dart puro, `test/round_import_test.dart`), `TournamentService.replaceFirstRound`.
+
+## Pantalla de inicio con cuenta y espaciado de botones (11/11)
+- Al abrir la app **sin sesión** se muestra primero una pantalla de inicio: **Iniciar sesión**, **Crear cuenta** o **Continuar sin cuenta** (modo local para organizadores con licencia). La elección "sin cuenta" se recuerda; al **cerrar sesión** vuelve a aparecer. Ajustes → Cuenta sigue igual. Código: `lib/features/account/start_screen.dart` (`StartGate` envuelve a `LicenseGate`).
+- Botones apilados con separación de 10 dp (Ajustes → Servidor, administrador, y en todos los diálogos cuando los botones no caben en una fila). El aviso de "Generar ronda 1" muestra las tres opciones (Al azar, Definir cruces, Importar texto) en vertical, a todo el ancho y con una línea de explicación.

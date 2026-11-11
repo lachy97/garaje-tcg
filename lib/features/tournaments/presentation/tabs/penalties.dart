@@ -65,6 +65,7 @@ class _PenaltyDialogState extends State<_PenaltyDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      actionsOverflowButtonSpacing: 10,
       title: Text('Penalización · ${widget.player}'),
       content: SingleChildScrollView(
         child: Column(

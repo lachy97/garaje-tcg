@@ -155,6 +155,7 @@ class AccountsAdminPage extends ConsumerWidget {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
+          actionsOverflowButtonSpacing: 10,
           title: Text('Código para @${a.username}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,

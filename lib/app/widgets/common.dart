@@ -226,6 +226,7 @@ Future<bool> confirmDialog(
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
+      actionsOverflowButtonSpacing: 10,
       title: Text(title),
       content: Text(message),
       actions: [
@@ -255,6 +256,7 @@ Future<String?> promptText(
   return showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
+      actionsOverflowButtonSpacing: 10,
       title: Text(title),
       content: TextField(
         controller: controller,

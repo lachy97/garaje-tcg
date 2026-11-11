@@ -178,6 +178,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
+        actionsOverflowButtonSpacing: 10,
         title: const Text('Falta un paso'),
         content: const Text(
             'La copia está lista. Cierra la app por completo y vuelve a abrirla '

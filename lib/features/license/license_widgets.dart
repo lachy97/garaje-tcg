@@ -81,6 +81,7 @@ Future<bool> showActivateLicenseDialog(BuildContext context, WidgetRef ref) asyn
     barrierDismissible: false,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setState) => AlertDialog(
+        actionsOverflowButtonSpacing: 10,
         title: const Text('Introducir licencia'),
         content: SingleChildScrollView(
           child: Column(

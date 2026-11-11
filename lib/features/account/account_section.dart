@@ -8,6 +8,7 @@ import '../../core/auth/account.dart';
 import '../../core/auth/auth_providers.dart';
 import 'accounts_admin_page.dart';
 import 'auth_pages.dart';
+import 'start_screen.dart';
 
 /// Ajustes → Cuenta: sin cuenta (modo local, como hasta ahora) o la cuenta
 /// con su rol, la ficha vinculada y, para el administrador, las cuentas y
@@ -152,7 +153,12 @@ class _LoggedIn extends ConsumerWidget {
               message: 'El teléfono vuelve al modo local. Tus datos de torneos no se borran.',
               confirm: 'Cerrar sesión',
             );
-            if (ok && context.mounted) await ref.read(sessionProvider.notifier).logout();
+            if (ok && context.mounted) {
+              final start = ref.read(startSkippedProvider.notifier);
+              await ref.read(sessionProvider.notifier).logout();
+              // Vuelve a la pantalla de inicio.
+              await start.set(false);
+            }
           },
           icon: Icon(Icons.logout, color: AppColors.loss),
           label: Text('Cerrar sesión', style: TextStyle(color: AppColors.loss)),
