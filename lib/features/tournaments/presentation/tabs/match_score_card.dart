@@ -165,12 +165,16 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
 
     Widget button(_Pick p) => _ResultButton(
           label: p.label,
+          semanticLabel: _describe(p, p1, p2!),
           selected: saved == p,
           danger: p == _Pick.doubleLoss,
           onTap: enabled ? () => _pick(p) : null,
         );
 
-    return Container(
+    return Semantics(
+      container: true,
+      label: '${title.toLowerCase()}: $p1 contra $p2. ${status.$1}',
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
@@ -276,6 +280,7 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
             ),
         ],
       ),
+    ),
     );
   }
 }
@@ -286,10 +291,14 @@ class _ResultButton extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    required this.semanticLabel,
     this.danger = false,
   });
 
   final String label;
+
+  /// Lo que lee el lector de pantalla (p. ej. "Gana Ana 2-1").
+  final String semanticLabel;
   final bool selected;
   final bool danger;
   final VoidCallback? onTap;
@@ -298,7 +307,14 @@ class _ResultButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = danger ? AppColors.loss : AppColors.neon;
     final enabled = onTap != null;
-    return Material(
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      selected: selected,
+      label: semanticLabel,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: Material(
       color: selected ? accent.withValues(alpha: 0.18) : Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
@@ -339,6 +355,7 @@ class _ResultButton extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

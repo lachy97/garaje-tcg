@@ -38,6 +38,8 @@ dependencies:
   crypto: ^3.0.6
   # Gráficos
   fl_chart: ^1.0.0
+  # Pantalla encendida durante el tiempo de ronda
+  wakelock_plus: ^1.2.8
 
 dev_dependencies:
   flutter_test:

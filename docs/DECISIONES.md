@@ -260,3 +260,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Modo de color**: Ajustes → Apariencia: Sistema (por defecto), Claro u Oscuro; se guarda en el teléfono. Los colores de la app (`AppColors`) dependen de la paleta activa; al cambiar se redibuja todo sin perder el estado.
 - Las **imágenes compartidas** (ranking, tier list, torneos, informes, listas) se dibujan **siempre en oscuro**, para que se vean iguales en WhatsApp.
 - **Deshacer** al borrar jugador o torneo; **bienvenida** una vez por cuenta de jugador/juez; **destacados** en la ficha del jugador. Pendiente: primera columna fija, letra grande, pantalla encendida y Semantics (ver `docs/DISENO_UX.md`).
+
+## Tablas, letra grande, pantalla encendida y accesibilidad (11/11)
+- Tablas con **columnas fijas** (hasta la del nombre) al desplazar en horizontal.
+- **Letra del sistema** limitada a 130 % en toda la app; las tablas ensanchan sus columnas con ese factor.
+- **Pantalla encendida** mientras corre el tiempo de ronda, solo en el teléfono que lleva el torneo (no en los de solo consulta). Nueva dependencia: `wakelock_plus`.
+- **Semantics** en botones de resultado, tarjetas de mesa y filas de tablas.

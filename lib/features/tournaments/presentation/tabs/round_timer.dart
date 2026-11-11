@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/common.dart';
@@ -17,6 +18,8 @@ import '../../application/tournament_service.dart';
 ///
 /// La hora de inicio se guarda en la BD, así que el reloj sigue bien aunque
 /// se cierre la app o se apague la pantalla.
+///
+/// Mientras corre el tiempo, el teléfono del organizador no apaga la pantalla.
 class RoundTimer extends ConsumerStatefulWidget {
   const RoundTimer({super.key, required this.round, required this.minutes, this.readOnly = false});
 
@@ -34,6 +37,19 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
   Timer? _ticker;
   Duration? _lastRemaining;
 
+  /// Pantalla encendida pedida por este reloj.
+  bool _awake = false;
+
+  /// Mantiene la pantalla encendida mientras hay tiempo en marcha (solo en el
+  /// teléfono que lleva el torneo).
+  void _syncWakelock() {
+    final want = !widget.readOnly && widget.round.timerStartedAt != null;
+    if (want == _awake) return;
+    _awake = want;
+    // Si el teléfono no lo permite, no pasa nada.
+    WakelockPlus.toggle(enable: want).catchError((_) {});
+  }
+
   Duration get _total => Duration(minutes: widget.minutes);
 
   Duration? get _remaining {
@@ -47,6 +63,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     _lastRemaining = _remaining;
+    _syncWakelock();
   }
 
   @override
@@ -55,11 +72,13 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
     if (old.round.timerStartedAt != widget.round.timerStartedAt) {
       _lastRemaining = _remaining;
     }
+    _syncWakelock();
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    if (_awake) WakelockPlus.disable().catchError((_) {});
     super.dispose();
   }
 

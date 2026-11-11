@@ -64,9 +64,13 @@ real (torneo en marcha, jugadores nuevos), **B** = fricción notable, **C** = pu
 | Pantalla de bienvenida para jugadores y jueces. | **Hecho**: hoja de bienvenida la primera vez que entra cada cuenta (qué ver, vincular la ficha, VPN). |
 | Ficha del jugador con destacados. | **Hecho**: tarjeta con mazo más jugado, mejor mazo (≥3 partidas), rival más difícil y "le gana más a" (≥2 partidas). |
 
-## 8. Pendiente
+## 8. Tercera tanda (11/11)
 
-1. **Tablas**: fijar la primera columna al desplazar horizontalmente en ranking y tablas largas · B.
-2. **Tamaño de letra del sistema**: probar con letra grande y ajustar anchos fijos · C.
-3. **Pantalla encendida** durante el tiempo de ronda: necesita el plugin `wakelock_plus` o un cambio en `MainActivity.kt` · C.
-4. **Accesibilidad**: etiquetas Semantics en botones de resultado y tablas · C.
+| Mejora | Estado |
+|---|---|
+| Primera columna fija en las tablas. | **Hecho**: en todas las tablas (ranking, clasificación, mazos, fichas), al desplazar en horizontal las columnas hasta el nombre (# y Jugador/Mazo) se quedan fijas, con una sombra suave; barra de desplazamiento visible. Si las columnas fijas ocuparían más del 60 % de la pantalla, no se fijan. |
+| Letra grande del teléfono. | **Hecho**: la app respeta la letra del sistema hasta un 130 %; las columnas de las tablas se ensanchan en la misma proporción para que nada se corte. Las imágenes compartidas no cambian. |
+| Pantalla encendida durante la ronda. | **Hecho**: mientras corre el tiempo de ronda, el teléfono del organizador no apaga la pantalla (plugin `wakelock_plus`). Se apaga normal al detener el tiempo, pasar de ronda o salir del torneo. |
+| Accesibilidad (lector de pantalla). | **Hecho**: cada botón de resultado se lee como "Gana Ana 2-1", "Empate intencional"…, con estado seleccionado; cada mesa se anuncia ("mesa 3: Ana contra Luis. Pendiente"); cada fila de tabla se lee entera de una vez; el logo tiene nombre. |
+
+Con esto quedan aplicadas todas las propuestas de la auditoría.

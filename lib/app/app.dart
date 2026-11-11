@@ -56,7 +56,12 @@ class GarajeTcgApp extends ConsumerWidget {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       routerConfig: router,
       // Licencia: si no es válida se muestra la pantalla de bloqueo.
-      builder: (context, child) => LicenseGate(child: child ?? const SizedBox()),
+      // Letra del teléfono: se respeta hasta un 130 % para que las pantallas
+      // no se rompan con la letra más grande.
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.3,
+        child: LicenseGate(child: child ?? const SizedBox()),
+      ),
     );
   }
 }
