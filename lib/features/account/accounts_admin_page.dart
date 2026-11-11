@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
@@ -110,6 +112,12 @@ class AccountsAdminPage extends ConsumerWidget {
                 subtitle: const Text('Si el código no le llega'),
                 onTap: () => Navigator.pop(ctx, 'verify'),
               ),
+            ListTile(
+              leading: const Icon(Icons.password),
+              title: const Text('Código para cambiar la contraseña'),
+              subtitle: const Text('Para mandárselo por WhatsApp si olvidó la contraseña'),
+              onTap: () => Navigator.pop(ctx, 'resetcode'),
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -129,6 +137,55 @@ class AccountsAdminPage extends ConsumerWidget {
         if (context.mounted) showMessage(context, 'No se pudo conectar: $e', error: true);
       }
       return null;
+    }
+
+    if (action == 'resetcode') {
+      String? code;
+      try {
+        code = await api.adminResetCode(session, accountId: a.id);
+      } on AuthException catch (e) {
+        if (context.mounted) showMessage(context, e.message, error: true);
+      } catch (e) {
+        if (context.mounted) showMessage(context, 'No se pudo conectar: $e', error: true);
+      }
+      if (code == null || !context.mounted) return;
+      final text = 'Garage TCG · @${a.username}: tu código para poner una contraseña nueva es '
+          '$code (vale 15 minutos). En la app: Iniciar sesión → Olvidé mi contraseña → '
+          'Ya tengo un código.';
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Código para @${a.username}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SelectableText(code!,
+                  style: const TextStyle(
+                      fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 6,
+                      color: AppColors.neon)),
+              const SizedBox(height: 8),
+              const Text('Vale 15 minutos. Mándaselo al jugador por WhatsApp.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: text));
+                showMessage(ctx, 'Mensaje copiado');
+              },
+              child: const Text('Copiar mensaje'),
+            ),
+            FilledButton.icon(
+              onPressed: () => SharePlus.instance.share(ShareParams(text: text)),
+              icon: const Icon(Icons.share),
+              label: const Text('Compartir'),
+            ),
+          ],
+        ),
+      );
+      return;
     }
 
     Account? updated;

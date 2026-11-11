@@ -34,7 +34,9 @@ abstract interface class AuthApi {
   bool get isSimulated;
 
   /// Crea la cuenta (sin verificar) y envía el código al Gmail.
-  Future<void> register({
+  /// Devuelve false si la cuenta se creó pero el correo no se pudo enviar
+  /// (el administrador puede confirmarla a mano).
+  Future<bool> register({
     required String username,
     required String email,
     required String password,
@@ -76,6 +78,10 @@ abstract interface class AuthApi {
 
   /// Vincula la cuenta con la ficha de jugador que ya existe (null = quitar).
   Future<Account> linkPlayer(Session session, {required String accountId, String? playerId});
+
+  /// Código para poner contraseña nueva, para mandárselo al jugador por
+  /// WhatsApp cuando el correo no llega (vale 15 minutos).
+  Future<String> adminResetCode(Session session, {required String accountId});
 
   /// Verifica a mano una cuenta cuyo código no llegó.
   Future<Account> verifyManually(Session session, {required String accountId});

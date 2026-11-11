@@ -111,30 +111,41 @@ pruebas** (`DEV_CODES = "1"` en `wrangler.toml`): el código no llega al
 correo, sino que la app lo muestra en un recuadro amarillo. **No lo dejes así
 cuando los jugadores empiecen a registrarse.**
 
-## 9 · Correos de verificación con Brevo
+## 9 · Correos de verificación desde el Gmail del club
+
+El servidor envía los códigos directamente por el SMTP de Gmail con una
+**contraseña de aplicación** (no la contraseña normal). Gratis, sin dominio
+ni proveedores, hasta ~500 correos al día. Si un correo no sale, la cuenta
+se crea igual y el administrador la confirma a mano en **Cuentas y roles**
+(y puede darle un código de contraseña para mandarlo por WhatsApp).
 
 1. Crea el Gmail del club (por ejemplo `garagetcg.cuba@gmail.com`).
-2. Regístrate en **https://www.brevo.com** con ese Gmail (plan Free: 300
-   correos al día).
-3. En Brevo: **Senders, Domains & Dedicated IPs → Senders → Add a sender**:
-   nombre `Garage TCG` y el Gmail del club. Confírmalo con el correo que te
-   llega.
-4. **SMTP & API → API Keys → Generate a new API key**. Copia la clave
-   (empieza por `xkeysib-`).
-5. En el PC:
+2. Activa la **Verificación en 2 pasos** en ese Gmail:
+   **myaccount.google.com → Seguridad → Verificación en 2 pasos**.
+3. Crea la contraseña de aplicación en
+   **https://myaccount.google.com/apppasswords**: nombre `Garage TCG` →
+   **Crear**. Copia las 16 letras (los espacios dan igual).
+4. En el PC:
    ```powershell
-   npx wrangler secret put BREVO_API_KEY
-   npx wrangler secret put MAIL_FROM
+   npx wrangler secret put GMAIL_USER
+   npx wrangler secret put GMAIL_APP_PASSWORD
    ```
-   (en el primero pega la clave; en el segundo, el Gmail del club).
-6. En `wrangler.toml` cambia `DEV_CODES = "1"` por `DEV_CODES = "0"` y publica:
+   (el Gmail del club y la contraseña de aplicación).
+5. Si antes configuraste SendPulse o Brevo, borra el remitente viejo (si no,
+   se usaría como "De:"):
    ```powershell
-   npm run deploy
+   npx wrangler secret delete MAIL_FROM
    ```
+   (`SENDPULSE_ID`/`SENDPULSE_SECRET` pueden quedarse: si hay Gmail, se usa
+   Gmail.)
+6. `DEV_CODES = "0"` en `wrangler.toml` y `npm run deploy`.
+7. Prueba creando una cuenta con otro Gmail (mira también en **Spam**). Si
+   falla, `npm run logs`: la línea `mail Error: SMTP …` dice el motivo (p. ej.
+   `SMTP AUTH: 535` = usuario o contraseña de aplicación incorrectos).
 
-Los correos que se envían desde un Gmail a través de Brevo pueden caer en
-**Spam** más a menudo; la app ya avisa de mirar ahí. Con un dominio propio
-(más adelante) llegan mejor.
+Alternativas ya programadas (se usan si no hay Gmail configurado):
+SendPulse (`SENDPULSE_ID`, `SENDPULSE_SECRET`, `MAIL_FROM` de un dominio
+verificado) o Brevo (`BREVO_API_KEY`, `MAIL_FROM`).
 
 ## 10 · Sincronización (fase 2)
 
@@ -195,6 +206,7 @@ ficha. De los demás jugadores solo llega el apodo.
 | POST | `/v1/admin/accounts/:id/role` | `role` (admin) |
 | POST | `/v1/admin/accounts/:id/player` | `playerId` o `null` (admin) |
 | POST | `/v1/admin/accounts/:id/verify` | (admin) |
+| POST | `/v1/admin/accounts/:id/reset-code` | (admin) → `code` para mandar por WhatsApp |
 
 Errores: código HTTP 4xx con `{ "error": "mensaje para el usuario" }`; si la
 cuenta no está confirmada, además `"code": "unverified"` y `"email"`.

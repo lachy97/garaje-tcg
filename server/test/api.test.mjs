@@ -164,10 +164,14 @@ test('con correo configurado: se envía y no se devuelve el código', async () =
   assert.deepEqual(state.sent, [{ to: 'leo@gmail.com', code: '111111', purpose: 'verify' }]);
 });
 
-test('sin correo ni modo pruebas: 503', async () => {
-  const { call, env } = setup();
+test('sin correo ni modo pruebas: la cuenta se crea pero avisa; reenviar da 503', async () => {
+  const { call, env, tick } = setup();
   env.DEV_CODES = '0';
-  assert.equal((await reg(call, 'leo', 'leo@gmail.com')).status, 503);
+  const r = await reg(call, 'leo', 'leo@gmail.com');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.mailFailed, true);
+  tick(61);
+  assert.equal((await call('POST', '/v1/auth/resend', { email: 'leo@gmail.com' })).status, 503);
 });
 
 test('la raíz también responde como /v1/health', async () => {
@@ -175,4 +179,26 @@ test('la raíz también responde como /v1/health', async () => {
   const r = await call('GET', '/');
   assert.equal(r.status, 200);
   assert.equal(r.data.ok, true);
+});
+
+test('si el correo falla la cuenta se crea igual; el admin la confirma y da código de contraseña', async () => {
+  const { call, env, tick } = setup();
+  const r = await reg(call, 'lachy', 'lachy@gmail.com');
+  const admin = (await call('POST', '/v1/auth/verify', { email: 'lachy@gmail.com', code: r.data.devCode })).data.session;
+  env.DEV_CODES = '0'; // sin modo pruebas ni correo configurado → el envío falla
+  const leo = await reg(call, 'leo', 'leo@gmail.com');
+  assert.equal(leo.status, 200);
+  assert.equal(leo.data.mailFailed, true);
+  assert.equal(leo.data.devCode, undefined);
+  const list = await call('GET', '/v1/admin/accounts', null, admin.token);
+  const acc = list.data.accounts.find((a) => a.username === 'leo');
+  await call('POST', `/v1/admin/accounts/${acc.id}/verify`, {}, admin.token);
+  assert.equal((await call('POST', '/v1/auth/login', { identifier: 'leo', password: 'clave1234' })).status, 200);
+
+  tick(1);
+  const rc = await call('POST', `/v1/admin/accounts/${acc.id}/reset-code`, {}, admin.token);
+  assert.match(rc.data.code, /^\d{6}$/);
+  const ok = await call('POST', '/v1/auth/password/reset', { identifier: 'leo', code: rc.data.code, newPassword: 'nueva9876' });
+  assert.equal(ok.status, 200);
+  assert.equal((await call('POST', '/v1/auth/login', { identifier: 'leo', password: 'nueva9876' })).status, 200);
 });

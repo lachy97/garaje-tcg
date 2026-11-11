@@ -200,7 +200,7 @@ class LocalAuthApi implements AuthApi {
   // ───────────────────────── Cuenta ─────────────────────────
 
   @override
-  Future<void> register({
+  Future<bool> register({
     required String username,
     required String email,
     required String password,
@@ -247,6 +247,24 @@ class LocalAuthApi implements AuthApi {
     ));
     _sendCode(db, mail, 'verify');
     await _save(db);
+    return true;
+  }
+
+  @override
+  Future<String> adminResetCode(Session session, {required String accountId}) async {
+    final db = await _load();
+    _admin(db, session);
+    final u = _target(db, accountId);
+    final code = _newCode();
+    db.codes.removeWhere((c) => c.email == u.account.email && c.purpose == 'reset');
+    db.codes.add(_Code(
+      email: u.account.email,
+      purpose: 'reset',
+      code: code,
+      expiresAt: _now().add(const Duration(minutes: AuthRules.codeMinutes)),
+    ));
+    await _save(db);
+    return code;
   }
 
   @override

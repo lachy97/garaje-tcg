@@ -227,8 +227,16 @@ export class AuthService {
     const salt = randomToken(16);
     const now = this.iso();
     const phoneClean = R.cleanPhone(phone);
-    // El código primero: si el correo falla, la cuenta no queda a medias.
-    const dev = await this.issueCode(mail, 'verify');
+    // Si el correo no sale, la cuenta se crea igual: el administrador puede
+    // confirmarla a mano (Cuentas y roles) o el jugador pedir otro código.
+    let dev = {};
+    let mailFailed = false;
+    try {
+      dev = await this.issueCode(mail, 'verify');
+    } catch (e) {
+      if (!(e instanceof ApiError) || (e.status !== 502 && e.status !== 503)) throw e;
+      mailFailed = true;
+    }
     await this.db
       .prepare(
         `INSERT INTO accounts (id, username, email, nickname, phone, role, verified, salt, hash, created_at, updated_at)
@@ -247,7 +255,7 @@ export class AuthService {
         now,
       )
       .run();
-    return { ok: true, email: mail, ...dev };
+    return { ok: true, email: mail, ...dev, ...(mailFailed ? { mailFailed: true } : {}) };
   }
 
   async resendVerification({ email }) {
@@ -365,6 +373,21 @@ export class AuthService {
       .bind(pid, this.iso(), id)
       .run();
     return { account: publicAccount(await this.byId(id)) };
+  }
+
+  /** Código para poner contraseña nueva, para mandarlo por WhatsApp
+   *  cuando el correo no llega. Vale 15 minutos. */
+  async adminResetCode(token, id) {
+    await this.requireAdmin(token);
+    const a = await this.byId(id);
+    const code = this.newCode();
+    await this.db
+      .prepare(
+        'INSERT OR REPLACE INTO codes (email, purpose, code_hash, expires_at, attempts) VALUES (?, ?, ?, ?, 0)',
+      )
+      .bind(a.email, 'reset', await sha256(`${a.email}|reset|${code}`), this.now() + R.CODE_MINUTES * MIN)
+      .run();
+    return { code, email: a.email, username: a.username };
   }
 
   async verifyManually(token, id) {

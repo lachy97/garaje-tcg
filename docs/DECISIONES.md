@@ -239,3 +239,10 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Torneo en juego en el teléfono del jugador**: pestañas Rondas (con el tiempo de la ronda) y Clasificación, solo consulta (sin reportar, avanzar ni cambiar cruces).
 - Lo que llega del servidor no se vuelve a poner en la cola de subida (los disparadores se saltan mientras hay la marca `applying`).
 - Si el administrador vincula la ficha más tarde, el teléfono vuelve a bajar todo.
+
+## Correos: SendPulse (10/11)
+- Brevo no acepta direcciones de Cuba. Se usa **SendPulse** (ya probado desde Cuba en otra app): SMTP API con OAuth (ID + Secret), HTML en base64, token de 1 h guardado en el Worker y reintento si vence. Secretos `SENDPULSE_ID`, `SENDPULSE_SECRET`, `MAIL_FROM`. Brevo sigue como alternativa (`BREVO_API_KEY`). Guía: `server/LEEME.md`, paso 9.
+
+## Correos: Gmail del club + aprobación del administrador (10/11)
+- SendPulse sin dominio propio solo deja enviar en modo prueba (50 correos, remitente de ellos) y no se quiere usar el dominio de la otra cuenta. Se envía **desde el Gmail del club por SMTP** (`server/src/smtp.js`, sockets TCP de Workers, TLS en el puerto 465, AUTH con **contraseña de aplicación**). Secretos `GMAIL_USER` y `GMAIL_APP_PASSWORD`. Orden: Gmail → SendPulse → Brevo.
+- **Aprobación del administrador como respaldo**: si el correo no sale, la cuenta se crea igual (`mailFailed`) y la app lo dice; el administrador la confirma en Cuentas y roles ("Confirmar Gmail a mano") y el jugador entra con "Ya me la confirmaron: entrar". Para contraseña olvidada, "Código para cambiar la contraseña" en Cuentas y roles da un código de 15 min para mandarlo por WhatsApp; el jugador usa "Olvidé mi contraseña → Ya tengo un código".

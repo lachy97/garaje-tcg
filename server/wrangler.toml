@@ -12,7 +12,7 @@ workers_dev = true
 MAIL_FROM_NAME = "Garage TCG"
 # "1" = los códigos se devuelven en la respuesta y la app los muestra
 # (solo para pruebas, mientras Brevo no esté configurado). En producción "0".
-DEV_CODES = "1"
+DEV_CODES = "0"
 
 # Secretos (NO van aquí; se ponen con `npx wrangler secret put NOMBRE`):
 #   ADMIN_EMAIL    tu Gmail: la cuenta con ese correo nace como Administrador

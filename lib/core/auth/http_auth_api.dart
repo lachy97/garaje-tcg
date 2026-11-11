@@ -112,7 +112,7 @@ class HttpAuthApi implements AuthApi {
   }
 
   @override
-  Future<void> register({
+  Future<bool> register({
     required String username,
     required String email,
     required String password,
@@ -127,6 +127,15 @@ class HttpAuthApi implements AuthApi {
       'phone': phone,
     });
     _keepDevCode(data, email, 'verify');
+    return data['mailFailed'] != true;
+  }
+
+  @override
+  Future<String> adminResetCode(Session session, {required String accountId}) async {
+    final data = await _call(
+        'POST', 'v1/admin/accounts/${Uri.encodeComponent(accountId)}/reset-code',
+        body: const {}, token: session.token);
+    return '${data['code']}';
   }
 
   @override

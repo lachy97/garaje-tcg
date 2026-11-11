@@ -3,7 +3,7 @@
 import { ApiError, AuthService } from './auth.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.3.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -54,11 +54,12 @@ export async function handle(request, env, opts) {
         case '/v1/auth/logout': return json(await auth.logout(token));
         case '/v1/sync/push': return json(await sync.push(token, body));
       }
-      const admin = path.match(/^\/v1\/admin\/accounts\/([^/]+)\/(role|player|verify)$/);
+      const admin = path.match(/^\/v1\/admin\/accounts\/([^/]+)\/(role|player|verify|reset-code)$/);
       if (admin) {
         const [, id, what] = admin;
         if (what === 'role') return json(await auth.setRole(token, id, body));
         if (what === 'player') return json(await auth.linkPlayer(token, id, body));
+        if (what === 'reset-code') return json(await auth.adminResetCode(token, id));
         return json(await auth.verifyManually(token, id));
       }
     }

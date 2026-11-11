@@ -175,7 +175,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     } on UnverifiedAccountException catch (e) {
       if (!mounted) return;
       showMessage(context, e.message);
-      final ok = await openAuthPage<bool>(context, VerifyEmailPage(email: e.email));
+      final ok = await openAuthPage<bool>(
+          context, VerifyEmailPage(email: e.email, password: _pass.text));
       if ((ok ?? false) && mounted) Navigator.of(context).pop(true);
     } on AuthException catch (e) {
       if (mounted) showMessage(context, e.message, error: true);
@@ -277,8 +278,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (!_form.currentState!.validate()) return;
     setState(() => _busy = true);
     var go = false;
+    var mailSent = true;
     try {
-      await ref.read(authApiProvider).register(
+      mailSent = await ref.read(authApiProvider).register(
             username: _user.text,
             email: _email.text,
             password: _pass.text,
@@ -297,7 +299,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       if (mounted) setState(() => _busy = false);
     }
     if (!go || !mounted) return;
-    final ok = await openAuthPage<bool>(context, VerifyEmailPage(email: _email.text));
+    final ok = await openAuthPage<bool>(
+      context,
+      VerifyEmailPage(email: _email.text, password: _pass.text, mailFailed: !mailSent),
+    );
     if ((ok ?? false) && mounted) Navigator.of(context).pop(true);
   }
 
@@ -398,9 +403,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 // ───────────────────────── Confirmar Gmail ─────────────────────────
 
 class VerifyEmailPage extends ConsumerStatefulWidget {
-  const VerifyEmailPage({super.key, required this.email});
+  const VerifyEmailPage({super.key, required this.email, this.password, this.mailFailed = false});
 
   final String email;
+
+  /// Para entrar directamente cuando el administrador la confirme a mano.
+  final String? password;
+
+  /// El correo no se pudo enviar al registrarse.
+  final bool mailFailed;
 
   @override
   ConsumerState<VerifyEmailPage> createState() => _VerifyEmailPageState();
@@ -446,6 +457,29 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
     if (ok) showMessage(context, 'Código enviado. Mira también en Spam.');
   }
 
+  /// El administrador la confirmó a mano: entrar con la contraseña.
+  Future<void> _loginConfirmed() async {
+    final pass = widget.password;
+    if (pass == null) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(sessionProvider.notifier).login(widget.email, pass);
+      if (!mounted) return;
+      showMessage(context, 'Cuenta confirmada. ¡Bienvenido!');
+      Navigator.of(context).pop(true);
+    } on UnverifiedAccountException {
+      if (mounted) {
+        showMessage(context, 'Todavía no está confirmada. Avisa al administrador.', error: true);
+      }
+    } on AuthException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+    } catch (e) {
+      if (mounted) showMessage(context, 'No se pudo conectar: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final email = AuthRules.normalizeEmail(widget.email);
@@ -454,9 +488,13 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
       busy: _busy,
       children: [
         Text(
-          'Te enviamos un código de ${AuthRules.codeLength} dígitos a $email. '
-          'Vale ${AuthRules.codeMinutes} minutos. Si no lo ves, mira en Spam.',
-          style: const TextStyle(color: AppColors.textSecondary),
+          widget.mailFailed
+              ? 'Tu cuenta está creada, pero no pudimos enviarte el código a $email. '
+                  'Prueba "Reenviar código" en un rato o pide al administrador que '
+                  'confirme tu cuenta.'
+              : 'Te enviamos un código de ${AuthRules.codeLength} dígitos a $email. '
+                  'Vale ${AuthRules.codeMinutes} minutos. Si no lo ves, mira en Spam.',
+          style: TextStyle(color: widget.mailFailed ? AppColors.draw : AppColors.textSecondary),
         ),
         const SizedBox(height: 16),
         SimulatedMailBox(email: email, purpose: 'verify', refresh: _refresh),
@@ -473,6 +511,18 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
         const SizedBox(height: 20),
         FilledButton(onPressed: _busy ? null : _verify, child: const Text('Confirmar')),
         TextButton(onPressed: _busy ? null : _resend, child: const Text('Reenviar código')),
+        const Divider(height: 32),
+        const Text(
+          '¿No te llega? El administrador también puede confirmar tu cuenta '
+          '(en persona o por WhatsApp).',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        ),
+        if (widget.password != null)
+          TextButton(
+            onPressed: _busy ? null : _loginConfirmed,
+            child: const Text('Ya me la confirmaron: entrar'),
+          ),
       ],
     );
   }
@@ -500,6 +550,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   final _pass2 = TextEditingController();
   final _form = GlobalKey<FormState>();
   String? _sentTo;
+  bool _fromAdmin = false;
   bool _busy = false;
   int _refresh = 0;
 
@@ -525,6 +576,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
       _busy = false;
       if (ok) {
         _sentTo = to;
+        _fromAdmin = false;
         _refresh++;
       }
     });
@@ -569,18 +621,37 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
           ),
         ),
         const SizedBox(height: 12),
-        if (sent == null)
+        if (sent == null) ...[
           FilledButton(
             onPressed: _busy ? null : _send,
             child: const Text('Enviarme un código al Gmail'),
-          )
-        else
+          ),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () {
+                    if (_id.text.trim().isEmpty) {
+                      showMessage(context, 'Escribe tu usuario o Gmail', error: true);
+                      return;
+                    }
+                    setState(() {
+                      _fromAdmin = true;
+                      _sentTo = _id.text.trim();
+                    });
+                  },
+            child: const Text('Ya tengo un código (me lo dio el administrador)'),
+          ),
+        ] else
           Form(
             key: _form,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Te enviamos un código a $sent.',
+                Text(
+                    _fromAdmin
+                        ? 'Escribe el código que te dio el administrador (vale 15 minutos).'
+                        : 'Te enviamos un código a $sent. Si no llega, el administrador '
+                            'puede darte uno.',
                     style: const TextStyle(color: AppColors.textSecondary)),
                 const SizedBox(height: 12),
                 SimulatedMailBox(email: sent, purpose: 'reset', refresh: _refresh),
