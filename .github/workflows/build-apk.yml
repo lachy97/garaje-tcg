@@ -30,9 +30,13 @@ jobs:
           distribution: temurin
           java-version: '17'
  
+      # Flutter fijo en 3.47: la 3.50 exige el plugin de Android 9 (AGP 9.1.1+)
+      # y Gradle 9.3.1+, y el proyecto usa AGP 8.11.1 + Gradle 8.14.3. Pasar a
+      # AGP 9 es una migración aparte; hasta entonces, 3.47.x (último parche).
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.47.x
           cache: true
  
       - name: Dependencias
@@ -73,12 +77,9 @@ jobs:
       # --obfuscate: el código Dart queda con nombres sin sentido, así es mucho
       # más difícil descompilar la app y quitar la comprobación de licencias.
       # Los símbolos para leer errores quedan en build/debug-info (artefacto aparte).
-      # --android-skip-build-dependency-validation: las versiones nuevas de
-      # Flutter exigen Gradle 9.3.1 (y con él AGP 9), pero el proyecto sigue en
-      # Gradle 8.14.3 + AGP 8.11.1, que compilan bien. Sin la opción, falla.
       - name: Compilar APK
         run: >
-          flutter build apk --android-skip-build-dependency-validation --release --split-per-abi
+          flutter build apk --release --split-per-abi
           --obfuscate --split-debug-info=build/debug-info
           --build-number=${{ github.run_number }}
  

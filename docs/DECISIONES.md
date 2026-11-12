@@ -303,3 +303,6 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Mi mesa ahora** (Torneos, arriba): para quien tenga ficha vinculada y esté en un torneo en juego: ronda, mesa, rival, su mazo, resultado y tiempo que queda; toca para abrir el torneo.
 - **Pantalla para proyectar** (icono de TV en la barra del torneo en juego, organizador): cruces y clasificación en letra grande, reloj, columnas según el ancho; cambia sola cada 20 s o con un toque; pantalla completa y sin apagarse.
 - **Cupo y lista de espera** en la inscripción desde la app (esquema v12, `tournaments.capacity`, 0 = sin límite): con el cupo lleno (inscritos + aceptadas + pendientes) las solicitudes nuevas van a la lista de espera con su puesto; al liberarse plazas suben por orden de llegada (aceptadas solas o pendientes, según el modo). Aceptar a mano con el cupo lleno pide aumentarlo o rechazar a alguien.
+
+## Compilación: Flutter fijo en 3.47 (11/11)
+- Flutter 3.50 exige AGP 9.1.1+ y Gradle 9.3.1+; el proyecto usa AGP 8.11.1 + Gradle 8.14.3 (y Kotlin 2.2.20). Saltarse la comprobación no basta: el plugin de Flutter 3.50 usa la API de AGP 9 y falla con AGP 8. El workflow fija `flutter-version: 3.47.x`. Pasar a AGP 9 / Gradle 9 queda como migración aparte cuando Flutter resuelva los fallos abiertos (flutter#192167, #192111).
