@@ -40,6 +40,8 @@ dependencies:
   fl_chart: ^1.0.0
   # Pantalla encendida durante el tiempo de ronda
   wakelock_plus: ^1.2.8
+  # Avisos en el teléfono (sin Google: los genera la propia app al sincronizar)
+  flutter_local_notifications: ^19.0.0
 
 dev_dependencies:
   flutter_test:

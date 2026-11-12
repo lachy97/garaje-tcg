@@ -328,3 +328,10 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - Todos (con sesión) ven la **ficha pública** de cualquier jugador: apodo, torneos, mazos, winrate, destacados y rivales. Los **datos personales** (nombre, Konami ID, teléfono, notas) y las **penalizaciones** solo los ven el propio jugador, el administrador y los organizadores (`Permissions.canSeePersonalData`). El servidor ya no envía esos datos a los jugadores.
 - Se llega a una ficha tocando una fila del **ranking**, de la **clasificación** de un torneo, de los participantes del resumen, o desde rivales y mazos.
 - **Ranking ya calculado (privacidad #4)**: con la ficha pública, los resultados de los torneos terminados tienen que llegar a los teléfonos igual (de ellos salen torneos, mazos y winrate de cada ficha), así que mandar el ranking calculado no ocultaría nada más y obligaría a duplicar en el servidor el cálculo del ranking y de la tier list. Se queda como está: los jugadores sin licencia reciben esas partidas pero la app no les muestra las estadísticas de mazos.
+
+## Tanda 6: avisos en el teléfono (12/11)
+- **Sin Google** (Firebase está bloqueado en Cuba): los avisos los genera la propia app con `flutter_local_notifications` cada vez que sincroniza (cada 30 s con la app abierta o recién cerrada, y al volver a ella). Si Android cierra la app del todo, los avisos llegan al abrirla de nuevo. No hay avisos con la app cerrada del todo; para eso haría falta un servicio en segundo plano (más batería) o Google.
+- **Jugador**: ronda nueva con su mesa y rival (o BYE), quedan 5 minutos, se acabó el tiempo, su rival reportó el resultado (para confirmar), y cambios en su inscripción (aceptada, rechazada, lista de espera).
+- **Organizador y jueces**: llamadas al juez, resultados en disputa y solicitudes de inscripción nuevas.
+- Cada aviso sale una sola vez (se recuerdan los últimos 400). **Ajustes → Avisos** los apaga. El permiso de Android 13+ se pide la primera vez que se entra a la app.
+- Android: permiso `POST_NOTIFICATIONS` y *core library desugaring* (`desugar_jdk_libs` 2.1.4) en `android/app/build.gradle.kts`, que pide el plugin.

@@ -11,6 +11,7 @@ import '../auth/http_auth_api.dart';
 import '../db/app_database.dart';
 import '../db/database_provider.dart';
 import '../../features/tournaments/application/tournament_service.dart';
+import '../notify/app_notifier.dart';
 import '../play/play.dart';
 import '../registrations/registrations.dart';
 import 'sync_schema.dart';
@@ -195,6 +196,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
           lastSent: got,
           clearError: true,
         );
+        unawaited(checkNotifications(ref));
         return;
       }
       // Inscripciones desde la app aceptadas: se inscriben aquí (y se suben
@@ -242,6 +244,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
         rejected: rejected,
         clearError: true,
       );
+      unawaited(checkNotifications(ref));
     } on AuthNetworkException catch (e) {
       final pending = await _pendingOrNull();
       if (ref.mounted) state = state.copyWith(running: false, pending: pending, lastError: e.message);

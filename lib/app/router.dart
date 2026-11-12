@@ -15,6 +15,7 @@ import '../features/tournaments/presentation/create_tournament_page.dart';
 import '../features/tournaments/presentation/tournament_detail_page.dart';
 import '../features/tournaments/presentation/tournaments_page.dart';
 import '../core/auth/auth_providers.dart';
+import '../core/notify/app_notifier.dart';
 import '../core/sync/sync_service.dart';
 import '../features/account/welcome.dart';
 import 'theme.dart';
@@ -118,6 +119,8 @@ class HomeShell extends ConsumerWidget {
     final preview = ref.watch(rolePreviewProvider);
     // Mantiene viva la subida automática de datos al servidor.
     ref.listen(syncControllerProvider, (_, _) {});
+    // Permiso para los avisos del teléfono (una vez).
+    WidgetsBinding.instance.addPostFrameCallback((_) => AppNotifier.askOnce());
     final allPlayers = perms.canSeeAllPlayers;
     return PopScope(
       canPop: false,

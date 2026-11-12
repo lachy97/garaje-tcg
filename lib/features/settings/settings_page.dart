@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../app/restartable_app.dart';
 import '../../app/theme.dart';
 import '../../app/theme_mode.dart';
+import '../../core/notify/app_notifier.dart';
 import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
 import '../../core/backup/backup_codec.dart';
@@ -212,6 +213,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const AccountSection(),
               const SectionLabel('Sincronización'),
               const SyncSection(),
+              const SectionLabel('Avisos'),
+              NeonCard(
+                padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: ref.watch(notifyEnabledProvider),
+                  onChanged: (v) => ref.read(notifyEnabledProvider.notifier).set(v),
+                  title: const Text('Avisos en el teléfono'),
+                  subtitle: Text(
+                    'Ronda nueva y tu mesa, quedan 5 minutos, tu rival reportó, inscripciones, '
+                    'llamadas al juez. Llegan mientras la app está abierta o recién cerrada '
+                    '(sin servicios de Google).',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ),
+              ),
               const SectionLabel('Apariencia'),
               NeonCard(
                 child: Column(
