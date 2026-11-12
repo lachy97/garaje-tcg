@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
+import '../../../app/widgets/common.dart';
 import '../../../core/db/database_provider.dart';
 
 /// Mi partida de la ronda actual en un torneo en juego.
