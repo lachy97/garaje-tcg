@@ -46,7 +46,7 @@ class _CardDataSectionState extends ConsumerState<CardDataSection> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Se usan para las listas de mazos del Top 4. Las imágenes se descargan '
+            'Se usan para las listas de mazos del Top Cut. Las imágenes se descargan '
             'solo la primera vez que se ven y quedan guardadas en el teléfono.',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),

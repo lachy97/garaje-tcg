@@ -129,6 +129,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     int? capacity,
     bool? checkIn,
     String? checkinCode,
+    String? listVisibility,
   }) {
     return (update(tournaments)..where((t) => t.id.equals(id))).write(
       TournamentsCompanion(
@@ -137,6 +138,7 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
         capacity: Value.absentIfNull(capacity),
         checkIn: Value.absentIfNull(checkIn),
         checkinCode: Value.absentIfNull(checkinCode),
+        listVisibility: Value.absentIfNull(listVisibility),
         name: name == null ? const Value.absent() : Value(name.trim()),
         swissRounds: Value.absentIfNull(swissRounds),
         topCutSize: Value.absentIfNull(topCutSize),

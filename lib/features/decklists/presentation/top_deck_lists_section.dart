@@ -4,13 +4,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
+import '../../../core/auth/auth_providers.dart';
 import '../../../core/db/app_database.dart';
+import '../../../core/db/database_provider.dart';
+import '../../../core/sync/sync_service.dart';
+import '../../tournaments/presentation/providers.dart';
 import '../data/card_images.dart';
 import '../data/deck_lists_provider.dart';
 import '../domain/card_db.dart';
 import 'deck_list_editor_page.dart';
 import 'deck_list_export.dart';
 import 'deck_list_page.dart';
+
+/// Quién ve las listas (columna `tournaments.list_visibility`).
+const _visibilityOptions = [
+  ('open', 'Las listas en cuanto se suben'),
+  ('archetype', 'Solo el mazo, sin las cartas'),
+  ('after', 'Las listas al terminar el torneo'),
+];
 
 /// "Listas" del Top Cut en el resumen de un torneo terminado: cada jugador con
 /// su estado (lista subida o no). Tocar abre su lista o la pantalla de subirla;
@@ -25,6 +36,8 @@ class TopDeckListsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (targets.isEmpty) return const SizedBox.shrink();
     final saved = ref.watch(tournamentDeckListsProvider(tournamentId)).value ?? const {};
+    final canEdit = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
+    final visibility = ref.watch(tournamentProvider(tournamentId)).value?.listVisibility ?? 'open';
     // Solo se comparten las que ya están subidas.
     final uploaded = [for (final t in targets) if (saved.containsKey(t.playerId)) t];
     return Column(
@@ -33,6 +46,20 @@ class TopDeckListsSection extends ConsumerWidget {
         Row(
           children: [
             Expanded(child: SectionLabel('Listas del Top ${targets.length}')),
+            if (canEdit)
+              PopupMenuButton<String>(
+                tooltip: 'Quién ve las listas',
+                icon: Icon(Icons.visibility_outlined, color: AppColors.textSecondary),
+                initialValue: visibility,
+                onSelected: (v) => runGuarded(context, () async {
+                  await ref.read(tournamentsDaoProvider).updateSettings(tournamentId, listVisibility: v);
+                  await ref.read(syncControllerProvider.notifier).sync();
+                }),
+                itemBuilder: (_) => [
+                  for (final (v, label) in _visibilityOptions)
+                    CheckedPopupMenuItem(value: v, checked: v == visibility, child: Text(label)),
+                ],
+              ),
             Padding(
               padding: const EdgeInsets.only(right: 8, top: 8),
               child: TextButton.icon(
@@ -44,6 +71,13 @@ class TopDeckListsSection extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: Text(
+            'Los jugadores ven: ${_visibilityOptions.firstWhere((o) => o.$1 == visibility, orElse: () => _visibilityOptions.first).$2.toLowerCase()}.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
         ),
         for (final t in targets)
           NeonCard(
@@ -73,11 +107,13 @@ class TopDeckListsSection extends ConsumerWidget {
                     avatar: Icon(Icons.check, size: 16, color: AppColors.neon),
                     label: Text('Ver lista'),
                   )
-                else
+                else if (canEdit)
                   const Chip(
                     avatar: Icon(Icons.upload, size: 16),
                     label: Text('Subir lista'),
-                  ),
+                  )
+                else
+                  const Chip(label: Text('Sin publicar')),
               ],
             ),
           ),

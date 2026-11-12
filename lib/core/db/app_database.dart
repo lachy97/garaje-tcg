@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -147,6 +147,10 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(tournaments, tournaments.checkinCode);
             await m.addColumn(tournamentPlayers, tournamentPlayers.checkedIn);
             await m.addColumn(matches, matches.extraMinutes);
+          }
+          if (from < 14) {
+            // v14: visibilidad de las listas de mazo
+            await m.addColumn(tournaments, tournaments.listVisibility);
           }
         },
         beforeOpen: (details) async {

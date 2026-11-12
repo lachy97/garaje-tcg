@@ -177,3 +177,24 @@ test('privacidad: cover y notas solo para quien lleva el torneo; el organizador 
   const ad = (await call('GET', '/v1/sync/pull?since=0', null, admin.token)).data.rows;
   assert.equal(ad.find((x) => x.id === 't9').data.notes, 'privado');
 });
+
+test('listas de mazo: solo arquetipo o al terminar', async () => {
+  const { call, admin, org, player } = await setup();
+  await call('POST', `/v1/admin/accounts/${player.account.id}/player`, { playerId: 'p1' }, admin.token);
+  const push = (rows) => call('POST', '/v1/sync/push', { rows }, org.token);
+  await push([
+    row('tournaments', 'ta', 1, { id: 'ta', status: 'finished', list_visibility: 'archetype' }),
+    row('tournaments', 'tb', 1, { id: 'tb', status: 'topCut', list_visibility: 'after' }),
+    row('tournament_players', 'ea', 1, { id: 'ea', tournament_id: 'ta', player_id: 'p1' }),
+    row('tournament_players', 'eb', 1, { id: 'eb', tournament_id: 'tb', player_id: 'p1' }),
+    row('deck_lists', 'la', 1, { id: 'la', tournament_id: 'ta', player_id: 'p2' }),
+    row('deck_lists', 'lb', 1, { id: 'lb', tournament_id: 'tb', player_id: 'p2' }),
+  ]);
+  let rows = (await call('GET', '/v1/sync/pull?since=0', null, player.token)).data;
+  assert.ok(!rows.rows.some((x) => x.t === 'deck_lists'), 'ninguna lista todavía');
+  // Termina el torneo "al terminar": llegan sus listas.
+  await push([row('tournaments', 'tb', 2, { id: 'tb', status: 'finished', list_visibility: 'after' })]);
+  rows = (await call('GET', `/v1/sync/pull?since=${rows.seq}`, null, player.token)).data;
+  assert.ok(rows.rows.some((x) => x.id === 'lb'));
+  assert.ok(!rows.rows.some((x) => x.id === 'la'));
+});

@@ -136,6 +136,11 @@ class Tournaments extends Table with SyncColumns {
   /// [checkinCode] (o el organizador lo marca a mano).
   BoolColumn get checkIn => boolean().withDefault(const Constant(false))();
   TextColumn get checkinCode => text().nullable()();
+
+  /// Quién ve las listas de mazo del Top Cut (v14): 'open' (todos, en cuanto
+  /// se suben), 'archetype' (los jugadores solo ven el mazo, no las cartas)
+  /// o 'after' (al terminar el torneo).
+  TextColumn get listVisibility => text().withDefault(const Constant('open'))();
 }
 
 @DataClassName('TournamentPlayer')

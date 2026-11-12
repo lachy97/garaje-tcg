@@ -7,6 +7,7 @@ import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/play/play.dart';
+import '../../decklists/presentation/top_cut_lists_page.dart';
 import 'judge_floor_page.dart';
 import 'projection_page.dart';
 import 'providers.dart';
@@ -132,6 +133,14 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
             appBar: AppBar(
               title: title,
               actions: [
+                // Listas del Top Cut mientras se juega.
+                if (canManage && t.status == TournamentStatus.topCut)
+                  IconButton(
+                    tooltip: 'Listas del Top Cut',
+                    icon: const Icon(Icons.style_outlined),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => TopCutListsPage(tournament: t))),
+                  ),
                 // Pantalla para proyectar (TV o portátil) mientras se juega.
                 if (canManage && !finished && t.status != TournamentStatus.draft)
                   IconButton(

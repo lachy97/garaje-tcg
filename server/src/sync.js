@@ -201,13 +201,19 @@ export class SyncService {
     // Torneos visibles: terminados, con inscripción desde la app abierta y
     // en los que está inscrito.
     const tq = await this.db
-      .prepare("SELECT id, owner_id, json_extract(data, '$.status') AS status, json_extract(data, '$.online_registration') AS online FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0")
+      .prepare("SELECT id, owner_id, json_extract(data, '$.status') AS status, json_extract(data, '$.online_registration') AS online, json_extract(data, '$.list_visibility') AS lists FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0")
       .bind(community)
       .all();
     const visible = new Set();
     // Torneos que lleva este organizador: le llegan completos (cover, notas,
     // penalizaciones de todos).
     const owned = new Set();
+    // Listas de mazo: 'archetype' = no se envían (el mazo ya va en la
+    // inscripción); 'after' = solo con el torneo terminado.
+    const hiddenLists = new Set();
+    for (const t of tq.results ?? []) {
+      if (t.lists === 'archetype' || (t.lists === 'after' && t.status !== 'finished')) hiddenLists.add(t.id);
+    }
     // Torneos donde es juez: todas las partidas y penalizaciones (sin cover,
     // notas ni teléfonos).
     const judged = new Set();
@@ -258,6 +264,7 @@ export class SyncService {
       } else if (r.tournament_id && visible.has(r.tournament_id)) {
         const mine = owned.has(r.tournament_id);
         if (r.tbl === 'penalties' && r.player_id !== pid && !mine && !judged.has(r.tournament_id)) return;
+        if (r.tbl === 'deck_lists' && !mine && !judged.has(r.tournament_id) && hiddenLists.has(r.tournament_id)) return;
         const o = out(r);
         if (!mine) for (const k of ORGANIZER_ONLY[r.tbl] ?? []) delete o.data[k];
         rows.set(key, o);
