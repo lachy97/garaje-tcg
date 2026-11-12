@@ -356,6 +356,10 @@ class LocalAuthApi implements AuthApi {
   @override
   Future<Account> me(Session session) async => _bySession(await _load(), session).account;
 
+  @override
+  Future<Session> renew(Session session) async =>
+      session.withAccount(await me(session)); // la simulación no renueva
+
   // ───────────────────────── Administrador ─────────────────────────
 
   @override

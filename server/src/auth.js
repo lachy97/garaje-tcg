@@ -331,8 +331,19 @@ export class AuthService {
     return { ok: true };
   }
 
+  /**
+   * Cuenta de la sesión. Además renueva la sesión: vuelve a durar
+   * SESSION_DAYS desde ahora (la app la llama al abrirse con conexión), así
+   * quien usa la app no tiene que volver a iniciar sesión.
+   */
   async me(token) {
-    return { account: publicAccount(await this.authenticate(token)) };
+    const account = await this.authenticate(token);
+    const expires = this.now() + R.SESSION_DAYS * 24 * 60 * MIN;
+    await this.db
+      .prepare('UPDATE sessions SET expires_at = ? WHERE token_hash = ?')
+      .bind(expires, await sha256(token))
+      .run();
+    return { account: publicAccount(account), expiresAt: new Date(expires).toISOString() };
   }
 
   // ───────────────────── Administrador ─────────────────────

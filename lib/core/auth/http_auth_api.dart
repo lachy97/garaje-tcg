@@ -67,7 +67,7 @@ class HttpAuthApi implements AuthApi {
     } on HandshakeException {
       throw const AuthNetworkException('No se pudo conectar de forma segura con el servidor.');
     } on SocketException {
-      throw const AuthNetworkException('Sin conexión con el servidor. Revisa los datos o el wifi.');
+      throw const AuthNetworkException('Sin conexión con el servidor. Revisa los datos o el wifi, y que la VPN esté activada.');
     } on HttpException catch (e) {
       throw AuthNetworkException('Error de conexión: ${e.message}');
     }
@@ -177,6 +177,18 @@ class HttpAuthApi implements AuthApi {
   @override
   Future<Account> me(Session session) async =>
       _account(await _call('GET', 'v1/me', token: session.token));
+
+  @override
+  Future<Session> renew(Session session) async {
+    final data = await _call('GET', 'v1/me', token: session.token);
+    // Servidores anteriores no devuelven la fecha nueva: se mantiene la de antes.
+    final until = DateTime.tryParse((data['expiresAt'] as String?) ?? '');
+    return Session(
+      token: session.token,
+      account: _account(data),
+      expiresAt: until ?? session.expiresAt,
+    );
+  }
 
   @override
   Future<List<Account>> listAccounts(Session session) async {

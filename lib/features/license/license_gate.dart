@@ -43,6 +43,8 @@ class _LicenseGateState extends ConsumerState<LicenseGate> with WidgetsBindingOb
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(licenseProvider.notifier).refresh();
+      // Rol al día y sesión renovada (si hay conexión).
+      ref.read(sessionProvider.notifier).refreshAccount(onlyIfStale: true);
     }
   }
 

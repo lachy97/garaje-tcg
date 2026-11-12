@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -102,6 +103,10 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
+/// Última vez que se pulsó "atrás" en la pantalla principal (para salir hay
+/// que pulsarlo dos veces seguidas: así no se cierra la app sin querer).
+DateTime? _lastBackPress;
+
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
 
@@ -114,7 +119,29 @@ class HomeShell extends ConsumerWidget {
     // Mantiene viva la subida automática de datos al servidor.
     ref.listen(syncControllerProvider, (_, _) {});
     final allPlayers = perms.canSeeAllPlayers;
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // En otra pestaña: "atrás" vuelve a Torneos.
+        if (shell.currentIndex != 0) {
+          shell.goBranch(0);
+          return;
+        }
+        final now = DateTime.now();
+        if (_lastBackPress != null && now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPress = now;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(
+            content: Text('Pulsa atrás otra vez para salir'),
+            duration: Duration(seconds: 2),
+          ));
+      },
+      child: Scaffold(
       body: Column(
         children: [
           // "Ver la app como…" activo: aviso fijo arriba para volver.
@@ -181,6 +208,7 @@ class HomeShell extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }

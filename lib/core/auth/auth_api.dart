@@ -70,6 +70,9 @@ abstract interface class AuthApi {
   /// Datos actualizados de la cuenta de la sesión (rol, ficha vinculada).
   Future<Account> me(Session session);
 
+  /// Como [me], y además renueva la sesión (vuelve a durar 30 días).
+  Future<Session> renew(Session session);
+
   // ───────── Administrador ─────────
 
   Future<List<Account>> listAccounts(Session session);

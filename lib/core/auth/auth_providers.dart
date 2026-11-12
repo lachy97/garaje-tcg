@@ -40,9 +40,14 @@ class _LazyFileStore implements AuthStore {
 
 const _kSession = 'auth.session';
 
+/// Último usuario o Gmail con el que se inició sesión en este teléfono.
+const kLastLoginKey = 'auth.lastLogin';
+
 /// Sesión iniciada en este teléfono (null = sin cuenta, modo local).
 /// Se guarda 30 días y funciona sin conexión.
 class SessionController extends AsyncNotifier<Session?> {
+  DateTime? _lastRefresh;
+
   @override
   Future<Session?> build() async {
     final prefs = await SharedPreferences.getInstance();
@@ -75,8 +80,13 @@ class SessionController extends AsyncNotifier<Session?> {
 
   AuthApi get _api => ref.read(authApiProvider);
 
-  Future<void> login(String identifier, String password) async =>
-      _store(await _api.login(identifier: identifier, password: password));
+  Future<void> login(String identifier, String password) async {
+    final session = await _api.login(identifier: identifier, password: password);
+    // Para rellenar "Usuario o Gmail" la próxima vez.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(kLastLoginKey, identifier.trim());
+    await _store(session);
+  }
 
   Future<void> verify(String email, String code) async =>
       _store(await _api.verifyEmail(email: email, code: code));
@@ -94,12 +104,19 @@ class SessionController extends AsyncNotifier<Session?> {
     await _store(null);
   }
 
-  /// Trae del servidor el rol y la ficha vinculada (si hay conexión).
-  Future<void> refreshAccount() async {
+  /// Trae del servidor el rol y la ficha vinculada y renueva la sesión por
+  /// 30 días más (si hay conexión). Se llama al abrir la app y al volver a ella.
+  Future<void> refreshAccount({bool onlyIfStale = false}) async {
     final s = state.value;
     if (s == null) return;
+    // Al volver a la app: como mucho una vez por hora.
+    final now = DateTime.now();
+    if (onlyIfStale && _lastRefresh != null && now.difference(_lastRefresh!).inMinutes < 60) {
+      return;
+    }
+    _lastRefresh = now;
     try {
-      await _store(s.withAccount(await _api.me(s)));
+      await _store(await _api.renew(s));
     } on AuthNetworkException {
       // Sin conexión: se sigue con los datos guardados.
     } on AuthException {

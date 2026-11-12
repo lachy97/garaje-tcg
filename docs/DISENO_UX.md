@@ -74,3 +74,12 @@ real (torneo en marcha, jugadores nuevos), **B** = fricción notable, **C** = pu
 | Accesibilidad (lector de pantalla). | **Hecho**: cada botón de resultado se lee como "Gana Ana 2-1", "Empate intencional"…, con estado seleccionado; cada mesa se anuncia ("mesa 3: Ana contra Luis. Pendiente"); cada fila de tabla se lee entera de una vez; el logo tiene nombre. |
 
 Con esto quedan aplicadas todas las propuestas de la auditoría.
+
+## 9. Cuarta tanda (11/11)
+
+| Mejora | Estado |
+|---|---|
+| La sesión vencía a los 30 días aunque se usara la app a diario. | **Hecho**: se renueva sola al abrir la app con conexión. |
+| Había que escribir el usuario cada vez. | **Hecho**: se recuerda el último y el cursor va a la contraseña; teclado y botones "siguiente/listo" adecuados. |
+| "Atrás" en la pantalla principal cerraba la app de golpe. | **Hecho**: desde otra pestaña vuelve a Torneos; en Torneos pide pulsar dos veces. |
+| Mensaje de "sin conexión" sin pista de la VPN. | **Hecho**: lo menciona. |

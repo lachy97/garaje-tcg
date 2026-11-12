@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/theme.dart';
 import '../../app/widgets/brand.dart';
@@ -156,18 +157,34 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   final _form = GlobalKey<FormState>();
   final _id = TextEditingController();
   final _pass = TextEditingController();
+  final _passFocus = FocusNode();
   bool _busy = false;
   bool _show = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // El último usuario con el que se entró en este teléfono.
+    SharedPreferences.getInstance().then((prefs) {
+      final last = prefs.getString(kLastLoginKey);
+      if (last != null && mounted && _id.text.isEmpty) {
+        _id.text = last;
+        _passFocus.requestFocus();
+      }
+    });
+  }
 
   @override
   void dispose() {
     _id.dispose();
     _pass.dispose();
+    _passFocus.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     setState(() => _busy = true);
     try {
       await ref.read(sessionProvider.notifier).login(_id.text, _pass.text);
@@ -201,6 +218,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               TextFormField(
                 controller: _id,
                 autofillHints: const [AutofillHints.username, AutofillHints.email],
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _passFocus.requestFocus(),
                 decoration: const InputDecoration(
                   labelText: 'Usuario o Gmail',
                   prefixIcon: Icon(Icons.person_outline),
@@ -210,12 +231,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _pass,
+                focusNode: _passFocus,
                 obscureText: !_show,
+                textInputAction: TextInputAction.done,
                 autofillHints: const [AutofillHints.password],
                 decoration: InputDecoration(
                   labelText: 'Contraseña',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
+                    tooltip: _show ? 'Ocultar contraseña' : 'Mostrar contraseña',
                     icon: Icon(_show ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(() => _show = !_show),
                   ),
@@ -374,6 +398,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   helperText: 'Al menos 8 caracteres, con letras y números',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
+                    tooltip: _show ? 'Ocultar contraseña' : 'Mostrar contraseña',
                     icon: Icon(_show ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(() => _show = !_show),
                   ),

@@ -64,6 +64,8 @@ test('registro, verificación, login con usuario o Gmail; ADMIN_EMAIL es admin',
   assert.equal(l.status, 200);
   const me = await call('GET', '/v1/me', null, l.data.session.token);
   assert.equal(me.data.account.username, 'lachy');
+  // /v1/me renueva la sesión: devuelve la fecha nueva de vencimiento.
+  assert.ok(Date.parse(me.data.expiresAt) >= Date.parse(l.data.session.expiresAt));
 
   const wrong = await call('POST', '/v1/auth/login', { identifier: 'lachy', password: 'otra12345' });
   assert.equal(wrong.status, 401);
