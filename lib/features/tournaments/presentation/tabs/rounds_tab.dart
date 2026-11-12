@@ -14,6 +14,7 @@ import '../share_tournament.dart';
 import 'first_round_pairing_page.dart';
 import 'match_score_card.dart';
 import 'pairing_editor.dart';
+import 'play_alerts.dart';
 import 'round_timer.dart';
 
 /// Rondas: configuración (rondas Swiss / Top Cut), pairings, reporte de
@@ -378,6 +379,9 @@ class _MatchesSliver extends ConsumerWidget {
                 label: const Text('Cambiar cruces'),
               ),
             ),
+          // Avisos desde los móviles: juez, resultados reportados, drops.
+          if (isCurrent && !readOnly)
+            PlayAlertsPanel(tournament: tournament, matches: list, names: names),
           // Ronda 1 sin resultados: rehacer los cruces importándolos de un texto.
           if (isCurrent &&
               !readOnly &&

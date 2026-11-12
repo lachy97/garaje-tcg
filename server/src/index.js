@@ -1,10 +1,11 @@
 // Garage TCG · API (Cloudflare Workers + D1).
 // Rutas en /v1. Cuerpos y respuestas en JSON. Errores: { error, code? }.
 import { ApiError, AuthService } from './auth.js';
+import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.5.0';
+export const VERSION = '1.6.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -35,6 +36,7 @@ export async function handle(request, env, opts) {
   const auth = new AuthService(env, opts);
   const sync = new SyncService(env, auth);
   const regs = new RegistrationService(env, auth);
+  const play = new PlayService(env, auth);
   try {
     // Fase 0: prueba de conexión desde Cuba.
     if ((path === '/v1/health' || path === '/') && m === 'GET') {
@@ -57,6 +59,17 @@ export async function handle(request, env, opts) {
         case '/v1/sync/push': return json(await sync.push(token, body));
         case '/v1/admin/mail-test': return json(await auth.mailTest(token));
         case '/v1/registrations': return json(await regs.request(token, body));
+        case '/v1/play/report': return json(await play.report(token, body));
+        case '/v1/play/judge': return json(await play.judge(token, body));
+        case '/v1/play/drop': return json(await play.drop(token, body));
+      }
+      const pa = path.match(/^\/v1\/play\/([^/]+)\/(confirm|dispute|cancel|done)$/);
+      if (pa) {
+        const [, id, what] = pa;
+        if (what === 'confirm') return json(await play.answer(token, id, true));
+        if (what === 'dispute') return json(await play.answer(token, id, false));
+        if (what === 'cancel') return json(await play.cancel(token, id));
+        return json(await play.done(token, id));
       }
       const reg = path.match(/^\/v1\/registrations\/([^/]+)\/(accept|reject|done|cancel)$/);
       if (reg) {
@@ -81,6 +94,9 @@ export async function handle(request, env, opts) {
       if (path === '/v1/sync/pull') return json(await sync.pull(token, url.searchParams));
       if (path === '/v1/sync/status') return json(await sync.status(token));
       if (path === '/v1/registrations/mine') return json(await regs.mine(token));
+      if (path === '/v1/play/mine') return json(await play.mine(token, url.searchParams.get('tournament')));
+      if (path === '/v1/play/todo') return json(await play.todo(token));
+      if (path === '/v1/play') return json(await play.forTournament(token, url.searchParams.get('tournament')));
       if (path === '/v1/registrations/todo') return json(await regs.todo(token));
       if (path === '/v1/registrations') {
         return json(await regs.forTournament(token, url.searchParams.get('tournament')));

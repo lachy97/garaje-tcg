@@ -306,3 +306,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 
 ## Compilación: Flutter fijo en 3.47 (11/11)
 - Flutter 3.50 exige AGP 9.1.1+ y Gradle 9.3.1+; el proyecto usa AGP 8.11.1 + Gradle 8.14.3 (y Kotlin 2.2.20). Saltarse la comprobación no basta: el plugin de Flutter 3.50 usa la API de AGP 9 y falla con AGP 8. El workflow fija `flutter-version: 3.47.x`. Pasar a AGP 9 / Gradle 9 queda como migración aparte cuando Flutter resuelva los fallos abiertos (flutter#192167, #192111).
+
+## Tanda 2: resultados, juez y drop desde el móvil (12/11)
+- **Reportar resultado**: en "Mi mesa ahora", el jugador elige su resultado (Gané 2-0, Gané 2-1, Empate 1-1-1 —no en Top Cut—, Perdí 1-2, Perdí 0-2). El rival ve "X reportó: ganas/pierdes…" y **confirma** o dice **no es correcto**. Si los dos reportan lo mismo, queda confirmado; si no, queda **en disputa** para el juez/organizador.
+- Los **confirmados** los pone solo el teléfono del organizador al sincronizar (si la mesa sigue sin resultado). Los demás se ven en **Avisos de los jugadores** (ronda actual): "Poner 2-1" para aplicarlo, o "Descartar". El resultado que ponga el organizador a mano siempre manda.
+- **Llamar al juez** (con nota opcional) y **drop** desde el móvil. El drop se aplica solo al sincronizar (desde la ronda actual); la llamada al juez se marca "Atendido".
+- Servidor: tabla `play_actions` (migración `0005_play.sql`, `npm run db:mesa`), rutas `/v1/play/*`.

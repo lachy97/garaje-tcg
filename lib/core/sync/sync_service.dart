@@ -10,6 +10,8 @@ import '../auth/auth_providers.dart';
 import '../auth/http_auth_api.dart';
 import '../db/app_database.dart';
 import '../db/database_provider.dart';
+import '../../features/tournaments/application/tournament_service.dart';
+import '../play/play.dart';
 import '../registrations/registrations.dart';
 import 'sync_schema.dart';
 
@@ -198,6 +200,8 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       // Inscripciones desde la app aceptadas: se inscriben aquí (y se suben
       // con el resto de cambios).
       await _applyRegistrations(session, api);
+      // Resultados confirmados por los jugadores y drops desde el móvil.
+      await _applyPlay(session, api);
       // Primera vez que esta cuenta sube desde este teléfono: todo.
       const key = 'all_enqueued_for';
       if (await _state(key) != session.account.id) {
@@ -264,6 +268,16 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       rethrow;
     } catch (_) {
       // Servidor sin inscripciones desde la app u otro fallo: no frena la subida.
+    }
+  }
+
+  Future<void> _applyPlay(Session session, HttpAuthApi api) async {
+    try {
+      await applyPlayActions(_db, ref.read(tournamentServiceProvider), PlayApi(api, session));
+    } on AuthNetworkException {
+      rethrow;
+    } catch (_) {
+      // Servidor sin esta función u otro fallo: no frena la subida.
     }
   }
 

@@ -9,6 +9,7 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/database_provider.dart';
+import 'table_actions.dart';
 
 /// Mi partida de la ronda actual en un torneo en juego.
 class MyTableInfo {
@@ -23,7 +24,18 @@ class MyTableInfo {
     required this.score,
     required this.timerStartedAt,
     required this.roundMinutes,
+    required this.matchId,
+    required this.iAmP1,
+    required this.topCut,
   });
+
+  final String matchId;
+
+  /// Soy el jugador 1 de la mesa (los marcadores se guardan desde él).
+  final bool iAmP1;
+
+  /// Ronda del Top Cut (sin empates).
+  final bool topCut;
 
   final String tournamentId;
   final String tournamentName;
@@ -57,7 +69,7 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
   final me = Variable.withString(playerId);
   return db
       .customSelect(
-        'SELECT t.id AS tid, t.name AS tname, t.round_minutes AS rm, '
+        'SELECT t.id AS tid, t.name AS tname, t.round_minutes AS rm, m.id AS mid, '
         'r.number AS rnum, r.phase AS rphase, r.bracket_size AS rbs, r.timer_started_at AS rts, '
         'm.table_number AS tbl, m.is_bye AS bye, m.result AS res, m.is_third_place AS third, '
         'm.player1_id AS p1, m.games1 AS g1, m.games_draw AS gd, m.games2 AS g2, '
@@ -105,6 +117,9 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
                   score: score,
                   timerStartedAt: r.readNullable<DateTime>('rts'),
                   roundMinutes: r.read<int>('rm'),
+                  matchId: r.read<String>('mid'),
+                  iAmP1: iAmP1,
+                  topCut: r.read<String>('rphase') != 'swiss',
                 );
               }(),
           ]);
@@ -203,6 +218,8 @@ class _MyTableCard extends StatelessWidget {
                   RoundCountdown(start: i.timerStartedAt!, minutes: i.roundMinutes),
               ],
             ),
+            // Reportar / confirmar el resultado, llamar al juez, drop.
+            TableActions(info: i),
           ],
         ),
       ),

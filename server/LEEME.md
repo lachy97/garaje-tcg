@@ -192,6 +192,15 @@ aceptan **a mano** o **solas**. Los jugadores la piden desde **Torneos →
 Inscripción abierta** con su mazo. El teléfono del organizador inscribe a los
 aceptados al sincronizar.
 
+## 13 · Resultados, juez y drop desde el móvil
+
+Una vez, en el PC (con VPN):
+
+```powershell
+npm run db:mesa
+npm run deploy
+```
+
 ## Útil
 
 | Para | Comando |
@@ -231,6 +240,14 @@ aceptados al sincronizar.
 | POST | `/v1/registrations/:id/accept` | `playerId?` (vincula la cuenta si no tenía ficha) |
 | POST | `/v1/registrations/:id/reject` | `reason?` |
 | POST | `/v1/registrations/:id/done` | (organizador) ya inscrito / ya quitado |
+| POST | `/v1/play/report` | `tournamentId, matchId, g1, gd, g2` (jugador de esa mesa) |
+| POST | `/v1/play/:id/confirm` · `/dispute` | (el rival) |
+| POST | `/v1/play/judge` · `/v1/play/drop` | `tournamentId, matchId?, note?` |
+| POST | `/v1/play/:id/cancel` | (quien lo envió) |
+| GET | `/v1/play/mine?tournament=` | (jugador) |
+| GET | `/v1/play?tournament=` | (organizador del torneo) avisos abiertos |
+| GET | `/v1/play/todo` | (organizador) confirmados y drops por aplicar |
+| POST | `/v1/play/:id/done` | (organizador) aplicado / atendido |
 
 Errores: código HTTP 4xx con `{ "error": "mensaje para el usuario" }`; si la
 cuenta no está confirmada, además `"code": "unverified"` y `"email"`.
