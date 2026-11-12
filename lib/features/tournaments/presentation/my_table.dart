@@ -27,7 +27,11 @@ class MyTableInfo {
     required this.matchId,
     required this.iAmP1,
     required this.topCut,
+    this.extraMinutes = 0,
   });
+
+  /// Tiempo extra que dio el juez a esta mesa (ya sumado en [roundMinutes]).
+  final int extraMinutes;
 
   final String matchId;
 
@@ -72,6 +76,7 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
         'SELECT t.id AS tid, t.name AS tname, t.round_minutes AS rm, m.id AS mid, '
         'r.number AS rnum, r.phase AS rphase, r.bracket_size AS rbs, r.timer_started_at AS rts, '
         'm.table_number AS tbl, m.is_bye AS bye, m.result AS res, m.is_third_place AS third, '
+        'm.extra_minutes AS ex, '
         'm.player1_id AS p1, m.games1 AS g1, m.games_draw AS gd, m.games2 AS g2, '
         'op.nickname AS opn, od.name AS opdeck '
         'FROM matches m '
@@ -116,7 +121,8 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
                   opponentDeck: r.readNullable<String>('opdeck'),
                   score: score,
                   timerStartedAt: r.readNullable<DateTime>('rts'),
-                  roundMinutes: r.read<int>('rm'),
+                  roundMinutes: r.read<int>('rm') + r.read<int>('ex'),
+                  extraMinutes: r.read<int>('ex'),
                   matchId: r.read<String>('mid'),
                   iAmP1: iAmP1,
                   topCut: r.read<String>('rphase') != 'swiss',
@@ -208,7 +214,9 @@ class _MyTableCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    i.score == null ? 'Sin resultado todavía' : 'Resultado: ${i.score}',
+                    i.score == null
+                        ? 'Sin resultado todavía${i.extraMinutes > 0 ? ' · +${i.extraMinutes} min del juez' : ''}'
+                        : 'Resultado: ${i.score}',
                     style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: i.score == null ? AppColors.textSecondary : AppColors.neon),

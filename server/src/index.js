@@ -5,7 +5,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -62,6 +62,15 @@ export async function handle(request, env, opts) {
         case '/v1/play/report': return json(await play.report(token, body));
         case '/v1/play/judge': return json(await play.judge(token, body));
         case '/v1/play/drop': return json(await play.drop(token, body));
+        case '/v1/play/checkin': return json(await play.checkin(token, body));
+        case '/v1/play/judge-result': return json(await play.judgeResult(token, body));
+        case '/v1/play/extension': return json(await play.extension(token, body));
+        case '/v1/play/penalty': return json(await play.penalty(token, body));
+      }
+      const st = path.match(/^\/v1\/tournaments\/([^/]+)\/judges(?:\/([^/]+)\/remove)?$/);
+      if (st) {
+        const [, tid, acc] = st;
+        return json(acc ? await play.removeJudge(token, tid, acc) : await play.addJudge(token, tid, body));
       }
       const pa = path.match(/^\/v1\/play\/([^/]+)\/(confirm|dispute|cancel|done)$/);
       if (pa) {
@@ -96,6 +105,10 @@ export async function handle(request, env, opts) {
       if (path === '/v1/registrations/mine') return json(await regs.mine(token));
       if (path === '/v1/play/mine') return json(await play.mine(token, url.searchParams.get('tournament')));
       if (path === '/v1/play/todo') return json(await play.todo(token));
+      if (path === '/v1/staff/candidates') return json(await play.candidates(token));
+      if (path === '/v1/me/judging') return json(await play.judging(token));
+      const gj = path.match(/^\/v1\/tournaments\/([^/]+)\/judges$/);
+      if (gj) return json(await play.judges(token, gj[1]));
       if (path === '/v1/play') return json(await play.forTournament(token, url.searchParams.get('tournament')));
       if (path === '/v1/registrations/todo') return json(await regs.todo(token));
       if (path === '/v1/registrations') {

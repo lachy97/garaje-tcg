@@ -312,3 +312,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - Los **confirmados** los pone solo el teléfono del organizador al sincronizar (si la mesa sigue sin resultado). Los demás se ven en **Avisos de los jugadores** (ronda actual): "Poner 2-1" para aplicarlo, o "Descartar". El resultado que ponga el organizador a mano siempre manda.
 - **Llamar al juez** (con nota opcional) y **drop** desde el móvil. El drop se aplica solo al sincronizar (desde la ronda actual); la llamada al juez se marca "Atendido".
 - Servidor: tabla `play_actions` (migración `0005_play.sql`, `npm run db:mesa`), rutas `/v1/play/*`.
+
+## Tanda 3: check-in y jueces por torneo (12/11)
+- **Check-in** (Jugadores del torneo, en inscripción): interruptor + código de 4 caracteres (sin 0/O ni 1/I; "Nuevo código" lo cambia). El jugador lo escribe en Torneos → Check-in; el organizador también puede marcarlo a mano en cada inscrito. Al generar la ronda 1, si hay inscritos sin check-in: **Quitarlos** / **Jugar con todos**. El código no llega a los teléfonos de los jugadores.
+- **Jueces por torneo** (Jugadores → Jueces → Gestionar): cuentas con rol Juez u Organizador. El juez ve el torneo entero (partidas y penalizaciones de todos, sin cover, notas ni teléfonos) y tiene **Vista de sala** (icono de mazo en la barra): mesa por mesa, **poner resultado** (también doble derrota; lo que pone el juez manda), **tiempo extra** por mesa (total en minutos) y **penalización** (jugador, tipo, motivo). También ve y atiende los avisos de los jugadores.
+- Todo lo que hacen el juez y el check-in lo aplica el teléfono del organizador al sincronizar. El tiempo extra se ve en la mesa del jugador y en la tarjeta de la mesa ("+5 MIN").
+- Esquema local v13: `tournaments.check_in`, `checkin_code`; `tournament_players.checked_in`; `matches.extra_minutes`. Servidor: `tournament_staff` y columnas nuevas en `play_actions` (migración `0006_judges.sql`, `npm run db:jueces`).

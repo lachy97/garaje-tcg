@@ -127,12 +127,16 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     bool? onlineRegistration,
     bool? autoAccept,
     int? capacity,
+    bool? checkIn,
+    String? checkinCode,
   }) {
     return (update(tournaments)..where((t) => t.id.equals(id))).write(
       TournamentsCompanion(
         onlineRegistration: Value.absentIfNull(onlineRegistration),
         autoAccept: Value.absentIfNull(autoAccept),
         capacity: Value.absentIfNull(capacity),
+        checkIn: Value.absentIfNull(checkIn),
+        checkinCode: Value.absentIfNull(checkinCode),
         name: name == null ? const Value.absent() : Value(name.trim()),
         swissRounds: Value.absentIfNull(swissRounds),
         topCutSize: Value.absentIfNull(topCutSize),
@@ -287,6 +291,25 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Marca si el jugador pagó el cover del torneo.
+  /// Check-in del jugador (a mano o desde su móvil).
+  Future<void> setCheckedIn(String tournamentId, String playerId, bool checkedIn) async {
+    await (update(tournamentPlayers)
+          ..where((t) =>
+              t.tournamentId.equals(tournamentId) & t.playerId.equals(playerId)))
+        .write(TournamentPlayersCompanion(
+      checkedIn: Value(checkedIn),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Tiempo extra de una mesa (minutos en total; 0 = sin extra).
+  Future<void> setExtraMinutes(String matchId, int minutes) async {
+    await (update(matches)..where((m) => m.id.equals(matchId))).write(MatchesCompanion(
+      extraMinutes: Value(minutes),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
   Future<void> setPaid(String tournamentId, String playerId, bool paid) async {
     await ensureEditable(tournamentId);
     await (update(tournamentPlayers)

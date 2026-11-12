@@ -11,6 +11,8 @@ import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/registrations/registrations.dart';
+import '../../../core/play/play.dart';
+import 'check_in.dart';
 import 'my_table.dart';
 import 'open_registrations.dart';
 import 'providers.dart';
@@ -32,11 +34,13 @@ class TournamentsPage extends ConsumerWidget {
     final openIds = player
         ? {for (final t in ref.watch(myRegistrationsProvider).value?.open ?? const []) t.id}
         : const <String>{};
+    // Torneos donde es juez (los ve enteros).
+    final judging = player ? ref.watch(judgingProvider).value ?? const <String>{} : const <String>{};
     final tournaments = perms.canCreateTournaments
         ? all
         : all.whenData((list) => [
               for (final t in list)
-                if ((mine?.contains(t.id) ?? false) && !openIds.contains(t.id)) t,
+                if (((mine?.contains(t.id) ?? false) || judging.contains(t.id)) && !openIds.contains(t.id)) t,
             ]);
     return Scaffold(
       body: SafeArea(
@@ -80,6 +84,8 @@ class TournamentsPage extends ConsumerWidget {
               // Quien juega (tenga el rol que tenga): su mesa de la ronda actual.
               if (perms.playerId != null)
                 SliverToBoxAdapter(child: MyTablesSection(playerId: perms.playerId!)),
+              if (perms.playerId != null)
+                SliverToBoxAdapter(child: CheckInSection(playerId: perms.playerId!)),
               if (player) const SliverToBoxAdapter(child: OpenRegistrationsSection()),
               ...tournaments.when<List<Widget>>(
                 skipLoadingOnReload: true,

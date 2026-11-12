@@ -15,7 +15,17 @@ import '../../application/tournament_service.dart';
 /// confirmar, y drops pedidos. Los confirmados por los dos y los drops se
 /// aplican solos al sincronizar.
 class PlayAlertsPanel extends ConsumerStatefulWidget {
-  const PlayAlertsPanel({super.key, required this.tournament, required this.matches, required this.names});
+  const PlayAlertsPanel({
+    super.key,
+    required this.tournament,
+    required this.matches,
+    required this.names,
+    this.asJudge = false,
+  });
+
+  /// Teléfono de un juez: los resultados se envían al servidor (los pone el
+  /// teléfono del organizador al sincronizar).
+  final bool asJudge;
 
   final Tournament tournament;
 
@@ -51,10 +61,14 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
 
   /// Pone el resultado reportado (aunque el rival aún no lo haya confirmado).
   Future<void> _apply(PlayAction a) => _run(a, (api) async {
+        if (widget.asJudge) {
+          await api.judgeResult(widget.tournament.id, a.matchId!, score: a.score!.game);
+          return;
+        }
         await ref.read(tournamentServiceProvider).reportScore(a.matchId!, a.score!.game);
         await api.done(a.id);
         await ref.read(syncControllerProvider.notifier).sync();
-      }, 'Resultado puesto');
+      }, widget.asJudge ? 'Enviado: lo pone el organizador al sincronizar' : 'Resultado puesto');
 
   String _ago(DateTime t) {
     final m = DateTime.now().difference(t).inMinutes;

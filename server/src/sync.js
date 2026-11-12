@@ -208,6 +208,17 @@ export class SyncService {
     // Torneos que lleva este organizador: le llegan completos (cover, notas,
     // penalizaciones de todos).
     const owned = new Set();
+    // Torneos donde es juez: todas las partidas y penalizaciones (sin cover,
+    // notas ni teléfonos).
+    const judged = new Set();
+    const jq = await this.db
+      .prepare('SELECT tournament_id FROM tournament_staff WHERE account_id = ?')
+      .bind(me.id)
+      .all();
+    for (const j of jq.results ?? []) {
+      judged.add(j.tournament_id);
+      visible.add(j.tournament_id);
+    }
     for (const t of tq.results ?? []) {
       if (isOrganizer && t.owner_id === me.id) {
         owned.add(t.id);
@@ -228,7 +239,7 @@ export class SyncService {
     const PRIVATE_PLAYER = ['full_name', 'photo_path', 'notes', 'konami_id', 'phone'];
     // Datos solo para quien lleva el torneo (se quitan; la app pone el valor
     // por defecto): cover pagado y notas del organizador.
-    const ORGANIZER_ONLY = { tournament_players: ['paid'], tournaments: ['notes'] };
+    const ORGANIZER_ONLY = { tournament_players: ['paid'], tournaments: ['notes', 'checkin_code'] };
     const rows = new Map();
     const add = (r) => {
       const key = `${r.tbl}|${r.id}`;
@@ -246,7 +257,7 @@ export class SyncService {
         rows.set(key, o);
       } else if (r.tournament_id && visible.has(r.tournament_id)) {
         const mine = owned.has(r.tournament_id);
-        if (r.tbl === 'penalties' && r.player_id !== pid && !mine) return;
+        if (r.tbl === 'penalties' && r.player_id !== pid && !mine && !judged.has(r.tournament_id)) return;
         const o = out(r);
         if (!mine) for (const k of ORGANIZER_ONLY[r.tbl] ?? []) delete o.data[k];
         rows.set(key, o);

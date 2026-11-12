@@ -13,6 +13,7 @@ import '../../../players/presentation/players_page.dart';
 import '../../application/tournament_service.dart';
 import '../providers.dart';
 import 'online_registration.dart';
+import 'staff_cards.dart';
 import 'penalties.dart';
 
 /// Último mazo de cada jugador (para proponerlo al inscribirlo).
@@ -96,6 +97,9 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
             ),
             // Inscripción desde la app (solo en inscripción y con servidor).
             OnlineRegistrationCard(tournament: tournament),
+            // Check-in el día del torneo y jueces del torneo.
+            CheckInCard(tournament: tournament, registered: list),
+            JudgesCard(tournament: tournament),
             PenaltiesSection(
               tournament: tournament,
               names: {for (final r in list) r.player.id: r.player.nickname},
@@ -210,6 +214,15 @@ class _RegisteredTile extends ConsumerWidget {
               ],
             ),
           ),
+          if (draft && tournament.checkIn)
+            _PaidCheck(
+              paid: item.entry.checkedIn,
+              label: 'Check-in',
+              on: 'Hizo check-in',
+              off: 'Sin check-in',
+              onChanged: (v) => runGuarded(
+                  context, () => dao.setCheckedIn(tournament.id, item.player.id, v)),
+            ),
           _PaidCheck(
             paid: item.entry.paid,
             onChanged: (v) => runGuarded(
@@ -276,15 +289,24 @@ class _RegisteredTile extends ConsumerWidget {
 
 /// Casilla "pagó el cover" de cada inscrito.
 class _PaidCheck extends StatelessWidget {
-  const _PaidCheck({required this.paid, required this.onChanged});
+  const _PaidCheck({
+    required this.paid,
+    required this.onChanged,
+    this.label = 'Cover',
+    this.on = 'Pagó el cover',
+    this.off = 'No ha pagado el cover',
+  });
 
   final bool paid;
   final ValueChanged<bool> onChanged;
+  final String label;
+  final String on;
+  final String off;
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: paid ? 'Pagó el cover' : 'No ha pagado el cover',
+      message: paid ? on : off,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () => onChanged(!paid),
@@ -305,7 +327,7 @@ class _PaidCheck extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                 ),
               ),
-              Text('Cover',
+              Text(label,
                   style: TextStyle(
                       fontSize: 11,
                       color: paid ? AppColors.neon : AppColors.textSecondary)),

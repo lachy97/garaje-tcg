@@ -201,6 +201,15 @@ npm run db:mesa
 npm run deploy
 ```
 
+## 14 · Check-in y jueces por torneo
+
+Una vez, en el PC (con VPN):
+
+```powershell
+npm run db:jueces
+npm run deploy
+```
+
 ## Útil
 
 | Para | Comando |
@@ -248,6 +257,14 @@ npm run deploy
 | GET | `/v1/play?tournament=` | (organizador del torneo) avisos abiertos |
 | GET | `/v1/play/todo` | (organizador) confirmados y drops por aplicar |
 | POST | `/v1/play/:id/done` | (organizador) aplicado / atendido |
+| POST | `/v1/play/checkin` | `tournamentId, code` (jugador inscrito) |
+| POST | `/v1/play/judge-result` | `tournamentId, matchId, g1, gd, g2` o `doubleLoss` (juez u organizador) |
+| POST | `/v1/play/extension` | `tournamentId, matchId, minutes` (juez) |
+| POST | `/v1/play/penalty` | `tournamentId, playerId, penalty, reason?` (juez) |
+| GET | `/v1/staff/candidates` | (organizador) cuentas que pueden ser jueces |
+| GET/POST | `/v1/tournaments/:id/judges` | listar / añadir `accountId` (organizador del torneo) |
+| POST | `/v1/tournaments/:id/judges/:accountId/remove` | (organizador del torneo) |
+| GET | `/v1/me/judging` | torneos donde soy juez |
 
 Errores: código HTTP 4xx con `{ "error": "mensaje para el usuario" }`; si la
 cuenta no está confirmada, además `"code": "unverified"` y `"email"`.

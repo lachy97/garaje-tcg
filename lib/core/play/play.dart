@@ -47,7 +47,7 @@ class ReportScore {
   int get hashCode => Object.hash(g1, gd, g2);
 }
 
-enum PlayKind { report, judge, drop }
+enum PlayKind { report, judge, drop, checkin, jresult, extension, penalty }
 
 enum PlayStatus { proposed, confirmed, disputed, open, done, cancelled }
 
@@ -65,6 +65,10 @@ class PlayAction {
     required this.note,
     required this.status,
     required this.createdAt,
+    this.extra,
+    this.targetPlayer,
+    this.penalty,
+    this.doubleLoss = false,
   });
 
   factory PlayAction.fromJson(Map<String, Object?> j) => PlayAction(
@@ -81,6 +85,10 @@ class PlayAction {
         note: j['note'] as String?,
         status: PlayStatus.values.firstWhere((s) => s.name == j['status'], orElse: () => PlayStatus.open),
         createdAt: DateTime.tryParse((j['createdAt'] as String?) ?? '') ?? DateTime.now(),
+        extra: (j['extra'] as num?)?.toInt(),
+        targetPlayer: j['targetPlayer'] as String?,
+        penalty: j['penalty'] as String?,
+        doubleLoss: j['doubleLoss'] == true,
       );
 
   final String id;
@@ -98,6 +106,30 @@ class PlayAction {
   final String? note;
   final PlayStatus status;
   final DateTime createdAt;
+
+  /// Tiempo extra (minutos), jugador penalizado, tipo de penalización y
+  /// resultado de juez "doble derrota".
+  final int? extra;
+  final String? targetPlayer;
+  final String? penalty;
+  final bool doubleLoss;
+}
+
+/// Cuenta que puede ser juez de un torneo.
+class StaffAccount {
+  const StaffAccount({required this.id, required this.username, required this.nickname, required this.role});
+
+  factory StaffAccount.fromJson(Map<String, Object?> j) => StaffAccount(
+        id: j['id']! as String,
+        username: (j['username'] as String?) ?? '',
+        nickname: (j['nickname'] as String?) ?? '',
+        role: (j['role'] as String?) ?? '',
+      );
+
+  final String id;
+  final String username;
+  final String nickname;
+  final String role;
 }
 
 class PlayApi {
@@ -147,7 +179,72 @@ class PlayApi {
   Future<List<PlayAction>> todo() async => _list(await _call('GET', 'v1/play/todo'));
 
   Future<PlayAction> done(String id) async => _one(await _call('POST', 'v1/play/${_p(id)}/done', const {}));
+
+  // Check-in y jueces
+
+  Future<PlayAction> checkin(String tournamentId, String code) async =>
+      _one(await _call('POST', 'v1/play/checkin', {'tournamentId': tournamentId, 'code': code}));
+
+  Future<PlayAction> judgeResult(String tournamentId, String matchId, {GameScore? score, bool doubleLoss = false}) async =>
+      _one(await _call('POST', 'v1/play/judge-result', {
+        'tournamentId': tournamentId,
+        'matchId': matchId,
+        if (doubleLoss) 'doubleLoss': true,
+        if (score != null) ...{'g1': score.p1, 'gd': score.draws, 'g2': score.p2},
+      }));
+
+  Future<PlayAction> extension(String tournamentId, String matchId, int minutes) async =>
+      _one(await _call('POST', 'v1/play/extension',
+          {'tournamentId': tournamentId, 'matchId': matchId, 'minutes': minutes}));
+
+  Future<PlayAction> penalty(String tournamentId, String playerId, String kind, {String? reason, String? matchId}) async =>
+      _one(await _call('POST', 'v1/play/penalty', {
+        'tournamentId': tournamentId,
+        'playerId': playerId,
+        'penalty': kind,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+        if (matchId != null) 'matchId': matchId,
+      }));
+
+  static List<StaffAccount> _staff(Object? l) => [
+        for (final a in (l as List?) ?? const []) StaffAccount.fromJson((a as Map).cast<String, Object?>()),
+      ];
+
+  Future<List<StaffAccount>> candidates() async => _staff((await _call('GET', 'v1/staff/candidates'))['accounts']);
+
+  Future<List<StaffAccount>> judges(String tournamentId) async =>
+      _staff((await _call('GET', 'v1/tournaments/${_p(tournamentId)}/judges'))['judges']);
+
+  Future<List<StaffAccount>> addJudge(String tournamentId, String accountId) async => _staff(
+      (await _call('POST', 'v1/tournaments/${_p(tournamentId)}/judges', {'accountId': accountId}))['judges']);
+
+  Future<List<StaffAccount>> removeJudge(String tournamentId, String accountId) async => _staff((await _call(
+          'POST', 'v1/tournaments/${_p(tournamentId)}/judges/${_p(accountId)}/remove', const {}))['judges']);
+
+  Future<Set<String>> judging() async => {
+        for (final t in ((await _call('GET', 'v1/me/judging'))['tournaments'] as List?) ?? const []) '$t',
+      };
 }
+
+/// Torneos donde esta cuenta es juez.
+final judgingProvider = FutureProvider<Set<String>>((ref) async {
+  final api = ref.watch(playApiProvider);
+  if (api == null) return const {};
+  ref.watch(syncControllerProvider.select((s) => s.lastSync));
+  try {
+    return await api.judging();
+  } catch (_) {
+    return const {};
+  }
+});
+
+/// Jueces de un torneo (organizador).
+final tournamentJudgesProvider =
+    FutureProvider.autoDispose.family<List<StaffAccount>, String>((ref, tournamentId) async {
+  final api = ref.watch(playApiProvider);
+  if (api == null) return const [];
+  return api.judges(tournamentId);
+});
 
 final playApiProvider = Provider<PlayApi?>((ref) {
   final api = ref.watch(authApiProvider);
@@ -186,6 +283,31 @@ Future<int> applyPlayActions(AppDatabase db, TournamentService service, PlayApi 
         final m = await db.tournamentsDao.matchById(a.matchId!);
         if (m == null) continue;
         if (!m.result.isReported) await service.reportScore(m.id, a.score!.game);
+      } else if (a.kind == PlayKind.jresult && a.matchId != null) {
+        // Lo que decide el juez manda (también sobre un resultado ya puesto).
+        if (await db.tournamentsDao.matchById(a.matchId!) == null) continue;
+        if (a.doubleLoss) {
+          await service.reportDoubleLoss(a.matchId!);
+        } else if (a.score != null) {
+          await service.reportScore(a.matchId!, a.score!.game);
+        }
+      } else if (a.kind == PlayKind.extension && a.matchId != null) {
+        if (await db.tournamentsDao.matchById(a.matchId!) == null) continue;
+        await db.tournamentsDao.setExtraMinutes(a.matchId!, a.extra ?? 0);
+      } else if (a.kind == PlayKind.penalty && a.targetPlayer != null) {
+        final kind = PenaltyKind.values.where((k) => k.name == a.penalty).firstOrNull;
+        if (kind == null) continue;
+        await db.tournamentsDao.addPenalty(
+          tournamentId: t.id,
+          playerId: a.targetPlayer!,
+          round: t.currentRound,
+          kind: kind,
+          reason: a.note,
+        );
+      } else if (a.kind == PlayKind.checkin) {
+        if (t.status == TournamentStatus.draft) {
+          await db.tournamentsDao.setCheckedIn(t.id, a.playerId, true);
+        }
       } else if (a.kind == PlayKind.drop) {
         if (t.status != TournamentStatus.swiss && t.status != TournamentStatus.topCut) continue;
         final reg = await db.tournamentsDao.registeredPlayers(t.id);

@@ -6,6 +6,7 @@ import '../../../../app/widgets/brand.dart';
 import '../../../../app/widgets/common.dart';
 import '../../../../core/db/app_database.dart';
 import '../../../../core/db/daos/tournaments_dao.dart';
+import '../../../../core/db/database_provider.dart';
 import '../../../decks/presentation/decks_page.dart';
 import '../../application/tournament_service.dart';
 import '../../domain/tournament_rules.dart';
@@ -591,6 +592,44 @@ class _AdvanceFab extends ConsumerWidget {
           : () => onRun(() async {
                 var fixed = const <(String, String?)>[];
                 var tables = const <String, int>{};
+                if (firstRound && t.checkIn) {
+                  // Check-in: quitar a los que no lo hicieron (no llegaron).
+                  final missing = [
+                    for (final r in registered)
+                      if (!r.entry.checkedIn && !r.entry.dropped) r,
+                  ];
+                  if (missing.isNotEmpty) {
+                    final remove = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        actionsOverflowButtonSpacing: 10,
+                        title: Text('${missing.length} sin check-in'),
+                        content: SingleChildScrollView(
+                          child: Text('${missing.map((r) => r.player.nickname).join(', ')}\n\n'
+                              '¿Los quito del torneo antes de generar la ronda 1?'),
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Jugar con todos'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Quitarlos'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (remove == null || !context.mounted) throw const ActionCancelled();
+                    if (remove) {
+                      final dao = ref.read(tournamentsDaoProvider);
+                      for (final r in missing) {
+                        await dao.unregisterPlayer(t.id, r.player.id);
+                      }
+                    }
+                  }
+                }
                 if (firstRound) {
                   // Ronda 1: al azar, o definiendo los enfrentamientos a mano.
                   final mode = await _askFirstRound(context, title, message);

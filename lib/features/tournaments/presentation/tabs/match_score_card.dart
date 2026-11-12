@@ -156,11 +156,8 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                         ? AppColors.neon
                         : AppColors.draw,
               );
-    final title = m.isThirdPlace
-        ? '3ER PUESTO'
-        : _isTopCut
-            ? 'MATCH ${m.tableNumber ?? ''}'
-            : 'MESA ${m.tableNumber ?? ''}';
+    final title = '${m.isThirdPlace ? '3ER PUESTO' : _isTopCut ? 'MATCH ${m.tableNumber ?? ''}' : 'MESA ${m.tableNumber ?? ''}'}'
+        '${m.extraMinutes > 0 ? ' · +${m.extraMinutes} MIN' : ''}';
     final enabled = widget.editable && !_saving;
 
     Widget button(_Pick p) => _ResultButton(

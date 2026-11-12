@@ -131,6 +131,11 @@ class Tournaments extends Table with SyncColumns {
   /// Plazas de la inscripción desde la app (v12). 0 = sin límite; si se
   /// llena, las solicitudes nuevas van a la lista de espera.
   IntColumn get capacity => integer().withDefault(const Constant(0))();
+
+  /// Check-in el día del torneo (v13): los jugadores lo hacen con el código
+  /// [checkinCode] (o el organizador lo marca a mano).
+  BoolColumn get checkIn => boolean().withDefault(const Constant(false))();
+  TextColumn get checkinCode => text().nullable()();
 }
 
 @DataClassName('TournamentPlayer')
@@ -159,6 +164,9 @@ class TournamentPlayers extends Table with SyncColumns {
 
   /// Pagó el cover (la entrada) del torneo (v7). Solo registro.
   BoolColumn get paid => boolean().withDefault(const Constant(false))();
+
+  /// Hizo check-in el día del torneo (v13).
+  BoolColumn get checkedIn => boolean().withDefault(const Constant(false))();
 
   @override
   List<Set<Column<Object>>> get uniqueKeys => [
@@ -233,6 +241,9 @@ class Matches extends Table with SyncColumns {
   IntColumn get standingsGames1 => integer().nullable()();
   IntColumn get standingsGamesDraw => integer().nullable()();
   IntColumn get standingsGames2 => integer().nullable()();
+
+  /// Tiempo extra para esta mesa en minutos (v13), lo da el juez.
+  IntColumn get extraMinutes => integer().withDefault(const Constant(0))();
 }
 
 /// Penalización de un jugador en un torneo (v6). Solo registro.

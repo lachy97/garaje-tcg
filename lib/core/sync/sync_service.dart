@@ -299,7 +299,16 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     // Si cambia la ficha vinculada, se baja todo de nuevo.
     final seqKey = 'pull_seq:${account.id}';
     final playerKey = 'pull_player:${account.id}';
-    final player = account.playerId ?? '';
+    // Si cambia la ficha o los torneos donde es juez, se baja todo de nuevo.
+    var judging = '';
+    try {
+      judging = ((await PlayApi(api, session).judging()).toList()..sort()).join(',');
+    } on AuthNetworkException {
+      rethrow;
+    } catch (_) {
+      // Servidor sin jueces por torneo: no cambia nada.
+    }
+    final player = '${account.playerId ?? ''}|$judging';
     var since = int.tryParse(await _state(seqKey) ?? '') ?? 0;
     if ((await _state(playerKey) ?? '') != player) since = 0;
     var total = 0;

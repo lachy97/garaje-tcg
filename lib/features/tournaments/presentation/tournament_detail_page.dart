@@ -6,6 +6,8 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/play/play.dart';
+import 'judge_floor_page.dart';
 import 'projection_page.dart';
 import 'providers.dart';
 import 'tabs/registration_tab.dart';
@@ -57,6 +59,17 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
             child: Scaffold(
               appBar: AppBar(
                 title: title,
+                actions: [
+                  // Juez de este torneo: vista de sala.
+                  if (t.status != TournamentStatus.draft &&
+                      (ref.watch(judgingProvider).value?.contains(t.id) ?? false))
+                    IconButton(
+                      tooltip: 'Vista de sala (juez)',
+                      icon: const Icon(Icons.gavel),
+                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => JudgeFloorPage(tournamentId: t.id))),
+                    ),
+                ],
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(84),
                   child: Column(
