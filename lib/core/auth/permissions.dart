@@ -42,9 +42,14 @@ class Permissions {
   /// Lista de todos los jugadores (pestaña Jugadores).
   bool get canSeeAllPlayers => isAdmin;
 
-  /// Ficha completa de un jugador: la propia siempre, las demás solo el
-  /// administrador.
-  bool canSeePlayerProfile(String id) => isAdmin || (playerId != null && id == playerId);
+  /// Ficha de un jugador: todos ven la ficha pública de cualquiera (apodo,
+  /// torneos, mazos, winrate). Ver [canSeePersonalData] para lo privado.
+  bool canSeePlayerProfile(String id) => true;
+
+  /// Datos personales de una ficha (nombre, teléfono, Konami ID, notas) y sus
+  /// penalizaciones: la propia, el administrador y los organizadores.
+  bool canSeePersonalData(String id) =>
+      isAdmin || role == AppRole.organizer || (playerId != null && id == playerId);
 
   /// Estadísticas de todos los mazos (matriz de enfrentamientos y ficha de
   /// cada mazo).

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/brand.dart';
@@ -170,6 +171,7 @@ class _SwissStandings extends ConsumerWidget {
               rows: [
                 for (final s in list)
                   NeonTableRow(
+                    onTap: () => context.push('/jugadores/${s.playerId}'),
                     highlight: qualified.contains(s.playerId),
                     dim: s.dropped,
                     footer: s.playerId == lastQualified ? _CutLine(cut: cut) : null,

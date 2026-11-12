@@ -101,7 +101,7 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
                     ListView(
                       padding: const EdgeInsets.only(bottom: 40),
                       children: [
-                        _Header(player: p),
+                        _Header(player: p, showPrivate: perms.canSeePersonalData(playerId)),
                         picker,
                         _StatsGrid(totals: data.totals),
                         _ProfileHighlights(decks: data.decks, rivals: data.rivals),
@@ -110,7 +110,7 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
                           const _Empty('Todavía no ha jugado con ningún mazo.')
                         else
                           _DecksTable(decks: data.decks),
-                        _PlayerPenalties(playerId: playerId),
+                        if (perms.canSeePersonalData(playerId)) _PlayerPenalties(playerId: playerId),
                       ],
                     ),
                     // 2) Enfrentamientos por rival.
@@ -195,9 +195,13 @@ class _SeasonFilter extends StatelessWidget {
 // ───────────────────────── Cabecera ─────────────────────────
 
 class _Header extends StatelessWidget {
-  const _Header({required this.player});
+  const _Header({required this.player, this.showPrivate = true});
 
   final Player player;
+
+  /// Nombre, Konami ID, teléfono y notas: solo la propia ficha, el
+  /// administrador y los organizadores (la ficha pública no los muestra).
+  final bool showPrivate;
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +233,7 @@ class _Header extends StatelessWidget {
                           color: AppColors.neon,
                           shadows: AppColors.textGlow(blur: 8),
                         )),
-                    if (p.fullName != null)
+                    if (showPrivate && p.fullName != null)
                       Text(p.fullName!, style: const TextStyle(fontSize: 14)),
                     Text('Registrado desde $since',
                         style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
@@ -238,14 +242,14 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
-          if (p.konamiId != null || p.phone != null || p.notes != null) ...[
+          if (showPrivate && (p.konamiId != null || p.phone != null || p.notes != null)) ...[
             const SizedBox(height: 12),
             const Divider(height: 1),
             const SizedBox(height: 8),
           ],
-          if (p.konamiId != null) _InfoLine(icon: Icons.badge_outlined, text: 'Konami ID: ${p.konamiId}'),
-          if (p.phone != null) _InfoLine(icon: Icons.phone_outlined, text: p.phone!),
-          if (p.notes != null) _InfoLine(icon: Icons.notes, text: p.notes!),
+          if (showPrivate && p.konamiId != null) _InfoLine(icon: Icons.badge_outlined, text: 'Konami ID: ${p.konamiId}'),
+          if (showPrivate && p.phone != null) _InfoLine(icon: Icons.phone_outlined, text: p.phone!),
+          if (showPrivate && p.notes != null) _InfoLine(icon: Icons.notes, text: p.notes!),
         ],
       ),
     );

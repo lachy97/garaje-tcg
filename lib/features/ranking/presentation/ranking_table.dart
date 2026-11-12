@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/neon_table.dart';
@@ -81,6 +82,8 @@ class RankingTable extends StatelessWidget {
         for (final r in rows)
           NeonTableRow(
             accent: rankingColor(r.rank),
+            // Ficha pública del jugador (no en la imagen exportada).
+            onTap: forExport ? null : () => context.push('/jugadores/${r.playerId}'),
             cells: [
               Text(
                 '${r.rank}',

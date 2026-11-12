@@ -184,7 +184,10 @@ void main() {
       const p = Permissions(role: AppRole.player, hasLicense: false, playerId: 'me');
       expect(p.canSeeRanking && p.canSeeTierList, isTrue);
       expect(p.canSeePlayerProfile('me'), isTrue);
-      expect(p.canSeePlayerProfile('otro'), isFalse);
+      // Ficha pública de otros, sí; sus datos personales, no.
+      expect(p.canSeePlayerProfile('otro'), isTrue);
+      expect(p.canSeePersonalData('me'), isTrue);
+      expect(p.canSeePersonalData('otro'), isFalse);
       expect(p.canSeeAllPlayers, isFalse);
       expect(p.canSeeDeckStats, isFalse);
       expect(p.canSeeTournament(isEnrolled: true), isTrue);
@@ -193,10 +196,10 @@ void main() {
       expect(p.canBackup, isFalse);
     });
 
-    test('jugador con licencia: estadísticas de mazos, no fichas ajenas', () {
+    test('jugador con licencia: estadísticas de mazos, sin datos personales ajenos', () {
       const p = Permissions(role: AppRole.player, hasLicense: true, playerId: 'me');
       expect(p.canSeeDeckStats, isTrue);
-      expect(p.canSeePlayerProfile('otro'), isFalse);
+      expect(p.canSeePersonalData('otro'), isFalse);
       expect(p.canCreateTournaments, isFalse);
     });
 
@@ -209,6 +212,7 @@ void main() {
       expect(con.canManageTournament(isOwner: true), isTrue);
       expect(con.canManageTournament(isOwner: false), isFalse);
       expect(con.canSeeAllPlayers, isFalse);
+      expect(con.canSeePersonalData('cualquiera'), isTrue, reason: 'el organizador ve el teléfono');
 
       const juez = Permissions(role: AppRole.judge, hasLicense: false);
       expect(juez.canReportResults(isOwner: false, isJudge: true), isTrue);
