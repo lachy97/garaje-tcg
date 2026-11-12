@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -136,6 +136,10 @@ class AppDatabase extends _$AppDatabase {
             // v11: inscripción desde la app
             await m.addColumn(tournaments, tournaments.onlineRegistration);
             await m.addColumn(tournaments, tournaments.autoAccept);
+          }
+          if (from < 12) {
+            // v12: cupo de la inscripción desde la app
+            await m.addColumn(tournaments, tournaments.capacity);
           }
         },
         beforeOpen: (details) async {

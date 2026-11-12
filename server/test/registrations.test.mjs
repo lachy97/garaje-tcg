@@ -131,3 +131,24 @@ test('activar "aceptar solas" después acepta las pendientes con ficha', async (
   const todo = await call('GET', '/v1/registrations/todo', null, org.token);
   assert.equal(todo.data.registrations[0].status, 'accepted');
 });
+
+test('cupo: lista de espera y sube cuando se libera una plaza', async () => {
+  const { call, org, ana, leo, tour, admin } = await setup();
+  await call('POST', `/v1/admin/accounts/${leo.account.id}/player`, { playerId: 'p-leo' }, admin.token);
+  await tour({ online_registration: 1, auto_accept: 1, capacity: 1 });
+  let r = await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'Zombie' }, ana.token);
+  assert.equal(r.data.registration.status, 'accepted');
+  r = await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'Goat' }, leo.token);
+  assert.equal(r.data.registration.status, 'waitlist');
+  const leoReq = r.data.registration.id;
+  let mine = await call('GET', '/v1/registrations/mine', null, leo.token);
+  assert.equal(mine.data.registrations[0].waitPosition, 1);
+  assert.equal(mine.data.open[0].capacity, 1);
+  // Aceptar a mano con el cupo lleno: no.
+  assert.equal((await call('POST', `/v1/registrations/${leoReq}/accept`, {}, org.token)).status, 400);
+  // Ana se borra (antes de inscribirla): Leo sube y queda aceptado.
+  const anaReq = (await call('GET', '/v1/registrations/mine', null, ana.token)).data.registrations[0].id;
+  await call('POST', `/v1/registrations/${anaReq}/cancel`, null, ana.token);
+  const todo = await call('GET', '/v1/registrations/todo', null, org.token);
+  assert.deepEqual(todo.data.registrations.map((x) => [x.nickname, x.status]), [['leo', 'accepted']]);
+});

@@ -6,6 +6,7 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/auth/auth_providers.dart';
+import 'projection_page.dart';
 import 'providers.dart';
 import 'tabs/registration_tab.dart';
 import 'tabs/rounds_tab.dart';
@@ -118,6 +119,14 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
             appBar: AppBar(
               title: title,
               actions: [
+                // Pantalla para proyectar (TV o portátil) mientras se juega.
+                if (canManage && !finished && t.status != TournamentStatus.draft)
+                  IconButton(
+                    tooltip: 'Pantalla para proyectar',
+                    icon: const Icon(Icons.connected_tv),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => ProjectionPage(tournamentId: t.id))),
+                  ),
                 if (finished)
                   TextButton.icon(
                     onPressed: () => setState(() => _editing = false),

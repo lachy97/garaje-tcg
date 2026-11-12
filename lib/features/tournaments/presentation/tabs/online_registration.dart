@@ -33,10 +33,10 @@ class OnlineRegistrationCard extends ConsumerWidget {
     final list = requests.value ?? const <RegistrationRequest>[];
     final pending = list.where((r) => r.status == RegistrationStatus.pending).length;
 
-    Future<void> save({bool? online, bool? auto}) async {
+    Future<void> save({bool? online, bool? auto, int? capacity}) async {
       await ref
           .read(tournamentsDaoProvider)
-          .updateSettings(t.id, onlineRegistration: online, autoAccept: auto);
+          .updateSettings(t.id, onlineRegistration: online, autoAccept: auto, capacity: capacity);
       // Se publica en el servidor enseguida (si hay conexión).
       await ref.read(syncControllerProvider.notifier).sync();
       ref.invalidate(tournamentRequestsProvider(t.id));
@@ -92,7 +92,31 @@ class OnlineRegistrationCard extends ConsumerWidget {
                   : 'Cada solicitud espera a que la aceptes o la rechaces.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.event_seat_outlined, size: 18, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    t.capacity > 0
+                        ? 'Cupo: ${t.capacity} plazas (después, lista de espera)'
+                        : 'Cupo: sin límite',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final n = await _askCapacity(context, t.capacity);
+                    if (n != null && context.mounted) {
+                      await runGuarded(context, () => save(capacity: n));
+                    }
+                  },
+                  child: const Text('Cambiar'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
             OutlinedButton.icon(
               onPressed: () => showModalBottomSheet<void>(
                 context: context,
@@ -118,6 +142,43 @@ class OnlineRegistrationCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Cupo de plazas (0 = sin límite). null = cancelado.
+Future<int?> _askCapacity(BuildContext context, int current) {
+  final c = TextEditingController(text: current > 0 ? '$current' : '');
+  return showDialog<int>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      actionsOverflowButtonSpacing: 10,
+      title: const Text('Cupo del torneo'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: c,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Plazas', hintText: 'Vacío = sin límite'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Cuentan los inscritos (también los que inscribes tú). Cuando se llena, '
+            'las solicitudes nuevas van a la lista de espera y suben solas si alguien se borra.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, int.tryParse(c.text.trim()) ?? 0),
+          child: const Text('Guardar'),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Lista de solicitudes con aceptar / rechazar.
@@ -254,6 +315,8 @@ class _RequestsSheetState extends ConsumerState<RequestsSheet> {
               List<RegistrationRequest> of(Set<RegistrationStatus> s) =>
                   [for (final r in list) if (s.contains(r.status)) r];
               final pending = of({RegistrationStatus.pending});
+              final waitlist = of({RegistrationStatus.waitlist})
+                ..sort((a, b) => (a.waitPosition ?? 0).compareTo(b.waitPosition ?? 0));
               final waiting = of({RegistrationStatus.accepted, RegistrationStatus.cancelRequested});
               final done = of({RegistrationStatus.registered});
               final closed = of({RegistrationStatus.rejected, RegistrationStatus.cancelled});
@@ -280,6 +343,16 @@ class _RequestsSheetState extends ConsumerState<RequestsSheet> {
                         ),
                       ),
                     for (final r in pending)
+                      _RequestTile(
+                        request: r,
+                        busy: _busy == r.id,
+                        onAccept: _busy == null ? () => _accept(r) : null,
+                        onReject: _busy == null ? () => _reject(r) : null,
+                      ),
+                  ],
+                  if (waitlist.isNotEmpty) ...[
+                    SectionLabel('Lista de espera (${waitlist.length})'),
+                    for (final r in waitlist)
                       _RequestTile(
                         request: r,
                         busy: _busy == r.id,
@@ -322,6 +395,7 @@ class _RequestTile extends StatelessWidget {
     final r = request;
     final (label, color) = switch (r.status) {
       RegistrationStatus.pending => ('Pendiente', AppColors.draw),
+      RegistrationStatus.waitlist => ('Lista de espera · puesto ${r.waitPosition ?? '?'}', AppColors.draw),
       RegistrationStatus.accepted => ('Aceptada · se inscribe al sincronizar', AppColors.leaf),
       RegistrationStatus.registered => ('Inscrito', AppColors.neon),
       RegistrationStatus.rejected => ('Rechazada${r.reason == null ? '' : ': ${r.reason}'}', AppColors.loss),

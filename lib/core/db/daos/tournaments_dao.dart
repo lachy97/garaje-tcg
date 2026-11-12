@@ -126,11 +126,13 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     int? roundMinutes,
     bool? onlineRegistration,
     bool? autoAccept,
+    int? capacity,
   }) {
     return (update(tournaments)..where((t) => t.id.equals(id))).write(
       TournamentsCompanion(
         onlineRegistration: Value.absentIfNull(onlineRegistration),
         autoAccept: Value.absentIfNull(autoAccept),
+        capacity: Value.absentIfNull(capacity),
         name: name == null ? const Value.absent() : Value(name.trim()),
         swissRounds: Value.absentIfNull(swissRounds),
         topCutSize: Value.absentIfNull(topCutSize),

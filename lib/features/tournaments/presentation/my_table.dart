@@ -1,0 +1,266 @@
+import 'dart:async';
+
+import 'package:drift/drift.dart' show Variable;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../app/theme.dart';
+import '../../../app/widgets/brand.dart';
+import '../../../core/db/database_provider.dart';
+
+/// Mi partida de la ronda actual en un torneo en juego.
+class MyTableInfo {
+  const MyTableInfo({
+    required this.tournamentId,
+    required this.tournamentName,
+    required this.roundLabel,
+    required this.table,
+    required this.bye,
+    required this.opponent,
+    required this.opponentDeck,
+    required this.score,
+    required this.timerStartedAt,
+    required this.roundMinutes,
+  });
+
+  final String tournamentId;
+  final String tournamentName;
+  final String roundLabel;
+  final int? table;
+  final bool bye;
+  final String? opponent;
+  final String? opponentDeck;
+
+  /// Marcador visto desde mí ("2-1"), null si aún no hay resultado.
+  final String? score;
+  final DateTime? timerStartedAt;
+  final int roundMinutes;
+}
+
+String _round(String phase, int number, int? bracket, bool third) {
+  if (third) return '3.er puesto';
+  if (phase == 'swiss') return 'Ronda $number';
+  return switch (bracket) {
+    2 => 'Final',
+    4 => 'Semis',
+    8 => 'Cuartos',
+    final n? => 'Top $n',
+    null => 'Top Cut',
+  };
+}
+
+/// Mi mesa en la última ronda de cada torneo en juego donde estoy inscrito.
+final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, String>((ref, playerId) {
+  final db = ref.watch(databaseProvider);
+  final me = Variable.withString(playerId);
+  return db
+      .customSelect(
+        'SELECT t.id AS tid, t.name AS tname, t.round_minutes AS rm, '
+        'r.number AS rnum, r.phase AS rphase, r.bracket_size AS rbs, r.timer_started_at AS rts, '
+        'm.table_number AS tbl, m.is_bye AS bye, m.result AS res, m.is_third_place AS third, '
+        'm.player1_id AS p1, m.games1 AS g1, m.games_draw AS gd, m.games2 AS g2, '
+        'op.nickname AS opn, od.name AS opdeck '
+        'FROM matches m '
+        'JOIN rounds r ON r.id = m.round_id '
+        'JOIN tournaments t ON t.id = m.tournament_id '
+        'LEFT JOIN players op ON op.id = CASE WHEN m.player1_id = ?1 THEN m.player2_id ELSE m.player1_id END '
+        'LEFT JOIN decks od ON od.id = CASE WHEN m.player1_id = ?1 THEN m.deck2_id ELSE m.deck1_id END '
+        "WHERE (m.player1_id = ?1 OR m.player2_id = ?1) AND t.status IN ('swiss', 'topCut') "
+        'AND t.deleted_at IS NULL AND r.deleted_at IS NULL AND m.deleted_at IS NULL '
+        'AND r.number = (SELECT MAX(r2.number) FROM rounds r2 '
+        '  WHERE r2.tournament_id = t.id AND r2.deleted_at IS NULL) '
+        'ORDER BY t.date DESC',
+        variables: [me],
+        readsFrom: {db.matches, db.rounds, db.tournaments, db.players, db.decks},
+      )
+      .watch()
+      .map((rows) => [
+            for (final r in rows)
+              () {
+                final iAmP1 = r.read<String>('p1') == playerId;
+                final g1 = r.readNullable<int>('g1');
+                final gd = r.readNullable<int>('gd') ?? 0;
+                final g2 = r.readNullable<int>('g2');
+                final res = r.read<String>('res');
+                String? score;
+                if (res == 'doubleLoss') {
+                  score = 'Doble derrota';
+                } else if (res != 'pending' && g1 != null && g2 != null) {
+                  final mine = iAmP1 ? g1 : g2;
+                  final theirs = iAmP1 ? g2 : g1;
+                  score = gd > 0 ? '$mine-$gd-$theirs' : '$mine-$theirs';
+                  if (mine + theirs + gd == 0) score = 'Empate (ID)';
+                }
+                return MyTableInfo(
+                  tournamentId: r.read<String>('tid'),
+                  tournamentName: r.read<String>('tname'),
+                  roundLabel: _round(r.read<String>('rphase'), r.read<int>('rnum'),
+                      r.readNullable<int>('rbs'), r.read<bool>('third')),
+                  table: r.readNullable<int>('tbl'),
+                  bye: r.read<bool>('bye'),
+                  opponent: r.readNullable<String>('opn'),
+                  opponentDeck: r.readNullable<String>('opdeck'),
+                  score: score,
+                  timerStartedAt: r.readNullable<DateTime>('rts'),
+                  roundMinutes: r.read<int>('rm'),
+                );
+              }(),
+          ]);
+});
+
+/// Tarjeta fija arriba en Torneos: ronda, mesa, rival, su mazo y el tiempo.
+class MyTablesSection extends ConsumerWidget {
+  const MyTablesSection({super.key, required this.playerId});
+
+  final String playerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final list = ref.watch(myTablesProvider(playerId)).value ?? const <MyTableInfo>[];
+    if (list.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionLabel('Mi mesa ahora'),
+        for (final t in list) _MyTableCard(info: t),
+      ],
+    );
+  }
+}
+
+class _MyTableCard extends StatelessWidget {
+  const _MyTableCard({required this.info});
+
+  final MyTableInfo info;
+
+  @override
+  Widget build(BuildContext context) {
+    final i = info;
+    final big = TextStyle(
+      fontSize: 34,
+      fontWeight: FontWeight.w900,
+      color: AppColors.neonBright,
+      shadows: AppColors.textGlow(blur: 10),
+    );
+    return Semantics(
+      container: true,
+      label: '${i.tournamentName}, ${i.roundLabel}. '
+          '${i.bye ? 'Tienes BYE' : 'Mesa ${i.table ?? '?'} contra ${i.opponent ?? '?'}'}',
+      child: NeonCard(
+        glow: true,
+        onTap: () => context.push('/torneos/${i.tournamentId}'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('${i.tournamentName} · ${i.roundLabel}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            if (i.bye)
+              Text('BYE · ganas 2-0', style: big)
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Column(
+                    children: [
+                      Text('MESA', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, letterSpacing: 1.2)),
+                      Text('${i.table ?? '?'}', style: big),
+                    ],
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('contra', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Text(i.opponent ?? '?',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                        Text(i.opponentDeck ?? 'Sin mazo',
+                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    i.score == null ? 'Sin resultado todavía' : 'Resultado: ${i.score}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: i.score == null ? AppColors.textSecondary : AppColors.neon),
+                  ),
+                ),
+                if (i.timerStartedAt != null && i.score == null)
+                  RoundCountdown(start: i.timerStartedAt!, minutes: i.roundMinutes),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tiempo que queda de ronda (se actualiza cada segundo).
+class RoundCountdown extends StatefulWidget {
+  const RoundCountdown({super.key, required this.start, required this.minutes, this.fontSize = 14});
+
+  final DateTime start;
+  final int minutes;
+  final double fontSize;
+
+  @override
+  State<RoundCountdown> createState() => _RoundCountdownState();
+}
+
+class _RoundCountdownState extends State<RoundCountdown> {
+  late final Timer _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _t.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = Duration(minutes: widget.minutes) - DateTime.now().difference(widget.start);
+    final over = left.isNegative;
+    final s = left.inSeconds.abs();
+    final text = '${over ? '+' : ''}${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+    final color = over
+        ? AppColors.loss
+        : left.inMinutes < 5
+            ? AppColors.draw
+            : AppColors.neon;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(over ? Icons.alarm : Icons.timer_outlined, size: widget.fontSize * 1.25, color: color),
+        SizedBox(width: widget.fontSize * 0.3),
+        Text(text,
+            style: TextStyle(
+                fontSize: widget.fontSize,
+                fontWeight: FontWeight.w900,
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()])),
+      ],
+    );
+  }
+}

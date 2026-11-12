@@ -9,6 +9,7 @@ import '../sync/sync_service.dart';
 /// Estado de una solicitud de inscripción desde la app.
 enum RegistrationStatus {
   pending, // espera al organizador
+  waitlist, // cupo lleno: espera a que se libere una plaza
   accepted, // aceptada; el teléfono del organizador la inscribe al sincronizar
   registered, // inscrito
   rejected,
@@ -17,6 +18,7 @@ enum RegistrationStatus {
 
   static RegistrationStatus parse(String? s) => switch (s) {
         'accepted' => accepted,
+        'waitlist' => waitlist,
         'registered' => registered,
         'rejected' => rejected,
         'cancel_requested' => cancelRequested,
@@ -25,7 +27,8 @@ enum RegistrationStatus {
       };
 
   /// Tiene la plaza pedida o concedida.
-  bool get active => this == pending || this == accepted || this == registered || this == cancelRequested;
+  bool get active =>
+      this == pending || this == waitlist || this == accepted || this == registered || this == cancelRequested;
 }
 
 class RegistrationRequest {
@@ -41,6 +44,7 @@ class RegistrationRequest {
     required this.status,
     required this.reason,
     required this.createdAt,
+    this.waitPosition,
   });
 
   factory RegistrationRequest.fromJson(Map<String, Object?> j) => RegistrationRequest(
@@ -54,6 +58,7 @@ class RegistrationRequest {
         deckName: j['deckName'] as String?,
         status: RegistrationStatus.parse(j['status'] as String?),
         reason: j['reason'] as String?,
+        waitPosition: (j['waitPosition'] as num?)?.toInt(),
         createdAt: DateTime.tryParse((j['createdAt'] as String?) ?? '') ?? DateTime.now(),
       );
 
@@ -73,6 +78,9 @@ class RegistrationRequest {
   final RegistrationStatus status;
   final String? reason;
   final DateTime createdAt;
+
+  /// Puesto en la lista de espera (1 = la próxima plaza).
+  final int? waitPosition;
 }
 
 /// Torneo con la inscripción desde la app abierta (según el servidor).
@@ -85,6 +93,7 @@ class OpenTournament {
     required this.topCutSize,
     required this.autoAccept,
     required this.enrolled,
+    this.capacity,
   });
 
   factory OpenTournament.fromJson(Map<String, Object?> j) {
@@ -101,6 +110,7 @@ class OpenTournament {
       topCutSize: (j['topCutSize'] as num?)?.toInt() ?? 0,
       autoAccept: j['autoAccept'] == true,
       enrolled: (j['enrolled'] as num?)?.toInt() ?? 0,
+      capacity: (j['capacity'] as num?)?.toInt(),
     );
   }
 
@@ -111,6 +121,11 @@ class OpenTournament {
   final int topCutSize;
   final bool autoAccept;
   final int enrolled;
+
+  /// Plazas (null = sin límite).
+  final int? capacity;
+
+  bool get full => capacity != null && enrolled >= capacity!;
 }
 
 class MyRegistrations {

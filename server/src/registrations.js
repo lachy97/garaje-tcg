@@ -30,6 +30,39 @@ export class RegistrationService {
     return t.data.status === 'draft' && Number(t.data.online_registration ?? 0) === 1;
   }
 
+  /** Cupo máximo del torneo (null = sin límite). */
+  static capacity(t) {
+    const n = Number(t.data.capacity ?? 0);
+    return n > 0 ? n : null;
+  }
+
+  /** Plazas ocupadas: inscritos + aceptadas aún sin inscribir (+ pendientes
+   * si [withPending], para no prometer más plazas de las que hay). */
+  async taken(community, tournamentId, withPending = false) {
+    const e = await this.db
+      .prepare("SELECT COUNT(*) AS n FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND deleted = 0")
+      .bind(community, tournamentId)
+      .first();
+    const states = withPending ? "('accepted', 'pending')" : "('accepted')";
+    const r = await this.db
+      .prepare(`SELECT COUNT(*) AS n FROM registrations WHERE tournament_id = ? AND status IN ${states}`)
+      .bind(tournamentId)
+      .first();
+    return (e?.n ?? 0) + (r?.n ?? 0);
+  }
+
+  /** Puesto en la lista de espera de cada solicitud que esté en ella. */
+  static positions(list) {
+    const byT = new Map();
+    for (const r of [...list].sort((a, b) => a.created_at - b.created_at)) {
+      if (r.status !== 'waitlist') continue;
+      const n = (byT.get(r.tournament_id) ?? 0) + 1;
+      byT.set(r.tournament_id, n);
+      r.wait_position = n;
+    }
+    return list;
+  }
+
   static autoAccept(t) {
     return Number(t.data.auto_accept ?? 0) === 1;
   }
@@ -67,6 +100,7 @@ export class RegistrationService {
       linked: Boolean(r.account_player),
       deckName: r.deck_name ?? null,
       status: r.status,
+      waitPosition: r.wait_position ?? null,
       reason: r.reason ?? null,
       createdAt: new Date(r.created_at).toISOString(),
       updatedAt: new Date(r.updated_at).toISOString(),
@@ -107,17 +141,20 @@ export class RegistrationService {
       throw bad('Ya estás inscrito en este torneo.');
     }
     const auto = RegistrationService.autoAccept(t) && me.player_id;
-    const status = auto ? 'accepted' : 'pending';
     const now = this.auth.now();
     const old = await this.db
       .prepare('SELECT id, status FROM registrations WHERE tournament_id = ? AND account_id = ?')
       .bind(t.id, me.id)
       .first();
+    // Cupo lleno (contando las pendientes): a la lista de espera.
+    const cap = RegistrationService.capacity(t);
+    const full = cap != null && (await this.taken(me.community_id, t.id, true)) >= cap;
+    const status = full ? 'waitlist' : auto ? 'accepted' : 'pending';
     // (Si figuraba como inscrito pero ya no está en la lista, el organizador
     // lo quitó: vuelve a pedirse.)
     if (old) {
       // Cambia el mazo; si estaba rechazada o cancelada, vuelve a pedirse.
-      const keep = old.status === 'pending' || old.status === 'accepted';
+      const keep = old.status === 'pending' || old.status === 'accepted' || old.status === 'waitlist';
       await this.db
         .prepare('UPDATE registrations SET deck_name = ?, status = ?, reason = NULL, player_id = ?, updated_at = ? WHERE id = ?')
         .bind(deck, keep ? old.status : status, me.player_id ?? null, now, old.id)
@@ -167,13 +204,28 @@ export class RegistrationService {
         name: d.name ?? '',
         date: d.date ?? null,
         swissRounds: d.swiss_rounds ?? null,
+        capacity: Number(d.capacity ?? 0) > 0 ? Number(d.capacity) : null,
         topCutSize: d.top_cut_size ?? 0,
         autoAccept: Number(d.auto_accept ?? 0) === 1,
         enrolled: r.enrolled ?? 0,
       };
     });
+    // Puesto en la lista de espera: se cuenta entre todas las del torneo.
+    const own = q.results ?? [];
+    const waiting = own.filter((r) => r.status === 'waitlist').map((r) => r.tournament_id);
+    if (waiting.length) {
+      const wq = await this.db
+        .prepare(
+          `SELECT id, tournament_id, status, created_at FROM registrations
+            WHERE status = 'waitlist' AND tournament_id IN (${waiting.map(() => '?').join(',')})`,
+        )
+        .bind(...waiting)
+        .all();
+      const pos = new Map(RegistrationService.positions(wq.results ?? []).map((r) => [r.id, r.wait_position]));
+      for (const r of own) if (pos.has(r.id)) r.wait_position = pos.get(r.id);
+    }
     return {
-      registrations: (q.results ?? []).map(RegistrationService.out),
+      registrations: own.map(RegistrationService.out),
       playerId: me.player_id ?? null,
       open,
     };
@@ -187,7 +239,7 @@ export class RegistrationService {
     if (r.account_id !== me.id) throw new ApiError(403, 'Esa solicitud no es tuya.');
     const t = await this.tournament(me.community_id, r.tournament_id);
     if (t.data.status !== 'draft') throw bad('El torneo ya empezó: habla con el organizador.');
-    if (r.status === 'pending' || r.status === 'accepted') {
+    if (r.status === 'pending' || r.status === 'accepted' || r.status === 'waitlist') {
       return { registration: await this.setStatus(id, 'cancelled') };
     }
     if (r.status === 'registered') return { registration: await this.setStatus(id, 'cancel_requested') };
@@ -207,7 +259,7 @@ export class RegistrationService {
       )
       .bind(me.community_id, tournamentId)
       .all();
-    return { registrations: (q.results ?? []).map(RegistrationService.out) };
+    return { registrations: RegistrationService.positions(q.results ?? []).map(RegistrationService.out) };
   }
 
   /**
@@ -230,18 +282,35 @@ export class RegistrationService {
       .all();
     const mine = (tq.results ?? []).filter((t) => t.status === 'draft');
     if (!mine.length) return { registrations: [] };
-    const now = this.auth.now();
-    const auto = mine.filter((t) => Number(t.online) === 1 && Number(t.auto) === 1).map((t) => t.id);
-    if (auto.length) {
-      await this.db
+    // Por cada torneo: con "aceptar solas", las pendientes con ficha pasan a
+    // aceptadas mientras haya plazas; y si se liberan plazas, sube la lista
+    // de espera (por orden de llegada).
+    for (const tr of mine) {
+      if (Number(tr.online) !== 1) continue;
+      const t = await this.tournament(me.community_id, tr.id);
+      const cap = RegistrationService.capacity(t);
+      const auto = Number(tr.auto) === 1;
+      const rq = await this.db
         .prepare(
-          `UPDATE registrations SET status = 'accepted', updated_at = ?,
-                  player_id = (SELECT player_id FROM accounts WHERE accounts.id = registrations.account_id)
-            WHERE status = 'pending' AND tournament_id IN (${auto.map(() => '?').join(',')})
-              AND (SELECT player_id FROM accounts WHERE accounts.id = registrations.account_id) IS NOT NULL`,
+          `SELECT r.id, r.status, a.player_id AS account_player FROM registrations r
+             JOIN accounts a ON a.id = r.account_id
+            WHERE r.tournament_id = ? AND r.status IN ('pending', 'waitlist') ORDER BY r.created_at`,
         )
-        .bind(now, ...auto)
-        .run();
+        .bind(tr.id)
+        .all();
+      let taken = await this.taken(me.community_id, tr.id, !auto);
+      for (const r of rq.results ?? []) {
+        const room = cap == null || taken < cap;
+        const toAccept = Boolean(auto && r.account_player && room);
+        if (r.status === 'pending' && auto && r.account_player && room) {
+          await this.setStatus(r.id, 'accepted', { playerId: r.account_player });
+          taken++;
+        } else if (r.status === 'waitlist' && room) {
+          await this.setStatus(r.id, toAccept ? 'accepted' : 'pending',
+            toAccept ? { playerId: r.account_player } : {});
+          taken++;
+        }
+      }
     }
     const ids = mine.map((t) => t.id);
     const q = await this.db
@@ -264,8 +333,12 @@ export class RegistrationService {
     const r = await this.byId(id);
     const { me, t } = await this.manager(token, r.tournament_id);
     if (t.data.status !== 'draft') throw bad('El torneo ya empezó.');
-    if (!['pending', 'rejected', 'accepted'].includes(r.status)) {
+    if (!['pending', 'rejected', 'accepted', 'waitlist'].includes(r.status)) {
       return { registration: RegistrationService.out(r) };
+    }
+    const cap = RegistrationService.capacity(t);
+    if (cap != null && r.status !== 'accepted' && (await this.taken(me.community_id, t.id)) >= cap) {
+      throw bad(`El cupo (${cap}) está lleno: auméntalo o rechaza a alguien.`);
     }
     const playerId = typeof body?.playerId === 'string' && body.playerId ? body.playerId : r.account_player;
     if (!playerId) throw bad('Elige la ficha de jugador de esta cuenta.');

@@ -140,3 +140,40 @@ test('jugador: baja solo lo que puede ver', async () => {
   assert.equal(all.data.rows.length, 12);
   assert.equal(all.data.rows.find((x) => x.id === 'p2').data.phone, '666');
 });
+
+test('privacidad: cover y notas solo para quien lleva el torneo; el organizador ve teléfonos', async () => {
+  const { call, admin, org, player } = await setup();
+  // El jugador tiene ficha p1; el torneo t1 (terminado) es del organizador.
+  await call('POST', `/v1/admin/accounts/${player.account.id}/player`, { playerId: 'p1' }, admin.token);
+  await call('POST', '/v1/sync/push', {
+    rows: [
+      row('players', 'p1', 1, { id: 'p1', nickname: 'Jug', phone: '5551' }),
+      row('players', 'p2', 1, { id: 'p2', nickname: 'Otro', phone: '5552' }),
+      row('tournaments', 't1', 1, { id: 't1', name: 'T1', status: 'finished', notes: 'secreto' }),
+      row('tournament_players', 'e1', 1, { id: 'e1', tournament_id: 't1', player_id: 'p1', paid: 1 }),
+      row('penalties', 'pen2', 1, { id: 'pen2', tournament_id: 't1', player_id: 'p2', reason: 'x' }),
+    ],
+  }, org.token);
+  // Torneo de otro (admin), en juego, donde no está nadie.
+  await call('POST', '/v1/sync/push', {
+    rows: [row('tournaments', 't9', 2, { id: 't9', name: 'T9', status: 'swiss', notes: 'privado' })],
+  }, admin.token);
+
+  const pj = (await call('GET', '/v1/sync/pull?since=0', null, player.token)).data.rows;
+  const t1 = pj.find((x) => x.id === 't1');
+  assert.ok(!('notes' in t1.data), 'sin notas del organizador');
+  assert.ok(!('paid' in pj.find((x) => x.id === 'e1').data), 'sin cover');
+  assert.equal(pj.find((x) => x.id === 'p2').data.phone, null);
+  assert.equal(pj.find((x) => x.id === 'p1').data.phone, '5551', 'lo suyo sí');
+  assert.ok(!pj.some((x) => x.id === 'pen2'), 'penalizaciones ajenas no');
+
+  const og = (await call('GET', '/v1/sync/pull?since=0', null, org.token)).data.rows;
+  assert.equal(og.find((x) => x.id === 't1').data.notes, 'secreto', 'su torneo completo');
+  assert.equal(og.find((x) => x.id === 'e1').data.paid, 1);
+  assert.ok(og.some((x) => x.id === 'pen2'));
+  assert.equal(og.find((x) => x.id === 'p2').data.phone, '5552', 'el organizador ve teléfonos');
+  assert.ok(!og.some((x) => x.id === 't9'), 'torneos en juego de otros no');
+
+  const ad = (await call('GET', '/v1/sync/pull?since=0', null, admin.token)).data.rows;
+  assert.equal(ad.find((x) => x.id === 't9').data.notes, 'privado');
+});

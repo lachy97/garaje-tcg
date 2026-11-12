@@ -159,11 +159,13 @@ export class SyncService {
 
   /**
    * Cambios con seq > since que esta cuenta puede ver.
-   * - Administrador y organizadores: todo (para restaurar).
+   * - Administrador: todo (para restaurar).
+   * - Organizadores: sus torneos completos y los datos de los jugadores
+   *   (también el teléfono); del resto, lo mismo que un jugador.
    * - Jugadores y jueces: catálogo, temporadas, ranking y tier list; los
    *   torneos terminados (para el ranking y las estadísticas) y aquellos en
    *   los que están inscritos; de los demás jugadores solo el apodo; sus
-   *   propias penalizaciones.
+   *   propias penalizaciones. Sin cover pagado ni notas del organizador.
    * Cuando un torneo pasa a ser visible (termina o se inscribe) se envía
    * entero, aunque sus filas sean anteriores a [since].
    */
@@ -174,7 +176,7 @@ export class SyncService {
     const community = me.community_id;
     const q = await this.db
       .prepare(
-        'SELECT tbl, id, data, deleted, changed_at, seq, tournament_id, player_id FROM sync_rows WHERE community_id = ? AND seq > ? ORDER BY seq LIMIT ?',
+        'SELECT tbl, id, data, deleted, changed_at, seq, tournament_id, player_id, owner_id FROM sync_rows WHERE community_id = ? AND seq > ? ORDER BY seq LIMIT ?',
       )
       .bind(community, since, limit)
       .all();
@@ -189,20 +191,28 @@ export class SyncService {
       deleted: Boolean(r.deleted),
       data: r.data ? JSON.parse(r.data) : null,
     });
-    if (me.role === 'admin' || me.role === 'organizer') {
+    if (me.role === 'admin') {
       return { rows: delta.map(out), more, seq, full: true };
     }
+    const isOrganizer = me.role === 'organizer';
     if (!delta.length) return { rows: [], more: false, seq };
 
     const pid = me.player_id ?? null;
     // Torneos visibles: terminados, con inscripción desde la app abierta y
     // en los que está inscrito.
     const tq = await this.db
-      .prepare("SELECT id, json_extract(data, '$.status') AS status, json_extract(data, '$.online_registration') AS online FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0")
+      .prepare("SELECT id, owner_id, json_extract(data, '$.status') AS status, json_extract(data, '$.online_registration') AS online FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0")
       .bind(community)
       .all();
     const visible = new Set();
+    // Torneos que lleva este organizador: le llegan completos (cover, notas,
+    // penalizaciones de todos).
+    const owned = new Set();
     for (const t of tq.results ?? []) {
+      if (isOrganizer && t.owner_id === me.id) {
+        owned.add(t.id);
+        visible.add(t.id);
+      }
       // Terminados, y en inscripción con la inscripción desde la app abierta.
       if (t.status === 'finished' || (t.status === 'draft' && Number(t.online) === 1)) visible.add(t.id);
     }
@@ -216,6 +226,9 @@ export class SyncService {
 
     const ALWAYS = new Set(['decks', 'seasons', 'points_scale_entries', 'ranking_snapshots', 'deck_snapshots']);
     const PRIVATE_PLAYER = ['full_name', 'photo_path', 'notes', 'konami_id', 'phone'];
+    // Datos solo para quien lleva el torneo (se quitan; la app pone el valor
+    // por defecto): cover pagado y notas del organizador.
+    const ORGANIZER_ONLY = { tournament_players: ['paid'], tournaments: ['notes'] };
     const rows = new Map();
     const add = (r) => {
       const key = `${r.tbl}|${r.id}`;
@@ -228,11 +241,15 @@ export class SyncService {
         rows.set(key, out(r));
       } else if (r.tbl === 'players') {
         const o = out(r);
-        if (r.id !== pid) for (const k of PRIVATE_PLAYER) if (k in o.data) o.data[k] = null;
+        // El organizador ve los datos de los jugadores (también el teléfono).
+        if (r.id !== pid && !isOrganizer) for (const k of PRIVATE_PLAYER) if (k in o.data) o.data[k] = null;
         rows.set(key, o);
       } else if (r.tournament_id && visible.has(r.tournament_id)) {
-        if (r.tbl === 'penalties' && r.player_id !== pid) return;
-        rows.set(key, out(r));
+        const mine = owned.has(r.tournament_id);
+        if (r.tbl === 'penalties' && r.player_id !== pid && !mine) return;
+        const o = out(r);
+        if (!mine) for (const k of ORGANIZER_ONLY[r.tbl] ?? []) delete o.data[k];
+        rows.set(key, o);
       }
     };
     for (const r of delta) add(r);

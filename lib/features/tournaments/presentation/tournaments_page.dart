@@ -11,6 +11,7 @@ import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/registrations/registrations.dart';
+import 'my_table.dart';
 import 'open_registrations.dart';
 import 'providers.dart';
 
@@ -76,6 +77,9 @@ class TournamentsPage extends ConsumerWidget {
                   ],
                 ),
               ),
+              // Quien juega (tenga el rol que tenga): su mesa de la ronda actual.
+              if (perms.playerId != null)
+                SliverToBoxAdapter(child: MyTablesSection(playerId: perms.playerId!)),
               if (player) const SliverToBoxAdapter(child: OpenRegistrationsSection()),
               ...tournaments.when<List<Widget>>(
                 skipLoadingOnReload: true,

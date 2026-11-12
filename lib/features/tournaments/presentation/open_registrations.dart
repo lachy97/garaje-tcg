@@ -138,7 +138,8 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
     final status = r?.status;
     final date = t.date == null ? '' : '${DateFormat.yMMMd('es').format(t.date!)} · ';
     final info = '$date${t.swissRounds ?? '?'} rondas · '
-        '${t.topCutSize == 0 ? 'sin Top' : 'Top ${t.topCutSize}'} · ${t.enrolled} inscrito(s)';
+        '${t.topCutSize == 0 ? 'sin Top' : 'Top ${t.topCutSize}'} · '
+        '${t.capacity == null ? '${t.enrolled} inscrito(s)' : '${t.enrolled}/${t.capacity} plazas'}';
 
     final (String? line, Color color) = switch (status) {
       _ when enrolled || status == RegistrationStatus.registered => (
@@ -149,6 +150,11 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
       RegistrationStatus.accepted => (
           'Aceptada con ${r!.deckName}: quedarás inscrito cuando sincronice el organizador.',
           AppColors.leaf
+        ),
+      RegistrationStatus.waitlist => (
+          'Cupo lleno: estás en la lista de espera (puesto ${r!.waitPosition ?? '?'}). '
+              'Si se libera una plaza, entras solo.',
+          AppColors.draw
         ),
       RegistrationStatus.cancelRequested => ('Baja pedida: el organizador te quitará.', AppColors.draw),
       RegistrationStatus.rejected => (
@@ -162,6 +168,7 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
         (status == null || status == RegistrationStatus.rejected || status == RegistrationStatus.cancelled);
     final canCancel = r != null &&
         (status == RegistrationStatus.pending ||
+            status == RegistrationStatus.waitlist ||
             status == RegistrationStatus.accepted ||
             (status == RegistrationStatus.registered && enrolled));
 
@@ -194,6 +201,11 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
             Text('Para borrarte o cambiar el mazo, habla con el organizador.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
+          if (canRequest && t.full) ...[
+            const SizedBox(height: 6),
+            Text('Torneo completo: si te inscribes, quedas en la lista de espera.',
+                style: TextStyle(fontSize: 12, color: AppColors.draw)),
+          ],
           if (canRequest && pid == null) ...[
             const SizedBox(height: 6),
             Text(
@@ -218,8 +230,9 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
                           style: TextStyle(color: AppColors.loss)),
                     ),
                   ),
-                if (canCancel && status == RegistrationStatus.pending) const SizedBox(width: 10),
-                if (status == RegistrationStatus.pending)
+                if (canCancel && (status == RegistrationStatus.pending || status == RegistrationStatus.waitlist))
+                  const SizedBox(width: 10),
+                if (status == RegistrationStatus.pending || status == RegistrationStatus.waitlist)
                   Expanded(
                     child: OutlinedButton(onPressed: _request, child: const Text('Cambiar mazo')),
                   ),

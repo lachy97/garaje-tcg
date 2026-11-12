@@ -289,3 +289,17 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - Aceptar a una cuenta sin ficha la **vincula** a la ficha elegida (si esa ficha no es de otra cuenta).
 - Los torneos en inscripción con la inscripción desde la app abierta bajan a los teléfonos de los jugadores (con los inscritos, solo apodos).
 - Se cierra sola al generar la ronda 1. El cover se sigue marcando a mano.
+
+## Decisiones de privacidad y roles (11/11)
+- **Ficha pública**: los jugadores verán la ficha pública de otros (apodo, torneos, mazos, winrate), sin datos personales (pendiente: tanda 5).
+- **Teléfono**: lo ven el administrador y el organizador.
+- **Listas de mazo**: de todo el Top Cut; el organizador elige si se ven al momento, solo el arquetipo o al terminar (pendiente: tanda 4).
+- **Juez por torneo**: todas las partidas y penalizaciones de ese torneo, sin teléfonos ni cover (pendiente: tanda 3).
+- **Sesión obligatoria**; más adelante, una web pública con datos de la comunidad.
+- **Servidor (hecho)**: a jugadores y jueces ya no les llegan el **cover pagado** ni las **notas del organizador**. Los **organizadores** ya no reciben todo: sus torneos completos (cover, notas, penalizaciones de todos), los datos de los jugadores (también el teléfono) y del resto lo mismo que un jugador. El administrador sigue recibiendo todo.
+- Pendiente (tanda 5): que los jugadores sin licencia reciban el ranking y la tier list ya calculados en vez de todas las partidas.
+
+## Tanda 1 de mejoras (11/11)
+- **Mi mesa ahora** (Torneos, arriba): para quien tenga ficha vinculada y esté en un torneo en juego: ronda, mesa, rival, su mazo, resultado y tiempo que queda; toca para abrir el torneo.
+- **Pantalla para proyectar** (icono de TV en la barra del torneo en juego, organizador): cruces y clasificación en letra grande, reloj, columnas según el ancho; cambia sola cada 20 s o con un toque; pantalla completa y sin apagarse.
+- **Cupo y lista de espera** en la inscripción desde la app (esquema v12, `tournaments.capacity`, 0 = sin límite): con el cupo lleno (inscritos + aceptadas + pendientes) las solicitudes nuevas van a la lista de espera con su puesto; al liberarse plazas suben por orden de llegada (aceptadas solas o pendientes, según el modo). Aceptar a mano con el cupo lleno pide aumentarlo o rechazar a alguien.

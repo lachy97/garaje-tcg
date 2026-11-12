@@ -127,6 +127,10 @@ class Tournaments extends Table with SyncColumns {
 
   /// Las solicitudes de cuentas con ficha vinculada se aceptan solas (v11).
   BoolColumn get autoAccept => boolean().withDefault(const Constant(false))();
+
+  /// Plazas de la inscripción desde la app (v12). 0 = sin límite; si se
+  /// llena, las solicitudes nuevas van a la lista de espera.
+  IntColumn get capacity => integer().withDefault(const Constant(0))();
 }
 
 @DataClassName('TournamentPlayer')
