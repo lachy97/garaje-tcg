@@ -136,6 +136,8 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
                 '${vs(a)} · falta que confirme el rival',
               ),
           },
+        // Check-in y acciones de juez: se aplican solas (no salen aquí).
+        _ => (Icons.info_outline, AppColors.textSecondary, '${a.nickname ?? '?'}', _ago(a.createdAt)),
       };
       final canApply = a.kind == PlayKind.report && a.score != null && a.matchId != null &&
           a.status != PlayStatus.confirmed;
