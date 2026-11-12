@@ -10,6 +10,7 @@ import '../auth/auth_providers.dart';
 import '../auth/http_auth_api.dart';
 import '../db/app_database.dart';
 import '../db/database_provider.dart';
+import '../registrations/registrations.dart';
 import 'sync_schema.dart';
 
 /// Estado de la subida de datos al servidor.
@@ -194,6 +195,9 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
         );
         return;
       }
+      // Inscripciones desde la app aceptadas: se inscriben aquí (y se suben
+      // con el resto de cambios).
+      await _applyRegistrations(session, api);
       // Primera vez que esta cuenta sube desde este teléfono: todo.
       const key = 'all_enqueued_for';
       if (await _state(key) != session.account.id) {
@@ -248,6 +252,18 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       if (ref.mounted) state = state.copyWith(running: false, lastError: 'Error al sincronizar: $e');
     } finally {
       _busy = false;
+    }
+  }
+
+  /// Solicitudes aceptadas → inscripciones locales; bajas → se quitan.
+  /// Si el servidor aún no tiene esta función (versión anterior), se ignora.
+  Future<void> _applyRegistrations(Session session, HttpAuthApi api) async {
+    try {
+      await applyAcceptedRegistrations(_db, RegistrationsApi(api, session));
+    } on AuthNetworkException {
+      rethrow;
+    } catch (_) {
+      // Servidor sin inscripciones desde la app u otro fallo: no frena la subida.
     }
   }
 

@@ -177,6 +177,21 @@ ver: catálogo de mazos, temporadas, ranking y tier list, los torneos
 terminados y aquellos en los que están inscritos (en vivo), y su propia
 ficha. De los demás jugadores solo llega el apodo.
 
+## 12 · Inscripción desde la app
+
+Una vez, en el PC (con VPN):
+
+```powershell
+npm run db:inscripcion
+npm run deploy
+```
+
+El organizador abre la inscripción desde la app en la pestaña **Jugadores**
+del torneo (mientras está en inscripción) y elige si las solicitudes se
+aceptan **a mano** o **solas**. Los jugadores la piden desde **Torneos →
+Inscripción abierta** con su mazo. El teléfono del organizador inscribe a los
+aceptados al sincronizar.
+
 ## Útil
 
 | Para | Comando |
@@ -207,6 +222,15 @@ ficha. De los demás jugadores solo llega el apodo.
 | POST | `/v1/admin/accounts/:id/player` | `playerId` o `null` (admin) |
 | POST | `/v1/admin/accounts/:id/verify` | (admin) |
 | POST | `/v1/admin/accounts/:id/reset-code` | (admin) → `code` para mandar por WhatsApp |
+| GET | `/v1/me` | también renueva la sesión → `expiresAt` |
+| POST | `/v1/registrations` | `tournamentId, deckName` (jugador: pedir plaza o cambiar el mazo) |
+| GET | `/v1/registrations/mine` | (jugador) → `registrations`, `open` (torneos abiertos), `playerId` |
+| POST | `/v1/registrations/:id/cancel` | (jugador) |
+| GET | `/v1/registrations?tournament=` | (organizador del torneo / admin) |
+| GET | `/v1/registrations/todo` | (organizador) aceptadas por inscribir y bajas por quitar |
+| POST | `/v1/registrations/:id/accept` | `playerId?` (vincula la cuenta si no tenía ficha) |
+| POST | `/v1/registrations/:id/reject` | `reason?` |
+| POST | `/v1/registrations/:id/done` | (organizador) ya inscrito / ya quitado |
 
 Errores: código HTTP 4xx con `{ "error": "mensaje para el usuario" }`; si la
 cuenta no está confirmada, además `"code": "unverified"` y `"email"`.

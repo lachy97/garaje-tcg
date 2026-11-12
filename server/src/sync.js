@@ -195,13 +195,17 @@ export class SyncService {
     if (!delta.length) return { rows: [], more: false, seq };
 
     const pid = me.player_id ?? null;
-    // Torneos visibles: terminados + en los que está inscrito.
+    // Torneos visibles: terminados, con inscripción desde la app abierta y
+    // en los que está inscrito.
     const tq = await this.db
-      .prepare("SELECT id, json_extract(data, '$.status') AS status FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0")
+      .prepare("SELECT id, json_extract(data, '$.status') AS status, json_extract(data, '$.online_registration') AS online FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0")
       .bind(community)
       .all();
     const visible = new Set();
-    for (const t of tq.results ?? []) if (t.status === 'finished') visible.add(t.id);
+    for (const t of tq.results ?? []) {
+      // Terminados, y en inscripción con la inscripción desde la app abierta.
+      if (t.status === 'finished' || (t.status === 'draft' && Number(t.online) === 1)) visible.add(t.id);
+    }
     if (pid) {
       const eq = await this.db
         .prepare("SELECT tournament_id FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND player_id = ? AND deleted = 0")

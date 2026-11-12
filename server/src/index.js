@@ -1,9 +1,10 @@
 // Garage TCG · API (Cloudflare Workers + D1).
 // Rutas en /v1. Cuerpos y respuestas en JSON. Errores: { error, code? }.
 import { ApiError, AuthService } from './auth.js';
+import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -33,6 +34,7 @@ export async function handle(request, env, opts) {
   const m = request.method;
   const auth = new AuthService(env, opts);
   const sync = new SyncService(env, auth);
+  const regs = new RegistrationService(env, auth);
   try {
     // Fase 0: prueba de conexión desde Cuba.
     if ((path === '/v1/health' || path === '/') && m === 'GET') {
@@ -54,6 +56,15 @@ export async function handle(request, env, opts) {
         case '/v1/auth/logout': return json(await auth.logout(token));
         case '/v1/sync/push': return json(await sync.push(token, body));
         case '/v1/admin/mail-test': return json(await auth.mailTest(token));
+        case '/v1/registrations': return json(await regs.request(token, body));
+      }
+      const reg = path.match(/^\/v1\/registrations\/([^/]+)\/(accept|reject|done|cancel)$/);
+      if (reg) {
+        const [, id, what] = reg;
+        if (what === 'accept') return json(await regs.accept(token, id, body));
+        if (what === 'reject') return json(await regs.reject(token, id, body));
+        if (what === 'done') return json(await regs.done(token, id));
+        return json(await regs.cancel(token, id));
       }
       const admin = path.match(/^\/v1\/admin\/accounts\/([^/]+)\/(role|player|verify|reset-code)$/);
       if (admin) {
@@ -69,6 +80,11 @@ export async function handle(request, env, opts) {
       if (path === '/v1/admin/accounts') return json(await auth.listAccounts(token));
       if (path === '/v1/sync/pull') return json(await sync.pull(token, url.searchParams));
       if (path === '/v1/sync/status') return json(await sync.status(token));
+      if (path === '/v1/registrations/mine') return json(await regs.mine(token));
+      if (path === '/v1/registrations/todo') return json(await regs.todo(token));
+      if (path === '/v1/registrations') {
+        return json(await regs.forTournament(token, url.searchParams.get('tournament')));
+      }
     }
     return json({ error: 'Ruta no encontrada.' }, 404);
   } catch (e) {

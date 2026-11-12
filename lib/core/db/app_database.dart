@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -131,6 +131,11 @@ class AppDatabase extends _$AppDatabase {
               'standings_games_draw = 0, standings_games2 = 0 '
               "WHERE id = '01a19893-6890-7c18-9348-8190cf9dab59' AND result = 'p2Win'",
             );
+          }
+          if (from < 11) {
+            // v11: inscripción desde la app
+            await m.addColumn(tournaments, tournaments.onlineRegistration);
+            await m.addColumn(tournaments, tournaments.autoAccept);
           }
         },
         beforeOpen: (details) async {

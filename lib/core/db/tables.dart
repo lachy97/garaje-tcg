@@ -120,6 +120,13 @@ class Tournaments extends Table with SyncColumns {
   /// Duración de cada ronda en minutos (v4). Solo informativo: el tiempo
   /// no decide resultados, avisa al organizador.
   IntColumn get roundMinutes => integer().withDefault(const Constant(45))();
+
+  /// Inscripción desde la app (v11): los jugadores piden plaza desde su
+  /// teléfono mientras el torneo está en inscripción.
+  BoolColumn get onlineRegistration => boolean().withDefault(const Constant(false))();
+
+  /// Las solicitudes de cuentas con ficha vinculada se aceptan solas (v11).
+  BoolColumn get autoAccept => boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('TournamentPlayer')

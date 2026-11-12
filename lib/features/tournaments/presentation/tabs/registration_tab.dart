@@ -12,6 +12,7 @@ import '../../../decks/presentation/deck_picker.dart';
 import '../../../players/presentation/players_page.dart';
 import '../../application/tournament_service.dart';
 import '../providers.dart';
+import 'online_registration.dart';
 import 'penalties.dart';
 
 /// Último mazo de cada jugador (para proponerlo al inscribirlo).
@@ -93,6 +94,8 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
                 ],
               ),
             ),
+            // Inscripción desde la app (solo en inscripción y con servidor).
+            OnlineRegistrationCard(tournament: tournament),
             PenaltiesSection(
               tournament: tournament,
               names: {for (final r in list) r.player.id: r.player.nickname},

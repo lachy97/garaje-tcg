@@ -30,7 +30,7 @@ class Stmt {
 export function makeD1() {
   const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON');
-  for (const f of ['0001_init.sql', '0002_sync.sql', '0003_pull_filters.sql']) {
+  for (const f of ['0001_init.sql', '0002_sync.sql', '0003_pull_filters.sql', '0004_registrations.sql']) {
     db.exec(readFileSync(new URL(`../migrations/${f}`, import.meta.url), 'utf8'));
   }
   return {

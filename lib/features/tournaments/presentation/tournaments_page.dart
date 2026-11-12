@@ -10,6 +10,8 @@ import '../../../app/widgets/sync_widgets.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/registrations/registrations.dart';
+import 'open_registrations.dart';
 import 'providers.dart';
 
 class TournamentsPage extends ConsumerWidget {
@@ -23,9 +25,18 @@ class TournamentsPage extends ConsumerWidget {
     final mine = perms.canCreateTournaments || perms.playerId == null
         ? null
         : ref.watch(playerTournamentIdsProvider(perms.playerId!)).value;
+    // Torneos con la inscripción desde la app abierta (según el servidor):
+    // se muestran aparte, con el botón para inscribirse.
+    final player = !perms.canCreateTournaments;
+    final openIds = player
+        ? {for (final t in ref.watch(myRegistrationsProvider).value?.open ?? const []) t.id}
+        : const <String>{};
     final tournaments = perms.canCreateTournaments
         ? all
-        : all.whenData((list) => [for (final t in list) if (mine?.contains(t.id) ?? false) t]);
+        : all.whenData((list) => [
+              for (final t in list)
+                if ((mine?.contains(t.id) ?? false) && !openIds.contains(t.id)) t,
+            ]);
     return Scaffold(
       body: SafeArea(
         child: SyncRefresh(
@@ -65,6 +76,7 @@ class TournamentsPage extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (player) const SliverToBoxAdapter(child: OpenRegistrationsSection()),
               ...tournaments.when<List<Widget>>(
                 skipLoadingOnReload: true,
                 loading: () => [
@@ -78,6 +90,9 @@ class TournamentsPage extends ConsumerWidget {
                   ),
                 ],
                 data: (list) {
+                  if (list.isEmpty && openIds.isNotEmpty) {
+                    return [const SliverToBoxAdapter(child: SizedBox(height: 96))];
+                  }
                   if (list.isEmpty) {
                     return [
                       SliverFillRemaining(
@@ -87,7 +102,8 @@ class TournamentsPage extends ConsumerWidget {
                           title: 'Aún no hay torneos',
                           subtitle: perms.canCreateTournaments
                               ? 'Crea el primero con "Nuevo torneo".'
-                              : 'Aquí verás los torneos en los que estés inscrito.',
+                              : 'Aquí verás los torneos en los que estés inscrito '
+                                  'y los que tengan la inscripción abierta.',
                         ),
                       ),
                     ];
