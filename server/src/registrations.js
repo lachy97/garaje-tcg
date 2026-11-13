@@ -19,7 +19,7 @@ export class RegistrationService {
   async tournament(community, id) {
     if (typeof id !== 'string' || !id) throw bad('Falta el torneo.');
     const r = await this.db
-      .prepare("SELECT id, data, owner_id FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND id = ? AND deleted = 0")
+      .prepare("SELECT id, data, owner_id FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
       .bind(community, id)
       .first();
     if (!r?.data) throw new ApiError(404, 'Ese torneo no existe o se borró.');
@@ -40,7 +40,7 @@ export class RegistrationService {
    * si [withPending], para no prometer más plazas de las que hay). */
   async taken(community, tournamentId, withPending = false) {
     const e = await this.db
-      .prepare("SELECT COUNT(*) AS n FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND deleted = 0")
+      .prepare("SELECT COUNT(*) AS n FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
       .bind(community, tournamentId)
       .first();
     const states = withPending ? "('accepted', 'pending')" : "('accepted')";
@@ -71,7 +71,7 @@ export class RegistrationService {
   async enrolled(community, tournamentId, playerId) {
     if (!playerId) return false;
     const r = await this.db
-      .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0")
+      .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
       .bind(community, tournamentId, playerId)
       .first();
     return Boolean(r);
@@ -189,9 +189,9 @@ export class RegistrationService {
       .prepare(
         `SELECT t.id, t.data,
                 (SELECT COUNT(*) FROM sync_rows p WHERE p.community_id = t.community_id AND p.tbl = 'tournament_players'
-                   AND p.tournament_id = t.id AND p.deleted = 0) AS enrolled
+                   AND p.tournament_id = t.id AND p.deleted = 0 AND json_extract(p.data, '$.deleted_at') IS NULL) AS enrolled
            FROM sync_rows t
-          WHERE t.community_id = ? AND t.tbl = 'tournaments' AND t.deleted = 0
+          WHERE t.community_id = ? AND t.tbl = 'tournaments' AND t.deleted = 0 AND json_extract(t.data, '$.deleted_at') IS NULL
             AND json_extract(t.data, '$.status') = 'draft'
             AND json_extract(t.data, '$.online_registration') = 1`,
       )
@@ -276,7 +276,7 @@ export class RegistrationService {
         `SELECT id, json_extract(data, '$.status') AS status,
                 json_extract(data, '$.online_registration') AS online,
                 json_extract(data, '$.auto_accept') AS auto
-           FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0 AND owner_id = ?`,
+           FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL AND owner_id = ?`,
       )
       .bind(me.community_id, me.id)
       .all();

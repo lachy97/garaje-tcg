@@ -152,3 +152,12 @@ test('cupo: lista de espera y sube cuando se libera una plaza', async () => {
   const todo = await call('GET', '/v1/registrations/todo', null, org.token);
   assert.deepEqual(todo.data.registrations.map((x) => [x.nickname, x.status]), [['leo', 'accepted']]);
 });
+
+test('un torneo borrado (borrado lógico) deja de salir abierto', async () => {
+  const { call, ana, tour } = await setup();
+  await tour({ online_registration: 1, auto_accept: 0 });
+  assert.equal((await call('GET', '/v1/registrations/mine', null, ana.token)).data.open.length, 1);
+  await tour({ online_registration: 1, auto_accept: 0, deleted_at: 1794480000 }, 200);
+  assert.equal((await call('GET', '/v1/registrations/mine', null, ana.token)).data.open.length, 0);
+  assert.equal((await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'X' }, ana.token)).status, 404);
+});

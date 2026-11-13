@@ -335,3 +335,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Organizador y jueces**: llamadas al juez, resultados en disputa y solicitudes de inscripción nuevas.
 - Cada aviso sale una sola vez (se recuerdan los últimos 400). **Ajustes → Avisos** los apaga. El permiso de Android 13+ se pide la primera vez que se entra a la app.
 - Android: permiso `POST_NOTIFICATIONS` y *core library desugaring* (`desugar_jdk_libs` 2.1.4) en `android/app/build.gradle.kts`, que pide el plugin.
+
+## Correcciones (13/11)
+- **Torneo borrado seguía saliendo a los jugadores** en "Inscripción abierta": el borrado es lógico (`deleted_at` en la fila), y el servidor solo miraba su marca `deleted`. Ahora inscripciones y acciones de mesa ignoran también las filas con `deleted_at` (torneos, inscritos quitados). Las bajas de inscritos tampoco cuentan ya para el cupo ni para "ya inscrito".
+- **Icono de los avisos**: silueta blanca de la casa del logo (`res/drawable-*/ic_notification.png`, tintada de verde), con `res/raw/keep.xml` para que la compilación de release no la quite.
+- **Jugadores del torneo**: la cabecera, las tarjetas (inscripción desde la app, check-in, jueces, penalizaciones) y el buscador ya no quedan fijos; todo se desplaza junto con la lista de inscritos.
+- Probado desde Cuba con internet (sin VPN): funciona.

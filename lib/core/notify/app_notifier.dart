@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,7 +26,7 @@ class AppNotifier {
     if (_ready) return;
     try {
       await _plugin.initialize(
-        const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+        const InitializationSettings(android: AndroidInitializationSettings('ic_notification')),
       );
       _ready = true;
     } catch (_) {
@@ -69,6 +71,9 @@ class AppNotifier {
             channelDescription: 'Ronda nueva, tu mesa, el tiempo, resultados y avisos del juez',
             importance: Importance.high,
             priority: Priority.high,
+            // Icono pequeño: la casa del logo en blanco (Android lo tiñe).
+            icon: 'ic_notification',
+            color: Color(0xFF8CF04C),
           ),
         ),
       );

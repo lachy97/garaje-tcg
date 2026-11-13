@@ -18,7 +18,7 @@ export class PlayService {
 
   async row(community, tbl, id) {
     const r = await this.db
-      .prepare('SELECT data, owner_id FROM sync_rows WHERE community_id = ? AND tbl = ? AND id = ? AND deleted = 0')
+      .prepare("SELECT data, owner_id FROM sync_rows WHERE community_id = ? AND tbl = ? AND id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
       .bind(community, tbl, id)
       .first();
     return r?.data ? { ...JSON.parse(r.data), _owner: r.owner_id } : null;
@@ -32,7 +32,7 @@ export class PlayService {
     if (t.status !== 'swiss' && t.status !== 'topCut') throw bad('El torneo no está en juego.');
     const e = await this.db
       .prepare(
-        "SELECT data FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0",
+        "SELECT data FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL",
       )
       .bind(me.community_id, tournamentId, me.player_id)
       .first();
@@ -266,7 +266,7 @@ export class PlayService {
                   (p.kind IN ('report', 'jresult', 'extension', 'penalty') AND p.status = 'confirmed')
                OR (p.kind IN ('drop', 'checkin') AND p.status = 'open'))
             AND p.tournament_id IN (SELECT id FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments'
-                                     AND deleted = 0 AND owner_id = ?)`,
+                                     AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL AND owner_id = ?)`,
       )
       .bind(me.community_id, me.community_id, me.id)
       .all();
@@ -296,7 +296,7 @@ export class PlayService {
     const norm = (v) => String(v ?? '').trim().toUpperCase();
     if (!norm(t.checkin_code) || norm(body?.code) !== norm(t.checkin_code)) throw bad('Código incorrecto.');
     const e = await this.db
-      .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0")
+      .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
       .bind(me.community_id, t.id, me.player_id)
       .first();
     if (!e) throw new ApiError(403, 'No estás inscrito en este torneo.');
@@ -365,7 +365,7 @@ export class PlayService {
     if (!kinds.includes(body?.penalty)) throw bad('Tipo de penalización no válido.');
     const target = typeof body?.playerId === 'string' ? body.playerId : '';
     const e = await this.db
-      .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0")
+      .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
       .bind(me.community_id, body.tournamentId, target)
       .first();
     if (!e) throw bad('Ese jugador no está en el torneo.');

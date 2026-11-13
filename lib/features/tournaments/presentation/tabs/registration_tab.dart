@@ -59,7 +59,11 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
             : [for (final r in list) if (r.player.nickname.toLowerCase().contains(q)) r];
         final noDeck = list.where((r) => r.deck == null).length;
         final unpaid = list.where((r) => !r.entry.dropped && !r.entry.paid).length;
-        return Column(
+        // Todo en una sola lista que se desplaza (cabecera, tarjetas, buscador
+        // e inscritos): así queda sitio para ver a los jugadores.
+        return ListView(
+          padding: const EdgeInsets.only(bottom: 32),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
@@ -116,23 +120,19 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
                   onChanged: (v) => setState(() => _query = v),
                 ),
               ),
-            Expanded(
-              child: list.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.how_to_reg_outlined,
-                      title: 'Nadie inscrito todavía',
-                      subtitle: 'Pulsa "Inscribir" y elige a los jugadores.',
-                    )
-                  : shown.isEmpty
-                      ? const EmptyState(icon: Icons.search_off, title: 'Nadie coincide')
-                      : ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 32),
-                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                          itemCount: shown.length,
-                          itemBuilder: (_, i) =>
-                              _RegisteredTile(tournament: tournament, item: shown[i]),
-                        ),
-            ),
+            if (list.isEmpty)
+              const SizedBox(
+                height: 260,
+                child: EmptyState(
+                  icon: Icons.how_to_reg_outlined,
+                  title: 'Nadie inscrito todavía',
+                  subtitle: 'Pulsa "Inscribir" y elige a los jugadores.',
+                ),
+              )
+            else if (shown.isEmpty)
+              const SizedBox(height: 200, child: EmptyState(icon: Icons.search_off, title: 'Nadie coincide'))
+            else
+              for (final r in shown) _RegisteredTile(key: ValueKey(r.player.id), tournament: tournament, item: r),
           ],
         );
       },
@@ -154,7 +154,7 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
 }
 
 class _RegisteredTile extends ConsumerWidget {
-  const _RegisteredTile({required this.tournament, required this.item});
+  const _RegisteredTile({super.key, required this.tournament, required this.item});
 
   final Tournament tournament;
   final RegisteredPlayer item;
