@@ -22,6 +22,10 @@ class HttpAuthApi implements AuthApi {
   /// servidor pueda exigir una versión mínima). Lo pone main() al arrancar.
   static int appBuild = 0;
 
+  /// Identificador y nombre de este teléfono (qué teléfono lleva cada torneo).
+  static String? deviceId;
+  static String? deviceName;
+
   /// El servidor pidió actualizar la app (versión demasiado vieja).
   static final updateRequired = ValueNotifier<bool>(false);
 
@@ -50,6 +54,9 @@ class HttpAuthApi implements AuthApi {
       final req = await _client.openUrl(method, _base.resolve(path)).timeout(timeout);
       req.headers.set(HttpHeaders.acceptHeader, 'application/json');
       req.headers.set('X-App-Build', '$appBuild');
+      if (deviceId != null) req.headers.set('X-Device-Id', deviceId!);
+      // Codificado: las cabeceras no admiten tildes.
+      if (deviceName != null) req.headers.set('X-Device-Name', Uri.encodeComponent(deviceName!));
       if (token != null) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       if (body != null) {
         req.headers.contentType = ContentType.json;

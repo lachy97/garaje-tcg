@@ -158,7 +158,7 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
         ),
       RegistrationStatus.cancelRequested => ('Baja pedida: el organizador te quitará.', AppColors.draw),
       RegistrationStatus.rejected => (
-          'Rechazada${r!.reason == null ? '' : ': ${r!.reason!}'}.',
+          'Rechazada${r!.reason == null ? '' : ': ${r.reason!}'}.',
           AppColors.loss
         ),
       _ => (null, AppColors.textSecondary),
@@ -225,7 +225,7 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
                 if (canCancel)
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => _cancel(r!),
+                      onPressed: () => _cancel(r),
                       child: Text(status == RegistrationStatus.registered ? 'Borrarme' : 'Cancelar',
                           style: TextStyle(color: AppColors.loss)),
                     ),

@@ -1,11 +1,12 @@
 // Garage TCG · API (Cloudflare Workers + D1).
 // Rutas en /v1. Cuerpos y respuestas en JSON. Errores: { error, code? }.
 import { ApiError, AuthService } from './auth.js';
+import { ControlService } from './control.js';
 import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.8.0';
+export const VERSION = '1.9.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -37,6 +38,9 @@ export async function handle(request, env, opts) {
   const sync = new SyncService(env, auth);
   const regs = new RegistrationService(env, auth);
   const play = new PlayService(env, auth);
+  const control = new ControlService(env, auth);
+  const device = (request.headers.get('x-device-id') ?? '').slice(0, 64);
+  const deviceName = request.headers.get('x-device-name');
   try {
     // Fase 0: prueba de conexión desde Cuba.
     if ((path === '/v1/health' || path === '/') && m === 'GET') {
@@ -70,7 +74,9 @@ export async function handle(request, env, opts) {
         case '/v1/auth/password/request': return json(await auth.requestPasswordReset(body));
         case '/v1/auth/password/reset': return json(await auth.resetPassword(body));
         case '/v1/auth/logout': return json(await auth.logout(token));
-        case '/v1/sync/push': return json(await sync.push(token, body));
+        case '/v1/sync/push': return json(await sync.push(token, body, device, deviceName));
+        case '/v1/control/beat': return json(await control.beat(token, body, device, deviceName));
+        case '/v1/control/take': return json(await control.take(token, body, device, deviceName));
         case '/v1/admin/mail-test': return json(await auth.mailTest(token));
         case '/v1/registrations': return json(await regs.request(token, body));
         case '/v1/play/report': return json(await play.report(token, body));

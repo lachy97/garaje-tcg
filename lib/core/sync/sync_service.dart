@@ -14,6 +14,7 @@ import '../../features/tournaments/application/tournament_service.dart';
 import '../notify/app_notifier.dart';
 import '../play/play.dart';
 import '../registrations/registrations.dart';
+import 'control.dart';
 import 'sync_schema.dart';
 
 /// Estado de la subida de datos al servidor.
@@ -185,6 +186,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     state = state.copyWith(running: true);
     var sent = 0;
     var rejected = 0;
+    var lostControl = false;
     try {
       if (state.download) {
         final got = await _pull(session, api);
@@ -221,6 +223,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
             body: {'rows': rows}, token: session.token);
         final bad = (res['rejected'] as List?) ?? const [];
         rejected += bad.length;
+        if (bad.any((b) => b is Map && b['reason'] == 'not_controller')) lostControl = true;
         sent += rows.length - bad.length;
         // Se quitan de la cola solo si no cambiaron mientras se enviaban.
         await _db.transaction(() async {
@@ -233,6 +236,14 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
         });
         if (batch.length < batchSize || !ref.mounted) break;
       }
+      if (!ref.mounted) return;
+      // Otro teléfono lleva alguno de estos torneos: se baja todo de nuevo
+      // para quedarse con lo que tiene el servidor.
+      if (lostControl) await _setState('pull_seq:${session.account.id}', '0');
+      // Bajar también: así otro teléfono de la misma cuenta (o el
+      // administrador) puede seguir un torneo si este se queda sin batería.
+      await _pullOrganizer(session, api);
+      await _beat(session, api);
       if (!ref.mounted) return;
       final pending = await _pendingCount();
       if (!ref.mounted) return;
@@ -282,6 +293,56 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     } catch (_) {
       // Servidor sin esta función u otro fallo: no frena la subida.
     }
+  }
+
+  // ───────────────────── Varios teléfonos por torneo ─────────────────────
+
+  Future<void> _pullOrganizer(Session session, HttpAuthApi api) async {
+    try {
+      await _pull(session, api);
+    } on AuthNetworkException {
+      rethrow;
+    } catch (_) {
+      // Servidor anterior: no frena la subida.
+    }
+  }
+
+  /// Avisa al servidor de que este teléfono sigue llevando sus torneos y
+  /// apunta qué torneos lleva otro teléfono (esos quedan solo para consultar).
+  Future<void> _beat(Session session, HttpAuthApi api) async {
+    if (HttpAuthApi.deviceId == null) return;
+    try {
+      final ids = [
+        for (final t in await _db.select(_db.tournaments).get())
+          if (t.deletedAt == null && t.status != TournamentStatus.finished) t.id,
+      ];
+      final list = ids.isEmpty ? const <TournamentControl>[] : await ControlApi(api, session).beat(ids);
+      if (ref.mounted) await ref.read(controlsProvider.notifier).replace(list);
+    } on AuthNetworkException {
+      rethrow;
+    } catch (_) {
+      // Servidor sin esta función: cada teléfono sigue como antes.
+    }
+  }
+
+  /// Este teléfono pasa a llevar el torneo (el otro se quedó sin batería o
+  /// sin datos). Lo que el otro no llegó a subir se pierde.
+  Future<void> takeControl(String tournamentId) async {
+    final session = ref.read(sessionProvider).value;
+    final api = ref.read(authApiProvider);
+    if (session == null || api is! HttpAuthApi) {
+      throw const AuthException('Sin conexión con el servidor.');
+    }
+    final c = await ControlApi(api, session).take(tournamentId);
+    if (!ref.mounted) return;
+    await ref.read(controlsProvider.notifier).put(c);
+    // Lo último que subió el otro teléfono, sin pisarlo con lo de aquí: lo
+    // que este teléfono tenía en cola de ese torneo ya fue rechazado.
+    await _setState('pull_seq:${session.account.id}', '0');
+    for (var i = 0; i < 60 && _busy; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    await sync();
   }
 
   // ───────────────────── Bajar (jugadores y jueces) ─────────────────────
@@ -337,10 +398,16 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     try {
       await _db.transaction(() async {
         await _db.customStatement("INSERT OR REPLACE INTO sync_state (k, v) VALUES ('applying', '1')");
+        // Cambios de este teléfono aún sin subir: no se pisan con lo del servidor.
+        final waiting = {
+          for (final q in await _db.customSelect('SELECT tbl, row_id FROM sync_outbox').get())
+            '${q.read<String>('tbl')}/${q.read<String>('row_id')}',
+        };
         for (final r in rows) {
           final t = r['t'];
           final id = r['id'];
           if (t is! String || id is! String || !kSyncTables.contains(t)) continue;
+          if (waiting.contains('$t/$id')) continue;
           final data = r['data'];
           if (r['deleted'] == true || data is! Map) {
             await _db.customStatement('DELETE FROM $t WHERE id = ?', [id]);

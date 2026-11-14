@@ -7,10 +7,12 @@ import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/play/play.dart';
+import '../../../core/sync/control.dart';
 import '../../decklists/presentation/top_cut_lists_page.dart';
 import 'judge_floor_page.dart';
 import 'projection_page.dart';
 import 'providers.dart';
+import 'tabs/control_banner.dart';
 import 'tabs/registration_tab.dart';
 import 'tabs/rounds_tab.dart';
 import 'tabs/standings_tab.dart';
@@ -50,7 +52,11 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
         final title = Text(t.name.toUpperCase(), overflow: TextOverflow.ellipsis);
         // Los torneos de este teléfono los creó su organizador (hasta que
         // haya sincronización no hay torneos de otros).
-        final canManage = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
+        final mayManage = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
+        // Lo lleva otro teléfono (o es de otro organizador): solo consulta.
+        final control = ref.watch(tournamentControlProvider(t.id));
+        final locked = mayManage && !finished && control != null && control.locked;
+        final canManage = mayManage && !locked;
 
         // En juego y sin permiso para llevarlo (jugadores): cruces y
         // clasificación en vivo, solo para consultar (llegan del servidor).
@@ -87,10 +93,17 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
                   ),
                 ),
               ),
-              body: TabBarView(
+              body: Column(
                 children: [
-                  RoundsTab(tournament: t, readOnly: true),
-                  StandingsTab(tournament: t),
+                  if (locked) ControlBanner(control: control),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        RoundsTab(tournament: t, readOnly: true),
+                        StandingsTab(tournament: t),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

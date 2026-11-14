@@ -7,7 +7,6 @@ import '../../../app/widgets/common.dart';
 import '../../../core/auth/account.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/play/play.dart';
-import '../../../core/sync/sync_service.dart';
 import '../domain/game_score.dart';
 import 'my_table.dart';
 

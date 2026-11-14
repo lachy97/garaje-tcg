@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app/restartable_app.dart';
 import 'core/auth/http_auth_api.dart';
+import 'core/sync/control.dart';
 import 'core/backup/pending_import.dart';
 import 'core/security/screen_protection.dart';
 import 'core/utils/app_paths.dart';
@@ -34,6 +35,10 @@ Future<void> main() async {
   try {
     final info = await PackageInfo.fromPlatform();
     HttpAuthApi.appBuild = (int.tryParse(info.buildNumber) ?? 0) % 1000;
+  } catch (_) {}
+  // Identificador de este teléfono (para pasar un torneo a otro teléfono).
+  try {
+    await DeviceIdentity.init();
   } catch (_) {}
   runApp(const RestartableApp());
 }

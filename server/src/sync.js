@@ -2,6 +2,7 @@
 // guarda la copia principal. Gana el cambio más reciente; una fila solo la
 // puede cambiar quien la subió primero (o el administrador).
 import { ApiError } from './auth.js';
+import { ControlService } from './control.js';
 
 /** Tablas de la app que se sincronizan. */
 export const SYNC_TABLES = [
@@ -45,7 +46,13 @@ export class SyncService {
    * body.rows: [{ t, id, changedAt, deleted?, data? }]
    * Respuesta: { accepted, stale, rejected: [{ t, id, reason }], seq }
    */
-  async push(token, body) {
+  /**
+   * [device]: identificador del teléfono (cabecera X-Device-Id). Si un torneo
+   * lo lleva otro teléfono (tournament_control), sus cambios se rechazan
+   * ('not_controller'); el primero que sube un torneo sin dueño lo reclama.
+   * Las versiones viejas de la app no envían el identificador: no se comprueba.
+   */
+  async push(token, body, device = '', deviceName = null) {
     const me = await this.writer(token);
     const rows = Array.isArray(body?.rows) ? body.rows : null;
     if (!rows) throw bad('Faltan las filas.');
@@ -92,6 +99,44 @@ export class SyncService {
       });
     }
 
+    // Borrados: el torneo se toma de la fila que ya hay en el servidor (para
+    // comprobar qué teléfono lo lleva).
+    const gone = valid.filter((r) => r.deleted && r.t !== 'tournaments');
+    const goneBy = new Map();
+    for (const r of gone) {
+      if (!goneBy.has(r.t)) goneBy.set(r.t, []);
+      goneBy.get(r.t).push(r);
+    }
+    for (const [t, list] of goneBy) {
+      for (let i = 0; i < list.length; i += 90) {
+        const chunk = list.slice(i, i + 90);
+        const q = await this.db
+          .prepare(`SELECT id, tournament_id FROM sync_rows WHERE community_id = ? AND tbl = ? AND id IN (${chunk.map(() => '?').join(',')})`)
+          .bind(community, t, ...chunk.map((r) => r.id))
+          .all();
+        const tid = new Map((q.results ?? []).map((e) => [e.id, e.tournament_id]));
+        for (const r of chunk) r.controlTid = tid.get(r.id) ?? null;
+      }
+    }
+    for (const r of valid) if (r.t === 'tournaments') r.controlTid = r.id;
+    const tidOf = (r) => r.tournamentId ?? r.controlTid ?? null;
+
+    // Torneos que lleva otro teléfono: sus filas no se aceptan.
+    const control = new ControlService({ DB: this.db }, this.auth);
+    const tids = [...new Set(valid.map(tidOf).filter(Boolean).map(String))];
+    const controls = device ? await control.load(tids) : new Map();
+    const blocked = new Set();
+    for (const [tid, c] of controls) if (c.device_id !== device) blocked.add(tid);
+    if (blocked.size) {
+      for (let i = valid.length - 1; i >= 0; i--) {
+        const r = valid[i];
+        if (tidOf(r) != null && blocked.has(String(tidOf(r)))) {
+          rejected.push({ t: r.t, id: r.id, reason: 'not_controller' });
+          valid.splice(i, 1);
+        }
+      }
+    }
+
     // Filas que ya están en el servidor (dueño y fecha del último cambio).
     const existing = new Map();
     const byTable = new Map();
@@ -111,6 +156,21 @@ export class SyncService {
           .bind(community, t, ...chunk)
           .all();
         for (const e of q.results ?? []) existing.set(`${t}|${e.id}`, e);
+      }
+    }
+
+    // Filas nuevas de un torneo ajeno (el administrador lo siguió desde su
+    // teléfono): quedan a nombre del dueño del torneo, para que pueda
+    // retomarlo después.
+    const tOwner = new Map();
+    if (isAdmin && tids.length) {
+      for (let i = 0; i < tids.length; i += 90) {
+        const chunk = tids.slice(i, i + 90);
+        const q = await this.db
+          .prepare(`SELECT id, owner_id FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND id IN (${chunk.map(() => '?').join(',')})`)
+          .bind(community, ...chunk)
+          .all();
+        for (const e of q.results ?? []) tOwner.set(e.id, e.owner_id);
       }
     }
 
@@ -137,7 +197,7 @@ export class SyncService {
                                    tournament_id, player_id)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6,
                      (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_rows WHERE community_id = ?1),
-                     ?7, ?7, ?8, ?9, ?10)
+                     ?11, ?7, ?8, ?9, ?10)
              ON CONFLICT (community_id, tbl, id) DO UPDATE SET
                data = excluded.data, deleted = excluded.deleted, changed_at = excluded.changed_at,
                seq = excluded.seq, updated_by = excluded.updated_by, received_at = excluded.received_at,
@@ -146,10 +206,19 @@ export class SyncService {
           )
           .bind(community, r.t, r.id, r.data, r.deleted ? 1 : 0, r.changedAt, me.id, now,
                 r.tournamentId != null ? String(r.tournamentId) : null,
-                r.playerId != null ? String(r.playerId) : null),
+                r.playerId != null ? String(r.playerId) : null,
+                (r.tournamentId != null && tOwner.get(String(r.tournamentId))) || me.id),
       );
     }
     if (stmts.length) await this.db.batch(stmts);
+    // Torneos sin teléfono a cargo: los reclama este (el primero que sube).
+    if (device) {
+      for (const tid of tids) {
+        if (!controls.has(tid) && !blocked.has(tid) && (await control.owns(me, tid))) {
+          await control.claim(me, tid, device, ControlService.clean(deviceName));
+        }
+      }
+    }
     const last = await this.db
       .prepare('SELECT COALESCE(MAX(seq), 0) AS s FROM sync_rows WHERE community_id = ?')
       .bind(community)
@@ -230,10 +299,14 @@ export class SyncService {
         owned.add(t.id);
         visible.add(t.id);
       }
-      // Terminados, y en inscripción con la inscripción desde la app abierta.
-      if (t.status === 'finished' || (t.status === 'draft' && Number(t.online) === 1)) visible.add(t.id);
+      // Terminados, y en inscripción con la inscripción desde la app abierta
+      // (a los organizadores solo les bajan los suyos: los demás no los
+      // pueden cambiar).
+      if (!isOrganizer && (t.status === 'finished' || (t.status === 'draft' && Number(t.online) === 1))) {
+        visible.add(t.id);
+      }
     }
-    if (pid) {
+    if (pid && !isOrganizer) {
       const eq = await this.db
         .prepare("SELECT tournament_id FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND player_id = ? AND deleted = 0")
         .bind(community, pid)

@@ -286,3 +286,17 @@ cuenta no está confirmada, además `"code": "unverified"` y `"email"`.
 Seguridad: contraseñas con PBKDF2-SHA256 (100.000 iteraciones, sal propia),
 sesiones de 30 días guardadas como hash, códigos guardados como hash, 5
 intentos por código, 3 códigos por hora, 10 inicios fallidos cada 15 minutos.
+
+## 16 · Seguir un torneo desde otro teléfono
+
+Una vez, en el PC (con VPN):
+
+```powershell
+npm run db:control
+npm run deploy
+```
+
+Cada torneo lo lleva un solo teléfono (el primero que lo sube). Si ese
+teléfono se queda sin batería o sin datos, el organizador entra con su cuenta
+en otro teléfono (o el administrador en el suyo), abre el torneo y toca
+**Tomar el control**. Lo que el primer teléfono no llegó a subir se pierde.
