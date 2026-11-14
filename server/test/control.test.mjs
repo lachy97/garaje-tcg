@@ -96,3 +96,16 @@ test('borrados de otro teléfono rechazados; filas nuevas del admin quedan del d
   r = await call('POST', '/v1/sync/push', round(4, { data: { id: 'r1', tournament_id: 't1', number: 1, x: 1 } }), org.token, 'A');
   assert.equal(r.data.accepted, 1);
 });
+
+test('base restaurada desde una copia: el teléfono que va por delante baja todo', async () => {
+  const { call, org } = await setup();
+  await call('POST', '/v1/sync/push', t1(1), org.token, 'A');
+  const now = await call('GET', '/v1/sync/pull?since=0', null, org.token, 'A');
+  assert.ok(now.data.seq > 0);
+  let r = await call('GET', `/v1/sync/pull?since=${now.data.seq}`, null, org.token, 'A');
+  assert.equal(r.data.reset, undefined); // al día: nada nuevo
+  r = await call('GET', `/v1/sync/pull?since=${now.data.seq + 500}`, null, org.token, 'A');
+  assert.equal(r.data.reset, true);
+  assert.equal(r.data.seq, 0);
+  assert.equal(r.data.more, true);
+});

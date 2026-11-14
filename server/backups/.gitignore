@@ -1,0 +1,4 @@
+# Copias de la base de datos: tienen correos, teléfonos y datos de cuentas.
+# NUNCA se suben a git.
+*
+!.gitignore

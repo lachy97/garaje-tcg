@@ -300,3 +300,62 @@ Cada torneo lo lleva un solo teléfono (el primero que lo sube). Si ese
 teléfono se queda sin batería o sin datos, el organizador entra con su cuenta
 en otro teléfono (o el administrador en el suyo), abre el torneo y toca
 **Tomar el control**. Lo que el primer teléfono no llegó a subir se pierde.
+
+## 17 · Copia de seguridad antes de cada torneo
+
+**Antes de empezar cada torneo**, en el PC (con VPN), dentro de `server`:
+
+```powershell
+npm run backup
+```
+
+Deja en `server/backups/` dos archivos con la fecha y la hora:
+
+- `garage-tcg_AAAA-MM-DD_HHMM.sql`: la base entera.
+- `garage-tcg_AAAA-MM-DD_HHMM.marca.txt`: la **marca** (bookmark) de ese
+  momento, para volver la base justo ahí.
+
+La carpeta `backups` **no se sube a git** (tiene correos, teléfonos y datos de
+las cuentas). No compartas esos archivos. Si quieres, copia de vez en cuando
+la carpeta a un pendrive.
+
+Además, Cloudflare guarda solo el historial de la base (*Time Travel*): se
+puede volver a cualquier minuto de los últimos **7 días** (plan gratis; 30 en
+el de pago). `npm run backup:info` muestra la marca actual.
+
+### Si algo sale mal: volver la base atrás
+
+**A. Dentro de los últimos 7 días** (lo normal): con la marca de la copia
+
+```powershell
+npx wrangler d1 time-travel restore garage-tcg --bookmark=MARCA_DEL_ARCHIVO
+```
+
+o a una hora concreta (hora de Cuba, ojo al `-05:00` / `-04:00` en verano):
+
+```powershell
+npx wrangler d1 time-travel restore garage-tcg --timestamp=2026-11-14T15:00:00-05:00
+```
+
+Se pierde **todo** lo que cambió después en el servidor (de todos los
+torneos). El propio comando muestra una marca para deshacer la restauración.
+
+**B. Más de 7 días o se perdió la base**: desde el `.sql`, en una base nueva
+
+```powershell
+npx wrangler d1 create garage-tcg-2
+npx wrangler d1 execute garage-tcg-2 --remote --file=backups/garage-tcg_AAAA-MM-DD_HHMM.sql
+```
+
+Luego, en `wrangler.toml`, cambia `database_name` por `garage-tcg-2` y
+`database_id` por el que mostró `create`, y `npm run deploy`. (Los scripts
+`db:*` y `backup` usan el nombre `garage-tcg`: cámbialo también en
+`package.json` y `scripts/backup.mjs`.)
+
+### Después de restaurar
+
+- Los teléfonos de jugadores y jueces **bajan todo de nuevo solos** (el
+  servidor detecta que la base volvió atrás).
+- Los teléfonos de los organizadores aún tienen lo que se perdió en el
+  servidor: en cada uno, **Ajustes → (sincronización) → Volver a subir todo**.
+  Así el servidor recupera lo que esos teléfonos tenían.

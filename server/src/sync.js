@@ -250,6 +250,15 @@ export class SyncService {
       .bind(community, since, limit)
       .all();
     const delta = q.results ?? [];
+    // La base se restauró desde una copia (su secuencia volvió atrás): el
+    // teléfono va por delante y no recibiría nada. Se le hace bajar todo.
+    if (!delta.length && since > 0) {
+      const top = await this.db
+        .prepare('SELECT COALESCE(MAX(seq), 0) AS s FROM sync_rows WHERE community_id = ?')
+        .bind(community)
+        .first();
+      if (since > Number(top?.s ?? 0)) return { rows: [], more: true, seq: 0, reset: true };
+    }
     const more = delta.length === limit;
     const seq = delta.length ? delta[delta.length - 1].seq : since;
     const out = (r) => ({
