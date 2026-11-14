@@ -361,3 +361,15 @@ Luego, en `wrangler.toml`, cambia `database_name` por `garage-tcg-2` y
 - Los teléfonos de los organizadores aún tienen lo que se perdió en el
   servidor: en cada uno, **Ajustes → (sincronización) → Volver a subir todo**.
   Así el servidor recupera lo que esos teléfonos tenían.
+
+## 18 · Una petición por sincronización (versión 1.10.0)
+
+Sin migraciones. En el PC (con VPN):
+
+```powershell
+npm run deploy
+```
+
+Despliega **antes** de instalar la APK nueva. Para vigilar el consumo:
+panel de Cloudflare → Workers & Pages → `garage-tcg-api` → Metrics
+(peticiones del día; el límite gratis es 100.000).

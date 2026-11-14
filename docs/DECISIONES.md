@@ -365,3 +365,11 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - Rondas: mesas con resultado en una línea, filtro de pendientes y "Faltan N" en lugar de "Generar ronda" mientras falten resultados. Se mantiene el orden por número de mesa a propósito.
 - "Cerrar temporada" queda en un menú y solo para organizadores/administración.
 - Nuevas para jugadores: historial contra el rival, tarjeta "Tu torneo" para compartir, cuánto falta en el ranking y los últimos torneos terminados en su pantalla de Torneos.
+
+## Una petición por ciclo de sincronización (14/11) — servidor 1.10.0
+- **Problema (auditoría)**: cada 30 s un teléfono de jugador hacía unas 8 peticiones (jueces ×3, pull, avisos ×2, inscripciones ×2) y el organizador 12 o más. Con 32 jugadores, unas 185.000 en un torneo de 6 h, por encima de las 100.000/día del plan gratis de Workers. El piloto con 5 teléfonos no lo habría mostrado.
+- **`POST /v1/poll`**: el teléfono manda la lista de consultas del ciclo (`gets`: pull, jueces, mis inscripciones, mis avisos por torneo, avisos y solicitudes del organizador, pendientes) y, si lleva torneos, el latido (`beat`). El servidor las resuelve por dentro (misma lógica y permisos que cada ruta, con la sesión leída una vez) y devuelve `{results: {ruta: {status, data}}, beat}`. Cuenta como **una** petición.
+- **Caché de 25 s en la app** (`HttpAuthApi.request`): las consultas GET se contestan con lo que trajo el poll (también los errores). Cualquier cambio (reportar, confirmar, aceptar, check-in…) la borra, así nunca se ve un dato viejo tras una acción propia. Subir datos, el latido y el poll no la borran.
+- **Intervalo adaptativo**: 30 s solo con un torneo en juego y la app abierta (60 s minimizada); con inscripción desde la app abierta, 60 s / 5 min; sin torneos, 2 min / 5 min. Arrastrar para actualizar, Reintentar, volver a la app y Tomar el control sincronizan al momento.
+- **Resultado estimado**: jugador, 1 petición cada 30 s durante el torneo; organizador, 2–3. Con 32 jugadores durante 6 h, unas 25.000 al día.
+- Compatible: con un servidor anterior (sin `/v1/poll`, 404) la app vuelve a pedir cada parte por separado.

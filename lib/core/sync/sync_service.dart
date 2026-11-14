@@ -87,6 +87,16 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
   Timer? _first;
   bool _busy = false;
 
+  /// Última sincronización lanzada por el temporizador o a mano.
+  DateTime? _lastRun;
+  bool _foreground = true;
+
+  /// Torneos donde esta cuenta es juez (del ciclo anterior).
+  Set<String> _judging = const {};
+
+  /// El servidor aún no tiene /v1/poll (versión anterior).
+  bool _noPoll = false;
+
   @override
   SyncStatus build() {
     final session = ref.watch(sessionProvider).value;
@@ -108,7 +118,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     final role = session!.account.role;
     final download = role != AppRole.admin && role != AppRole.organizer;
 
-    _timer = Timer.periodic(interval, (_) => sync());
+    _timer = Timer.periodic(interval, (_) => sync(force: false));
     WidgetsBinding.instance.addObserver(this);
     // Primera subida al poco de abrir (Timer cancelable: si el proveedor se
     // reconstruye o se descarta antes, no queda una llamada suelta).
@@ -126,8 +136,30 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.resumed) sync();
-    if (s == AppLifecycleState.paused) sync(); // lo último antes de salir
+    if (s == AppLifecycleState.resumed) {
+      _foreground = true;
+      sync();
+    }
+    if (s == AppLifecycleState.paused) {
+      _foreground = false;
+      sync(); // lo último antes de salir
+    }
+  }
+
+  /// Cada cuánto sincronizar: rápido solo cuando hay un torneo en juego (el
+  /// plan gratis del servidor admite 100.000 peticiones al día).
+  /// - Torneo en juego: 30 s con la app abierta, 60 s minimizada.
+  /// - Inscripción desde la app abierta: 60 s / 5 min.
+  /// - Si no: 2 min / 5 min.
+  Future<Duration> _every() async {
+    final rows = await _db
+        .customSelect("SELECT status, online_registration AS o FROM tournaments WHERE deleted_at IS NULL AND status <> 'finished'")
+        .get();
+    final live = rows.any((r) => r.read<String>('status') != 'draft');
+    final open = rows.any((r) => r.read<String>('status') == 'draft' && r.read<bool>('o'));
+    if (live) return Duration(seconds: _foreground ? 30 : 60);
+    if (open) return Duration(seconds: _foreground ? 60 : 300);
+    return Duration(seconds: _foreground ? 120 : 300);
   }
 
   AppDatabase get _db => ref.read(databaseProvider);
@@ -175,19 +207,31 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
   }
 
   /// Sube lo que haya en la cola. No lanza: deja el error en el estado.
-  Future<void> sync() async {
+  /// [force] = false (temporizador): solo si ya toca según [_every].
+  Future<void> sync({bool force = true}) async {
     // El temporizador o el ciclo de vida pueden llamar con el proveedor ya
     // descartado: entonces no se puede usar ref ni state.
     if (!ref.mounted || !state.enabled || _busy) return;
     final session = ref.read(sessionProvider).value;
     final api = ref.read(authApiProvider);
     if (session == null || api is! HttpAuthApi) return;
+    if (!force && _lastRun != null) {
+      try {
+        // Margen de 3 s: el temporizador no cae justo a los 30 s.
+        if (DateTime.now().difference(_lastRun!) + const Duration(seconds: 3) < await _every()) return;
+      } catch (_) {}
+      if (!ref.mounted || _busy) return;
+    }
+    _lastRun = DateTime.now();
     _busy = true;
     state = state.copyWith(running: true);
     var sent = 0;
     var rejected = 0;
     var lostControl = false;
     try {
+      // Todo lo que se va a consultar en este ciclo, en una sola petición.
+      await _poll(session, api);
+      if (!ref.mounted) return;
       if (state.download) {
         final got = await _pull(session, api);
         if (!ref.mounted) return;
@@ -243,7 +287,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       // Bajar también: así otro teléfono de la misma cuenta (o el
       // administrador) puede seguir un torneo si este se queda sin batería.
       await _pullOrganizer(session, api);
-      await _beat(session, api);
+      if (_noPoll) await _beat(session, api);
       if (!ref.mounted) return;
       final pending = await _pendingCount();
       if (!ref.mounted) return;
@@ -292,6 +336,71 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       rethrow;
     } catch (_) {
       // Servidor sin esta función u otro fallo: no frena la subida.
+    }
+  }
+
+  // ───────────────────── Una petición por ciclo ─────────────────────
+
+  /// Pregunta al servidor, en UNA petición (/v1/poll), todo lo que las
+  /// pantallas, los avisos y la sincronización van a consultar en este ciclo,
+  /// y lo deja guardado unos segundos en [HttpAuthApi]: las consultas
+  /// siguientes ya no salen a internet. Si falla, cada parte se pide sola.
+  Future<void> _poll(Session session, HttpAuthApi api) async {
+    if (_noPoll) return;
+    final account = session.account;
+    final organizer = !state.download;
+    final since = int.tryParse(await _state('pull_seq:${account.id}') ?? '') ?? 0;
+    final tq = await _db
+        .customSelect('SELECT id, status, online_registration AS o FROM tournaments '
+            "WHERE deleted_at IS NULL AND status <> 'finished'")
+        .get();
+    final live = [
+      for (final r in tq)
+        if (r.read<String>('status') != 'draft') r.read<String>('id'),
+    ];
+    final drafts = [
+      for (final r in tq)
+        if (r.read<String>('status') == 'draft') (r.read<String>('id'), r.read<bool>('o')),
+    ];
+    String q(String id) => Uri.encodeQueryComponent(id);
+    final gets = <String>[
+      'v1/sync/pull?since=$since',
+      'v1/me/judging',
+      'v1/registrations/mine',
+      if (organizer) ...['v1/play/todo', 'v1/registrations/todo'],
+      for (final id in live) ...[
+        if (account.playerId != null) 'v1/play/mine?tournament=${q(id)}',
+        if (organizer || _judging.contains(id)) 'v1/play?tournament=${q(id)}',
+      ],
+      if (organizer)
+        for (final (id, online) in drafts)
+          if (online) 'v1/registrations?tournament=${q(id)}',
+    ];
+    try {
+      final res = await api.request('POST', 'v1/poll', token: session.token, body: {
+        'gets': gets.take(30).toList(),
+        if (organizer && HttpAuthApi.deviceId != null)
+          'beat': [...live, for (final (id, _) in drafts) id],
+      });
+      HttpAuthApi.prime(session.token, ((res['results'] as Map?) ?? const {}).cast<String, Object?>());
+      final judging = (res['results'] as Map?)?['v1/me/judging'];
+      if (judging is Map && judging['data'] is Map) {
+        _judging = {for (final t in ((judging['data'] as Map)['tournaments'] as List?) ?? const []) '$t'};
+      }
+      final beat = res['beat'];
+      if (beat is Map && ref.mounted) {
+        await ref.read(controlsProvider.notifier).replace([
+          for (final c in (beat['controls'] as List?) ?? const [])
+            TournamentControl.fromJson((c as Map).cast<String, Object?>()),
+        ]);
+      }
+    } on AuthNetworkException {
+      rethrow;
+    } on AuthException catch (e) {
+      // Servidor anterior sin /v1/poll: cada parte se pide sola.
+      if (e.message.contains('Ruta no encontrada')) _noPoll = true;
+    } catch (_) {
+      // Respuesta rara: este ciclo sin guardar nada.
     }
   }
 

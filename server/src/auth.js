@@ -50,6 +50,7 @@ export class AuthService {
     this.newCode = opts.newCode ?? (() => randomCode(R.CODE_LENGTH));
     this.send = opts.send ?? ((to, code, purpose) => sendCode(env, to, code, purpose));
     this.iterations = opts.iterations;
+    this.opts = opts;
     this.devCodes = env.DEV_CODES === '1';
   }
 
@@ -181,6 +182,17 @@ export class AuthService {
   /** Cuenta de un token "Bearer". */
   async authenticate(token) {
     if (!token) throw new ApiError(401, 'Inicia sesión.');
+    // Dentro de /v1/poll varias consultas comparten la misma sesión: se lee
+    // una sola vez.
+    const cache = this.opts?.authCache;
+    if (cache) {
+      if (!cache.has(token)) cache.set(token, this._authenticate(token));
+      return cache.get(token);
+    }
+    return this._authenticate(token);
+  }
+
+  async _authenticate(token) {
     const s = await this.db
       .prepare('SELECT * FROM sessions WHERE token_hash = ?')
       .bind(await sha256(token))

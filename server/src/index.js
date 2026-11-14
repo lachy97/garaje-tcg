@@ -6,7 +6,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.9.0';
+export const VERSION = '1.10.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -74,6 +74,7 @@ export async function handle(request, env, opts) {
         case '/v1/auth/password/request': return json(await auth.requestPasswordReset(body));
         case '/v1/auth/password/reset': return json(await auth.resetPassword(body));
         case '/v1/auth/logout': return json(await auth.logout(token));
+        case '/v1/poll': return json(await poll(request, env, opts, url, body, token, device, deviceName));
         case '/v1/sync/push': return json(await sync.push(token, body, device, deviceName));
         case '/v1/control/beat': return json(await control.beat(token, body, device, deviceName));
         case '/v1/control/take': return json(await control.take(token, body, device, deviceName));
@@ -141,6 +142,53 @@ export async function handle(request, env, opts) {
     console.error(e);
     return json({ error: 'Error del servidor. Inténtalo de nuevo.' }, 500);
   }
+}
+
+/** Máximo de consultas en un /v1/poll. */
+const MAX_POLL_GETS = 30;
+
+/**
+ * Todo lo que un teléfono pregunta en cada sincronización, en UNA petición
+ * (el plan gratis de Cloudflare admite 100.000 al día). body:
+ *   gets: rutas GET ("v1/sync/pull?since=12", "v1/me/judging"…)
+ *   beat: ids de torneos (latido del teléfono que los lleva; opcional)
+ * Devuelve { results: { ruta: { status, data } }, beat }.
+ */
+async function poll(request, env, opts, url, body, token, device, deviceName) {
+  const authCache = new Map();
+  const auth = new AuthService(env, { ...opts, authCache });
+  await auth.authenticate(token); // sesión vencida: 401 para todo
+  const gets = (Array.isArray(body?.gets) ? body.gets : [])
+    .filter((g) => typeof g === 'string' && g.startsWith('v1/') && g.length < 300)
+    .slice(0, MAX_POLL_GETS);
+  const results = {};
+  // Solo las cabeceras que importan (no las del cuerpo del POST).
+  const headers = new Headers();
+  for (const h of ['authorization', 'x-device-id', 'x-device-name', 'x-app-build']) {
+    const v = request.headers.get(h);
+    if (v != null) headers.set(h, v);
+  }
+  for (const path of new Set(gets)) {
+    const inner = new Request(new URL(`/${path}`, url.origin), { method: 'GET', headers });
+    const res = await handle(inner, env, { ...opts, authCache });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      // vacío
+    }
+    results[path] = { status: res.status, data };
+  }
+  let beat = null;
+  if (Array.isArray(body?.beat) && device) {
+    try {
+      const c = new ControlService(env, auth);
+      beat = await c.beat(token, { tournamentIds: body.beat }, device, deviceName);
+    } catch (e) {
+      if (!(e instanceof ApiError)) throw e;
+    }
+  }
+  return { results, beat };
 }
 
 export default {

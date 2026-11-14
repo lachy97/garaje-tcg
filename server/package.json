@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Servidor de cuentas de Garage TCG (Cloudflare Workers + D1)",
   "scripts": {
-    "test": "node --test test/api.test.mjs test/sync.test.mjs test/mail.test.mjs test/smtp.test.mjs test/registrations.test.mjs test/play.test.mjs test/judges.test.mjs test/control.test.mjs",
+    "test": "node --test test/api.test.mjs test/sync.test.mjs test/mail.test.mjs test/smtp.test.mjs test/registrations.test.mjs test/play.test.mjs test/judges.test.mjs test/control.test.mjs test/poll.test.mjs",
     "dev": "wrangler dev",
     "db:init": "wrangler d1 execute garage-tcg --remote --file=migrations/0001_init.sql",
     "db:sync": "wrangler d1 execute garage-tcg --remote --file=migrations/0002_sync.sql",

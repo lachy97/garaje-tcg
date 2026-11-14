@@ -95,13 +95,54 @@ class HttpAuthApi implements AuthApi {
   }
 
   /// Llamada a cualquier ruta de la API (la usa la sincronización).
+  /// Las consultas (GET) se contestan con lo que trajo el último
+  /// [prime] si es reciente: así cada ciclo de sincronización es UNA sola
+  /// petición al servidor (/v1/poll) en vez de una por pantalla.
   Future<Map<String, Object?>> request(
     String method,
     String path, {
     Map<String, Object?>? body,
     String? token,
-  }) =>
-      _call(method, path, body: body, token: token);
+  }) async {
+    final key = '${token ?? ''}|$path';
+    if (method == 'GET') {
+      final hit = _cache[key];
+      if (hit != null && DateTime.now().difference(hit.at) < cacheTtl) {
+        if (hit.status >= 400) {
+          throw AuthException((hit.data['error'] as String?) ?? 'Error del servidor (${hit.status}).');
+        }
+        return hit.data;
+      }
+    } else if (!_keepsCache(path)) {
+      // Un cambio (reportar, aceptar, confirmar…): lo guardado ya no vale.
+      _cache.clear();
+    }
+    return _call(method, path, body: body, token: token);
+  }
+
+  /// Cuánto valen las respuestas de /v1/poll.
+  static const cacheTtl = Duration(seconds: 25);
+  static final Map<String, ({DateTime at, int status, Map<String, Object?> data})> _cache = {};
+
+  static bool _keepsCache(String path) =>
+      path.startsWith('v1/sync/') || path == 'v1/poll' || path == 'v1/control/beat';
+
+  /// Guarda las respuestas de /v1/poll ({ruta: {status, data}}).
+  static void prime(String? token, Map<String, Object?> results) {
+    final now = DateTime.now();
+    results.forEach((path, v) {
+      if (v is! Map) return;
+      final status = (v['status'] as num?)?.toInt() ?? 500;
+      final data = v['data'];
+      _cache['${token ?? ''}|$path'] = (
+        at: now,
+        status: status,
+        data: data is Map ? data.cast<String, Object?>() : const <String, Object?>{},
+      );
+    });
+  }
+
+  static void clearCache() => _cache.clear();
 
   /// Guarda el código si el servidor está en modo de pruebas.
   void _keepDevCode(Map<String, Object?> data, String email, String purpose) {
