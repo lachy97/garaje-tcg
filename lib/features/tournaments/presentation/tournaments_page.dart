@@ -38,10 +38,19 @@ class TournamentsPage extends ConsumerWidget {
     final judging = player ? ref.watch(judgingProvider).value ?? const <String>{} : const <String>{};
     final tournaments = perms.canCreateTournaments
         ? all
-        : all.whenData((list) => [
+        : all.whenData((list) {
+            // Los suyos (inscrito o juez) y, para que la app no se vea vacía,
+            // los últimos torneos terminados de la comunidad.
+            var finished = 0;
+            return [
               for (final t in list)
-                if (((mine?.contains(t.id) ?? false) || judging.contains(t.id)) && !openIds.contains(t.id)) t,
-            ]);
+                if (!openIds.contains(t.id) &&
+                    ((mine?.contains(t.id) ?? false) ||
+                        judging.contains(t.id) ||
+                        (t.status == TournamentStatus.finished && finished++ < 10)))
+                  t,
+            ];
+          });
     return Scaffold(
       body: SafeArea(
         child: SyncRefresh(
@@ -112,8 +121,8 @@ class TournamentsPage extends ConsumerWidget {
                           title: 'Aún no hay torneos',
                           subtitle: perms.canCreateTournaments
                               ? 'Crea el primero con "Nuevo torneo".'
-                              : 'Aquí verás los torneos en los que estés inscrito '
-                                  'y los que tengan la inscripción abierta.',
+                              : 'Aquí verás los torneos en los que estés inscrito, '
+                                  'los que tengan la inscripción abierta y los últimos resultados.',
                         ),
                       ),
                     ];

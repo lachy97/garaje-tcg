@@ -9,6 +9,9 @@ import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/db/database_provider.dart';
+import '../../ranking/domain/ranking_row.dart';
+import '../../ranking/presentation/ranking_page.dart';
+import '../../ranking/presentation/season_picker.dart';
 import 'player_profile_page.dart';
 
 /// Jugadores activos filtrados por texto ('' = todos).
@@ -91,11 +94,22 @@ class _PlayersPageState extends ConsumerState<PlayersPage> {
                       title: 'Aún no hay jugadores',
                       subtitle: 'Pulsa "Jugador" para registrar el primero.',
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 96),
-                      itemCount: list.length,
-                      itemBuilder: (_, i) => _PlayerTile(player: list[i]),
-                    ),
+                  : Builder(builder: (context) {
+                      // Puesto en el ranking de la temporada actual (subtítulo).
+                      final seasons = ref.watch(seasonListProvider).value;
+                      final season = seasons == null || seasons.isEmpty ? null : pickSeason(seasons, null);
+                      final rows = season == null
+                          ? const <RankingRow>[]
+                          : ref.watch(seasonRankingProvider(season.id)).value ?? const <RankingRow>[];
+                      final byId = {
+                        for (var i = 0; i < rows.length; i++) rows[i].playerId: (rows[i].rank > 0 ? rows[i].rank : i + 1, rows[i]),
+                      };
+                      return ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 96),
+                        itemCount: list.length,
+                        itemBuilder: (_, i) => _PlayerTile(player: list[i], ranking: byId[list[i].id]),
+                      );
+                    }),
             ),
           ),
         ],
@@ -110,9 +124,12 @@ class _PlayersPageState extends ConsumerState<PlayersPage> {
 }
 
 class _PlayerTile extends ConsumerWidget {
-  const _PlayerTile({required this.player});
+  const _PlayerTile({required this.player, this.ranking});
 
   final Player player;
+
+  /// Puesto y fila del ranking de la temporada actual (null: sin puntos).
+  final (int, RankingRow)? ranking;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -134,10 +151,14 @@ class _PlayerTile extends ConsumerWidget {
                 Text(player.nickname,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium),
-                if (player.fullName != null)
-                  Text(player.fullName!,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: AppColors.textSecondary)),
+                Text(
+                  ranking == null
+                      ? 'Sin torneos esta temporada'
+                      : '${ranking!.$2.points == 0 ? 'Sin puntos' : '${ranking!.$1}º · ${ranking!.$2.points} pts'}'
+                          '${ranking!.$2.lastDeck == null ? '' : ' · ${ranking!.$2.lastDeck}'}',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               ],
             ),
           ),

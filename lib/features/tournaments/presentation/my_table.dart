@@ -28,7 +28,13 @@ class MyTableInfo {
     required this.iAmP1,
     required this.topCut,
     this.extraMinutes = 0,
+    this.playerId,
+    this.opponentId,
   });
+
+  /// Yo y mi rival (para el historial entre los dos).
+  final String? playerId;
+  final String? opponentId;
 
   /// Tiempo extra que dio el juez a esta mesa (ya sumado en [roundMinutes]).
   final int extraMinutes;
@@ -78,7 +84,7 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
         'm.table_number AS tbl, m.is_bye AS bye, m.result AS res, m.is_third_place AS third, '
         'm.extra_minutes AS ex, '
         'm.player1_id AS p1, m.games1 AS g1, m.games_draw AS gd, m.games2 AS g2, '
-        'op.nickname AS opn, od.name AS opdeck '
+        'op.nickname AS opn, od.name AS opdeck, op.id AS opid '
         'FROM matches m '
         'JOIN rounds r ON r.id = m.round_id '
         'JOIN tournaments t ON t.id = m.tournament_id '
@@ -126,10 +132,105 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
                   matchId: r.read<String>('mid'),
                   iAmP1: iAmP1,
                   topCut: r.read<String>('rphase') != 'swiss',
+                  playerId: playerId,
+                  opponentId: r.readNullable<String>('opid'),
                 );
               }(),
           ]);
 });
+
+/// Historial entre dos jugadores (partidas con resultado, sin la actual).
+class HeadToHead {
+  const HeadToHead(this.wins, this.losses, this.draws, this.last);
+
+  final int wins;
+  final int losses;
+  final int draws;
+
+  /// Resultado de la última vez, visto desde mí: 'win', 'loss', 'draw' (null: nunca).
+  final String? last;
+
+  int get played => wins + losses + draws;
+}
+
+/// Clave: "yo|rival|partida actual".
+final headToHeadProvider = StreamProvider.autoDispose.family<HeadToHead, String>((ref, key) {
+  final [me, op, current] = key.split('|');
+  final db = ref.watch(databaseProvider);
+  return db
+      .customSelect(
+        "SELECT m.player1_id AS p1, m.result AS res FROM matches m "
+        'JOIN tournaments t ON t.id = m.tournament_id '
+        'JOIN rounds r ON r.id = m.round_id '
+        'WHERE ((m.player1_id = ?1 AND m.player2_id = ?2) OR (m.player1_id = ?2 AND m.player2_id = ?1)) '
+        "AND m.id <> ?3 AND m.result <> 'pending' AND m.is_bye = 0 "
+        'AND m.deleted_at IS NULL AND t.deleted_at IS NULL AND r.deleted_at IS NULL '
+        'ORDER BY t.date, r.number',
+        variables: [Variable.withString(me), Variable.withString(op), Variable.withString(current)],
+        readsFrom: {db.matches, db.tournaments, db.rounds},
+      )
+      .watch()
+      .map((rows) {
+    var w = 0, l = 0, d = 0;
+    String? last;
+    for (final r in rows) {
+      final iAmP1 = r.read<String>('p1') == me;
+      final res = r.read<String>('res');
+      final out = switch (res) {
+        'p1Win' => iAmP1 ? 'win' : 'loss',
+        'p2Win' => iAmP1 ? 'loss' : 'win',
+        'doubleLoss' => 'loss',
+        _ => 'draw',
+      };
+      switch (out) {
+        case 'win':
+          w++;
+        case 'loss':
+          l++;
+        default:
+          d++;
+      }
+      last = out;
+    }
+    return HeadToHead(w, l, d, last);
+  });
+});
+
+/// "Contra Leo: 2-1 · la última vez ganaste" (o primera vez).
+class HeadToHeadLine extends ConsumerWidget {
+  const HeadToHeadLine({super.key, required this.info});
+
+  final MyTableInfo info;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final me = info.playerId;
+    final op = info.opponentId;
+    if (me == null || op == null || info.bye) return const SizedBox.shrink();
+    final h = ref.watch(headToHeadProvider('$me|$op|${info.matchId}')).value;
+    if (h == null) return const SizedBox.shrink();
+    final text = h.played == 0
+        ? 'Primera vez que se enfrentan'
+        : 'Historial: ${h.wins}-${h.losses}${h.draws > 0 ? '-${h.draws}' : ''} · la última vez '
+            '${switch (h.last) {
+              'win' => 'ganaste',
+              'loss' => 'perdiste',
+              _ => 'empataron',
+            }}';
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(Icons.history, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(text, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Tarjeta fija arriba en Torneos: ronda, mesa, rival, su mazo y el tiempo.
 class MyTablesSection extends ConsumerWidget {
@@ -204,6 +305,7 @@ class _MyTableCard extends StatelessWidget {
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
                         Text(i.opponentDeck ?? 'Sin mazo',
                             style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        HeadToHeadLine(info: i),
                       ],
                     ),
                   ),

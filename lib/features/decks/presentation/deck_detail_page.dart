@@ -84,7 +84,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
           length: 4,
           child: Scaffold(
             appBar: AppBar(
-              title: Text(title.toUpperCase(), overflow: TextOverflow.ellipsis),
+              title: NameTitle(title),
               bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.center,

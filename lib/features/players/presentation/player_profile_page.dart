@@ -63,7 +63,7 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
           length: 3,
           child: Scaffold(
             appBar: AppBar(
-              title: Text(p.nickname.toUpperCase(), overflow: TextOverflow.ellipsis),
+              title: NameTitle(p.nickname),
               actions: [
                 if (perms.isAdmin)
                   IconButton(

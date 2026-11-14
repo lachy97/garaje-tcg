@@ -228,52 +228,78 @@ class _RegisteredTile extends ConsumerWidget {
             onChanged: (v) => runGuarded(
                 context, () => dao.setPaid(tournament.id, item.player.id, v)),
           ),
-          if (draft)
-            IconButton(
-              tooltip: 'Quitar',
-              icon: Icon(Icons.close, color: AppColors.textSecondary),
-              onPressed: () async {
-                final ok = await confirmDialog(
-                  context,
-                  title: 'Quitar inscripción',
-                  message: '¿Quitar a ${item.player.nickname} de este torneo? '
-                      'El jugador no se borra de la app.',
-                  confirm: 'Quitar',
-                  danger: true,
-                );
-                if (ok && context.mounted) {
-                  await runGuarded(
-                      context, () => dao.unregisterPlayer(tournament.id, item.player.id));
-                }
-              },
-            ),
-          if (running && !dropped)
-            TextButton(
-              onPressed: () => runGuarded(context, () async {
-                final ok = await confirmDialog(
-                  context,
-                  title: 'Retirar jugador',
-                  message: '${item.player.nickname} no será emparejado en las '
-                      'próximas rondas. Sus resultados se mantienen.',
-                  confirm: 'Retirar',
-                  danger: true,
-                );
-                if (!ok) throw const ActionCancelled();
-                await dao.dropPlayer(tournament.id, item.player.id, tournament.currentRound);
-              }),
-              child: Text('Drop', style: TextStyle(color: AppColors.loss)),
-            ),
-          if (!draft)
-            IconButton(
-              tooltip: 'Penalización',
-              icon: Icon(Icons.gavel, size: 20, color: AppColors.textSecondary),
-              onPressed: () => addPenaltyDialog(context, ref,
-                  tournament: tournament, player: item.player),
-            ),
+          // Acciones menos frecuentes en el menú: la fila queda limpia.
+          PopupMenuButton<String>(
+            tooltip: 'Más',
+            icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
+            onSelected: (v) => switch (v) {
+              'deck' => _pickDeck(context, ref),
+              'remove' => _remove(context, ref),
+              'drop' => _drop(context, ref),
+              _ => addPenaltyDialog(context, ref, tournament: tournament, player: item.player),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'deck',
+                child: ListTile(leading: Icon(Icons.style_outlined), title: Text('Cambiar mazo')),
+              ),
+              if (!draft)
+                const PopupMenuItem(
+                  value: 'penalty',
+                  child: ListTile(leading: Icon(Icons.gavel), title: Text('Penalización')),
+                ),
+              if (running && !dropped)
+                PopupMenuItem(
+                  value: 'drop',
+                  child: ListTile(
+                    leading: Icon(Icons.logout, color: AppColors.loss),
+                    title: Text('Retirar (drop)', style: TextStyle(color: AppColors.loss)),
+                  ),
+                ),
+              if (draft)
+                PopupMenuItem(
+                  value: 'remove',
+                  child: ListTile(
+                    leading: Icon(Icons.person_remove_outlined, color: AppColors.loss),
+                    title: Text('Quitar del torneo', style: TextStyle(color: AppColors.loss)),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
   }
+
+  Future<void> _remove(BuildContext context, WidgetRef ref) async {
+    final ok = await confirmDialog(
+      context,
+      title: 'Quitar inscripción',
+      message: '¿Quitar a ${item.player.nickname} de este torneo? '
+          'El jugador no se borra de la app.',
+      confirm: 'Quitar',
+      danger: true,
+    );
+    if (ok && context.mounted) {
+      await runGuarded(context,
+          () => ref.read(tournamentsDaoProvider).unregisterPlayer(tournament.id, item.player.id));
+    }
+  }
+
+  Future<void> _drop(BuildContext context, WidgetRef ref) => runGuarded(context, () async {
+        final ok = await confirmDialog(
+          context,
+          title: 'Retirar jugador',
+          message: '${item.player.nickname} no será emparejado en las '
+              'próximas rondas. Sus resultados se mantienen.',
+          confirm: 'Retirar',
+          danger: true,
+        );
+        if (!ok) throw const ActionCancelled();
+        await ref
+            .read(tournamentsDaoProvider)
+            .dropPlayer(tournament.id, item.player.id, tournament.currentRound);
+      });
 
   Future<void> _pickDeck(BuildContext context, WidgetRef ref) async {
     final name = await showDeckPicker(context, current: item.deck?.name);

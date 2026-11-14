@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/brand.dart';
 import '../../../../app/widgets/common.dart';
+import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/db/app_database.dart';
 import '../../../decklists/presentation/deck_list_editor_page.dart' show DeckListTarget;
 import '../../../decklists/presentation/top_deck_lists_section.dart';
@@ -80,6 +81,7 @@ class SummaryTab extends ConsumerWidget {
               r.playerId: r.points,
           };
           final listCut = cut > 0 ? cut : 4;
+          final me = ref.watch(permissionsProvider).playerId;
           return DefaultTabController(
             length: 3,
             child: Column(
@@ -89,12 +91,10 @@ class SummaryTab extends ConsumerWidget {
                   unselectedLabelColor: AppColors.textSecondary,
                   indicatorColor: AppColors.neon,
                   dividerColor: AppColors.outlineVariant,
-                  tabs: [
-                    Tab(icon: Tooltip(message: 'Participantes', child: Icon(Icons.groups))),
-                    Tab(
-                        icon: Tooltip(
-                            message: 'Deck Breakdown', child: Icon(Icons.pie_chart_outline))),
-                    Tab(icon: Tooltip(message: 'Listas', child: Icon(Icons.style_outlined))),
+                  tabs: const [
+                    Tab(text: 'Participantes'),
+                    Tab(text: 'Mazos'),
+                    Tab(text: 'Listas'),
                   ],
                 ),
                 Expanded(
@@ -104,6 +104,35 @@ class SummaryTab extends ConsumerWidget {
                       ListView(
                         padding: const EdgeInsets.only(bottom: 40),
                         children: [
+                          // Quien jugó el torneo: su resultado, para compartirlo.
+                          if (report.participants.where((l) => l.playerId == me).firstOrNull
+                              case final mine?) ...[
+                            const SectionLabel('Tu torneo'),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: MyResultCard(
+                                tournament: tournament,
+                                players: report.players,
+                                line: mine,
+                                points: points[mine.playerId],
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: TextButton.icon(
+                                  onPressed: () => exportMyResult(context,
+                                      tournament: tournament,
+                                      report: report,
+                                      line: mine,
+                                      points: points[mine.playerId]),
+                                  icon: const Icon(Icons.share, size: 18),
+                                  label: const Text('Compartir mi resultado'),
+                                ),
+                              ),
+                            ),
+                          ],
                           _Header(
                             title: 'Participantes',
                             onShare: () => exportParticipants(context,
@@ -273,11 +302,7 @@ class _Header extends StatelessWidget {
         Expanded(child: SectionLabel(title)),
         Padding(
           padding: const EdgeInsets.only(top: 8, right: 4),
-          child: TextButton.icon(
-            onPressed: onShare,
-            icon: const Icon(Icons.share, size: 20),
-            label: const Text('Compartir'),
-          ),
+          child: ShareButton(onPressed: onShare, tooltip: 'Compartir ${title.toLowerCase()}'),
         ),
       ],
     );

@@ -71,7 +71,7 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
     final t = widget.target;
     return Scaffold(
       appBar: AppBar(
-        title: Text('LISTA · ${t.playerName.toUpperCase()}', overflow: TextOverflow.ellipsis),
+        title: NameTitle('Lista de ${t.playerName}'),
         actions: [
           IconButton(
             tooltip: 'Importar .ydk',

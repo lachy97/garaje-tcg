@@ -143,7 +143,8 @@ class _SwissStandings extends ConsumerWidget {
                 const Expanded(child: SectionLabel('Clasificación Swiss')),
                 Padding(
                   padding: const EdgeInsets.only(top: 8, right: 4),
-                  child: TextButton.icon(
+                  child: ShareButton(
+                    tooltip: 'Compartir clasificación',
                     onPressed: () => shareStandings(
                       context,
                       tournament: tournament,
@@ -152,8 +153,6 @@ class _SwissStandings extends ConsumerWidget {
                       decks: decks,
                       cut: cut,
                     ),
-                    icon: const Icon(Icons.share, size: 20),
-                    label: const Text('Compartir'),
                   ),
                 ),
               ],

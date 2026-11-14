@@ -26,7 +26,20 @@ class MatchScoreCard extends ConsumerStatefulWidget {
     required this.deckNames,
     required this.editable,
     this.canClear = true,
+    this.compact = false,
+    this.onToggle,
+    this.highlightPlayerId,
   });
+
+  /// Una sola línea (mesa con resultado o solo consulta). Al tocarla se
+  /// abre si se puede editar.
+  final bool compact;
+
+  /// Abrir (en una línea) o plegar (abierta y con resultado).
+  final VoidCallback? onToggle;
+
+  /// Jugador a resaltar (el del teléfono, en la vista de jugador).
+  final String? highlightPlayerId;
 
   final Match match;
   final RoundPhase phase;
@@ -135,7 +148,47 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
     final p1 = widget.names[m.player1Id] ?? '?';
     final p2 = m.player2Id == null ? null : widget.names[m.player2Id] ?? '?';
 
-    if (m.isBye) return _ByeCard(name: p1, deck: widget.deckNames[m.deck1Id]);
+    if (m.isBye) {
+      return widget.compact
+          ? _CompactRow(
+              table: 'BYE',
+              p1: p1,
+              p2: null,
+              score: '2-0',
+              p1Wins: true,
+              p2Wins: false,
+              mine: widget.highlightPlayerId == m.player1Id,
+            )
+          : _ByeCard(name: p1, deck: widget.deckNames[m.deck1Id]);
+    }
+
+    if (widget.compact) {
+      final reported = m.result.isReported;
+      final score = !reported
+          ? null
+          : switch (_saved) {
+              _Pick.doubleLoss => 'DD',
+              _Pick.intentionalDraw => 'ID',
+              _ => '${m.games1 ?? 0}-${m.games2 ?? 0}${(m.gamesDraw ?? 0) > 0 ? '-${m.gamesDraw}' : ''}',
+            };
+      return _CompactRow(
+        table: m.isThirdPlace
+            ? '3º'
+            : _isTopCut
+                ? 'M${m.tableNumber ?? ''}'
+                : '${m.tableNumber ?? ''}',
+        p1: p1,
+        p2: p2,
+        score: score,
+        p1Wins: m.result == MatchResult.p1Win,
+        p2Wins: m.result == MatchResult.p2Win,
+        danger: m.result == MatchResult.doubleLoss,
+        extra: m.extraMinutes > 0 ? '+${m.extraMinutes}' : null,
+        mine: widget.highlightPlayerId != null &&
+            (widget.highlightPlayerId == m.player1Id || widget.highlightPlayerId == m.player2Id),
+        onTap: widget.editable ? widget.onToggle : null,
+      );
+    }
 
     final saved = _saved;
     final reported = m.result.isReported;
@@ -268,12 +321,24 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                 style: TextStyle(fontSize: 12, color: AppColors.draw),
               ),
             ),
-          if (widget.editable && widget.canClear && reported)
-            TextButton.icon(
-              onPressed: enabled ? _clear : null,
-              icon: Icon(Icons.undo, size: 18, color: AppColors.loss),
-              label: Text('Borrar resultado',
-                  style: TextStyle(color: AppColors.loss, fontSize: 12)),
+          if (widget.editable && reported)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.canClear)
+                  TextButton.icon(
+                    onPressed: enabled ? _clear : null,
+                    icon: Icon(Icons.undo, size: 18, color: AppColors.loss),
+                    label: Text('Borrar resultado',
+                        style: TextStyle(color: AppColors.loss, fontSize: 12)),
+                  ),
+                if (widget.onToggle != null)
+                  TextButton.icon(
+                    onPressed: widget.onToggle,
+                    icon: const Icon(Icons.expand_less, size: 18),
+                    label: const Text('Plegar', style: TextStyle(fontSize: 12)),
+                  ),
+              ],
             ),
         ],
       ),
@@ -433,3 +498,131 @@ String _overrideLabel(MatchResult r, String p1, String p2) => switch (r) {
       MatchResult.doubleLoss => 'doble derrota',
       MatchResult.pending => 'sin resultado',
     };
+
+/// Mesa en una línea: "3  Dante  2-1  Leo  ✓".
+class _CompactRow extends StatelessWidget {
+  const _CompactRow({
+    required this.table,
+    required this.p1,
+    required this.p2,
+    required this.score,
+    required this.p1Wins,
+    required this.p2Wins,
+    this.danger = false,
+    this.extra,
+    this.mine = false,
+    this.onTap,
+  });
+
+  final String table;
+  final String p1;
+  final String? p2;
+
+  /// null = sin resultado.
+  final String? score;
+  final bool p1Wins;
+  final bool p2Wins;
+  final bool danger;
+
+  /// Tiempo extra ("+5").
+  final String? extra;
+
+  /// Mesa del jugador de este teléfono.
+  final bool mine;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    TextStyle name(bool win) => TextStyle(
+          fontSize: 14,
+          fontWeight: win ? FontWeight.w800 : FontWeight.w500,
+          color: win ? AppColors.neon : AppColors.textPrimary,
+        );
+    final done = score != null;
+    return Semantics(
+      button: onTap != null,
+      label: 'mesa $table: $p1 contra ${p2 ?? 'BYE'}. ${score ?? 'Sin resultado'}',
+      excludeSemantics: true,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+        decoration: BoxDecoration(
+          color: mine ? AppColors.neon.withValues(alpha: 0.10) : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: mine
+                ? AppColors.neon
+                : danger
+                    ? AppColors.loss.withValues(alpha: 0.6)
+                    : AppColors.outline,
+            width: mine ? 1.2 : 0.8,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 34,
+                      child: Text(table,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textSecondary)),
+                    ),
+                    Expanded(
+                      child: Text(p1,
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: name(p1Wins)),
+                    ),
+                    Container(
+                      width: 56,
+                      alignment: Alignment.center,
+                      child: Text(
+                        score ?? '–',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: danger
+                              ? AppColors.loss
+                              : done
+                                  ? AppColors.textPrimary
+                                  : AppColors.textDisabled,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(p2 ?? 'BYE',
+                          textAlign: TextAlign.end,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: p2 == null
+                              ? TextStyle(fontSize: 14, color: AppColors.textSecondary)
+                              : name(p2Wins)),
+                    ),
+                    if (extra != null) ...[
+                      const SizedBox(width: 6),
+                      Text(extra!,
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.draw)),
+                    ],
+                    if (onTap != null) ...[
+                      const SizedBox(width: 6),
+                      Icon(done ? Icons.check_circle : Icons.expand_more,
+                          size: 18, color: done ? AppColors.leaf : AppColors.textSecondary),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

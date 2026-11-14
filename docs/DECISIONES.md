@@ -359,3 +359,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **`npm run backup`** (en `server`, con VPN): exporta la base D1 entera a `server/backups/garage-tcg_AAAA-MM-DD_HHMM.sql` y guarda al lado la **marca de Time Travel** de ese momento (`.marca.txt`). La carpeta `backups` tiene su propio `.gitignore`: nunca se sube a git (correos, teléfonos, cuentas).
 - **Dos capas**: Time Travel de Cloudflare (volver a cualquier minuto de los últimos 7 días en el plan gratis, con la marca o una hora) y el `.sql` en el PC para más allá de 7 días o si se pierde la base. Pasos para restaurar en `server/LEEME.md` §17.
 - **Tras restaurar, los teléfonos se recuperan solos**: si un teléfono pide cambios desde una secuencia mayor que la del servidor (la base volvió atrás), el servidor responde `reset` con `seq: 0` y el teléfono baja todo de nuevo (funciona con las versiones de la app ya instaladas). Los organizadores usan "Volver a subir todo" para devolver al servidor lo que se perdió.
+
+## Rediseño tras la auditoría con capturas (14/11)
+- Todas las propuestas de `DISENO_UX.md` §10 aplicadas (detalle allí). Solo cambia la presentación: la lógica del torneo, la sincronización y el esquema no se tocan.
+- Rondas: mesas con resultado en una línea, filtro de pendientes y "Faltan N" en lugar de "Generar ronda" mientras falten resultados. Se mantiene el orden por número de mesa a propósito.
+- "Cerrar temporada" queda en un menú y solo para organizadores/administración.
+- Nuevas para jugadores: historial contra el rival, tarjeta "Tu torneo" para compartir, cuánto falta en el ranking y los últimos torneos terminados en su pantalla de Torneos.

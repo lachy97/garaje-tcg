@@ -258,3 +258,116 @@ class MetagamePoster extends StatelessWidget {
     );
   }
 }
+
+// ───────────────────────── Mi torneo (jugador) ─────────────────────────
+
+/// Tarjeta para compartir el resultado de un jugador: puesto, mazo, récord y
+/// puntos de ranking ("2º de 12 · Snake-Eye · 3-2 · +300 pts").
+Future<void> exportMyResult(
+  BuildContext context, {
+  required Tournament tournament,
+  required TournamentReport report,
+  required ParticipantLine line,
+  int? points,
+}) {
+  return AppColors.runDark(() => runExport<ParticipantLine>(
+        context,
+        ExportSpec(
+          heading: tournament.name.toUpperCase(),
+          items: const [],
+          summary: MyResultCard(
+            tournament: tournament,
+            players: report.players,
+            line: line,
+            points: points,
+            forExport: true,
+          ),
+          summaryHeightEstimate: 420,
+          legend: '${DateFormat('dd/MM/yyyy').format(tournament.date)} · ${report.players} jugadores',
+          fileBase: 'mi_torneo_${_fileSafe(tournament.name)}',
+          shareText: '${line.name} en ${tournament.name}',
+          preload: _deckImages(report),
+        ),
+      ));
+}
+
+/// Puesto, mazo, récord y puntos de un jugador en un torneo terminado.
+class MyResultCard extends StatelessWidget {
+  const MyResultCard({
+    super.key,
+    required this.tournament,
+    required this.players,
+    required this.line,
+    this.points,
+    this.forExport = false,
+  });
+
+  final Tournament tournament;
+  final int players;
+  final ParticipantLine line;
+  final int? points;
+  final bool forExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = forExport ? 1.6 : 1.0;
+    final pos = line.position;
+    final stat = TextStyle(fontSize: 13 * k, color: AppColors.textSecondary);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16 * k),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: line.madeTop ? AppColors.neon : AppColors.outline, width: 1.2),
+        boxShadow: line.madeTop ? AppColors.glow(strength: 0.6) : null,
+      ),
+      child: Row(
+        children: [
+          DeckImage(path: line.deckImage, name: line.deck ?? '?', width: 72 * k),
+          SizedBox(width: 16 * k),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(line.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 20 * k, fontWeight: FontWeight.w900)),
+                Text(line.deck ?? 'Sin mazo',
+                    style: TextStyle(fontSize: 14 * k, color: AppColors.textSecondary)),
+                SizedBox(height: 8 * k),
+                Wrap(
+                  spacing: 14 * k,
+                  runSpacing: 4,
+                  children: [
+                    Text('Récord ${line.record}', style: stat),
+                    Text('${(line.winRate * 100).round()}% victorias', style: stat),
+                    if (points != null && points! > 0)
+                      Text('+$points pts', style: stat.copyWith(color: AppColors.neon, fontWeight: FontWeight.w800)),
+                    if (line.madeTop && tournament.topCutSize > 0)
+                      Text('Top ${tournament.topCutSize}',
+                          style: stat.copyWith(color: AppColors.neon, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 12 * k),
+          Column(
+            children: [
+              Text(pos == null ? '–' : '$posº',
+                  style: TextStyle(
+                    fontSize: 40 * k,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.neonBright,
+                    shadows: AppColors.textGlow(blur: 10),
+                  )),
+              Text('de $players', style: stat),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -83,3 +83,36 @@ Con esto quedan aplicadas todas las propuestas de la auditoría.
 | Había que escribir el usuario cada vez. | **Hecho**: se recuerda el último y el cursor va a la contraseña; teclado y botones "siguiente/listo" adecuados. |
 | "Atrás" en la pantalla principal cerraba la app de golpe. | **Hecho**: desde otra pestaña vuelve a Torneos; en Torneos pide pulsar dos veces. |
 | Mensaje de "sin conexión" sin pista de la VPN. | **Hecho**: lo menciona. |
+
+## 10. Segunda auditoría con capturas (14/11) — propuestas
+
+| # | Hallazgo | Propuesta | Prioridad |
+|---|---|---|---|
+| 1 | Rondas: cada mesa ocupa media pantalla (7 botones) aunque ya tenga resultado; con 20 mesas hay mucho scroll. | Mesas con resultado se pliegan a una línea; las pendientes arriba; filtro "Solo pendientes". | A |
+| 2 | "Generar ronda N" visible y encima de las mesas aunque falten resultados. | Mientras falten resultados, "Faltan 3" (lleva a la primera pendiente); el botón aparece al completar la ronda. | A |
+| 3 | Inscritos: "Drop" en rojo, casilla Cover y martillo en cada fila. | Fila con Cover a la vista; Drop y penalización en el menú ⋮. | B |
+| 4 | Rondas repite la configuración ("4 rondas Swiss · Top 4") que ya sale bajo el título. | Quitar la línea; editar desde el menú. | B |
+| 5 | Títulos en mayúsculas se cortan ("GARAGE WEEKLY #14 N…"). | Nombre del torneo en tipografía normal, hasta 2 líneas. | B |
+| 6 | Torneo terminado: pestañas solo con iconos. | Iconos con texto (Participantes · Mazos · Listas). | B |
+| 7 | "Cerrar temporada" destacado arriba del ranking. | Al menú ⋮ (es irreversible y se usa 4 veces al año). | B |
+| 8 | "Compartir" en 5 sitios y formas distintas. | Siempre el mismo icono en la barra superior. | C |
+| 9 | Lista de jugadores repite el apodo con el nombre completo. | Subtítulo útil: puesto en el ranking y mazo habitual. | C |
+| 10 | Ranking: filas resaltadas en dos verdes sin leyenda. | Leyenda corta o un solo resaltado. | C |
+| 11 | Jugador sin inscripciones: "Aún no hay torneos", aunque tiene los terminados. | Mostrar los últimos terminados de la comunidad. | B |
+
+Ideas nuevas: historial contra el rival en "Mi mesa ahora", tarjeta para compartir "Mi torneo" del jugador, y "te faltan X puntos para el Top 8" en la ficha.
+
+**Estado (14/11): todo hecho.** Detalles:
+- Rondas: las mesas siguen **en orden de mesa** (si las pendientes subieran, la lista saltaría al anotar cada resultado). Con resultado se pliegan a una línea ("1  Dante  2-1  Mara ✓"); al tocarla se abre para corregir y "Plegar" la cierra. Filtro **Todas / Pendientes**. Compartir es un icono junto al título de la ronda; Cambiar cruces, Importar cruces y Deshacer ronda pasan al menú ⋮. La línea "4 rondas Swiss · Top 4 · Fijado" ya no sale (la configuración solo aparece mientras se puede cambiar, en inscripción).
+- Botón flotante: con resultados pendientes dice **"Faltan N"** y al tocarlo muestra solo las mesas pendientes; al completarse la ronda pasa a "Generar ronda N" / "Iniciar Top" / "Finalizar".
+- Vista de jugador: todas las mesas en una línea y la suya resaltada en verde.
+- Inscritos: a la vista solo la casilla Cover (y Check-in); Cambiar mazo, Penalización, Retirar (drop) y Quitar en el menú ⋮.
+- Títulos de torneo, jugador, mazo y lista: en su forma normal y hasta en 2 líneas (`NameTitle`).
+- Torneo terminado: pestañas Participantes · Mazos · Listas.
+- "Cerrar temporada": en el menú ⋮ del ranking y solo para quien crea torneos (antes salía a cualquiera).
+- Compartir: siempre el mismo icono (`ShareButton`).
+- Lista de jugadores: "3º · 200 pts · Yubel" o "Sin puntos" en vez del nombre completo (la búsqueda sigue encontrando por nombre).
+- Ranking: leyenda del verde ("los 8 primeros, más claro = mejor puesto") y, para quien tiene ficha, "Vas 6º con 120 pts: te faltan 40 para alcanzar a Leo" / "para el Top 8".
+- Jugadores: en Torneos ven también los **últimos 10 terminados** de la comunidad.
+- Nuevo: **historial contra el rival** en "Mi mesa ahora" ("Historial: 2-1 · la última vez ganaste" o "Primera vez que se enfrentan").
+- Nuevo: **"Tu torneo"** en el resumen de un torneo terminado (puesto, mazo, récord, % y puntos) con **Compartir mi resultado** (imagen).

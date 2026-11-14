@@ -69,6 +69,39 @@ class EmptyState extends StatelessWidget {
   }
 }
 
+/// Título de la barra con un nombre propio (torneo, jugador, mazo): en su
+/// forma normal y hasta en dos líneas, para que los nombres largos no se
+/// corten ("GARAGE WEEKLY #14 N…").
+class NameTitle extends StatelessWidget {
+  const NameTitle(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 18, height: 1.15, letterSpacing: 0.2),
+    );
+  }
+}
+
+/// Botón de compartir: el mismo icono en toda la app (a la derecha del título
+/// de la sección o en la barra superior).
+class ShareButton extends StatelessWidget {
+  const ShareButton({super.key, required this.onPressed, this.tooltip = 'Compartir'});
+
+  final VoidCallback? onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) =>
+      IconButton(tooltip: tooltip, icon: const Icon(Icons.share), onPressed: onPressed);
+}
+
 /// Etiqueta de sección en mayúsculas ("MESA 1", "CONFIGURACIÓN"...).
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key, this.padding});

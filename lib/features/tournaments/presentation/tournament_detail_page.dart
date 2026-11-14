@@ -49,7 +49,7 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
           );
         }
         final finished = t.status == TournamentStatus.finished;
-        final title = Text(t.name.toUpperCase(), overflow: TextOverflow.ellipsis);
+        final title = NameTitle(t.name);
         // Los torneos de este teléfono los creó su organizador (hasta que
         // haya sincronización no hay torneos de otros).
         final mayManage = ref.watch(permissionsProvider).canManageTournament(isOwner: true);

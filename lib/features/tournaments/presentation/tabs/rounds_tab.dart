@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme.dart';
 import '../../../../app/widgets/brand.dart';
 import '../../../../app/widgets/common.dart';
+import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/db/app_database.dart';
 import '../../../../core/db/daos/tournaments_dao.dart';
 import '../../../../core/db/database_provider.dart';
@@ -36,6 +37,9 @@ class RoundsTab extends ConsumerStatefulWidget {
 class _RoundsTabState extends ConsumerState<RoundsTab> {
   String? _selectedRoundId; // null = la última
   bool _busy = false;
+
+  /// Ver solo las mesas sin resultado.
+  bool _onlyPending = false;
 
   Tournament get t => widget.tournament;
 
@@ -78,7 +82,9 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                     Expanded(
                       child: CustomScrollView(
                   slivers: [
-                    if (t.status != TournamentStatus.finished && !widget.readOnly)
+                    // Configuración: solo mientras se puede cambiar (inscripción);
+                    // después ya se ve debajo del nombre del torneo.
+                    if (t.status == TournamentStatus.draft && !widget.readOnly)
                       SliverToBoxAdapter(
                         child: _ConfigCard(tournament: t, players: players),
                       ),
@@ -123,6 +129,8 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                         names: names,
                         deckNames: deckNames,
                         readOnly: widget.readOnly,
+                        onlyPending: _onlyPending,
+                        onOnlyPending: (v) => setState(() => _onlyPending = v),
                       ),
                     // espacio para que el botón flotante no tape la última tarjeta
                     const SliverToBoxAdapter(child: SizedBox(height: 104)),
@@ -143,6 +151,11 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                     activePlayers: players.where((p) => !p.entry.dropped).length,
                     busy: _busy,
                     onRun: _run,
+                    // "Faltan 3": muestra solo las mesas pendientes de la ronda actual.
+                    onShowPending: () => setState(() {
+                      _selectedRoundId = null;
+                      _onlyPending = true;
+                    }),
                   ),
                 ),
               ),
@@ -159,7 +172,10 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
     if (mounted) {
       setState(() {
         _busy = false;
-        if (ok) _selectedRoundId = null; // saltar a la ronda nueva
+        if (ok) {
+          _selectedRoundId = null; // saltar a la ronda nueva
+          _onlyPending = false;
+        }
       });
     }
   }
@@ -300,13 +316,15 @@ class TopCutSelector extends StatelessWidget {
 
 // ───────────────────────── Matches ─────────────────────────
 
-class _MatchesSliver extends ConsumerWidget {
+class _MatchesSliver extends ConsumerStatefulWidget {
   const _MatchesSliver({
     required this.tournament,
     required this.round,
     required this.isCurrent,
     required this.names,
     required this.deckNames,
+    required this.onlyPending,
+    required this.onOnlyPending,
     this.readOnly = false,
   });
 
@@ -318,10 +336,34 @@ class _MatchesSliver extends ConsumerWidget {
   final bool isCurrent;
   final Map<String, String> names;
   final Map<String, String> deckNames;
+  final bool onlyPending;
+  final ValueChanged<bool> onOnlyPending;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MatchesSliver> createState() => _MatchesSliverState();
+}
+
+class _MatchesSliverState extends ConsumerState<_MatchesSliver> {
+  /// Mesas con resultado abiertas a mano para corregirlas.
+  final Set<String> _open = {};
+
+  Tournament get tournament => widget.tournament;
+  Round get round => widget.round;
+  bool get readOnly => widget.readOnly;
+  bool get isCurrent => widget.isCurrent;
+  Map<String, String> get names => widget.names;
+  Map<String, String> get deckNames => widget.deckNames;
+
+  @override
+  void didUpdateWidget(covariant _MatchesSliver old) {
+    super.didUpdateWidget(old);
+    if (old.round.id != round.id) _open.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final matches = ref.watch(roundMatchesProvider(round.id));
+    final me = ref.watch(permissionsProvider).playerId;
     final title = round.phase == RoundPhase.swiss
         ? 'Ronda ${round.number}'
         : roundLabel(round);
@@ -334,51 +376,108 @@ class _MatchesSliver extends ConsumerWidget {
               child: Center(child: CircularProgressIndicator()))),
       error: (e, _) => SliverToBoxAdapter(child: Text('$e')),
       data: (list) {
-        final pending = list.where((m) => !m.result.isReported).length;
+        final pending = list.where((m) => !m.isBye && !m.result.isReported).length;
+        final canPair = isCurrent &&
+            !readOnly &&
+            round.phase == RoundPhase.swiss &&
+            tournament.status == TournamentStatus.swiss;
+        final canImport = canPair &&
+            round.number == 1 &&
+            list.every((m) => m.isBye || !m.result.isReported);
+        final showPending = widget.onlyPending && pending > 0;
+        final shown = showPending
+            ? [for (final m in list) if (!m.isBye && !m.result.isReported) m]
+            : list;
         return SliverList.list(children: [
-          const SizedBox(height: 8),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: AppColors.neon,
-              shadows: AppColors.textGlow(blur: 10),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 4, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.neon,
+                          shadows: AppColors.textGlow(blur: 10),
+                        ),
+                      ),
+                      Text(
+                        pending == 0 ? 'Todos los resultados reportados' : 'Faltan $pending resultado(s)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: pending == 0 ? AppColors.leaf : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Compartir ronda',
+                  icon: const Icon(Icons.share),
+                  onPressed: () => shareRound(
+                    context,
+                    tournament: tournament,
+                    roundTitle: title,
+                    isTopCut: round.phase == RoundPhase.topCut,
+                    matches: list,
+                    names: names,
+                  ),
+                ),
+                if (isCurrent && !readOnly)
+                  PopupMenuButton<String>(
+                    tooltip: 'Más',
+                    onSelected: (v) => switch (v) {
+                      'pair' => openPairingEditor(context, round: round, names: names),
+                      'import' => _importFirstRound(context),
+                      _ => _undoRound(context),
+                    },
+                    itemBuilder: (_) => [
+                      if (canPair)
+                        const PopupMenuItem(
+                          value: 'pair',
+                          child: ListTile(leading: Icon(Icons.swap_horiz), title: Text('Cambiar cruces')),
+                        ),
+                      if (canImport)
+                        const PopupMenuItem(
+                          value: 'import',
+                          child: ListTile(
+                              leading: Icon(Icons.content_paste_go), title: Text('Importar cruces desde texto')),
+                        ),
+                      PopupMenuItem(
+                        value: 'undo',
+                        child: ListTile(
+                          leading: Icon(Icons.undo, color: AppColors.loss),
+                          title: Text('Deshacer ${title.toLowerCase()}', style: TextStyle(color: AppColors.loss)),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            pending == 0 ? 'Todos los resultados reportados' : 'Faltan $pending resultado(s)',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: pending == 0 ? AppColors.leaf : AppColors.textSecondary,
-            ),
-          ),
-          Center(
-            child: TextButton.icon(
-              onPressed: () => shareRound(
-                context,
-                tournament: tournament,
-                roundTitle: title,
-                isTopCut: round.phase == RoundPhase.topCut,
-                matches: list,
-                names: names,
-              ),
-              icon: const Icon(Icons.share, size: 20),
-              label: const Text('Compartir ronda'),
-            ),
-          ),
-          if (isCurrent &&
-              !readOnly &&
-              round.phase == RoundPhase.swiss &&
-              tournament.status == TournamentStatus.swiss)
-            Center(
-              child: TextButton.icon(
-                onPressed: () => openPairingEditor(context, round: round, names: names),
-                icon: const Icon(Icons.swap_horiz, size: 20),
-                label: const Text('Cambiar cruces'),
+          // Filtro: todas las mesas o solo las que faltan.
+          if (pending > 0 && pending < list.length)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: Text('Todas (${list.length})'),
+                    selected: !showPending,
+                    onSelected: (_) => widget.onOnlyPending(false),
+                  ),
+                  ChoiceChip(
+                    label: Text('Pendientes ($pending)'),
+                    selected: showPending,
+                    onSelected: (_) => widget.onOnlyPending(true),
+                  ),
+                ],
               ),
             ),
           // ¿Llegan los reportes de los jugadores? Última sincronización.
@@ -386,20 +485,6 @@ class _MatchesSliver extends ConsumerWidget {
           // Avisos desde los móviles: juez, resultados reportados, drops.
           if (isCurrent && !readOnly)
             PlayAlertsPanel(tournament: tournament, matches: list, names: names),
-          // Ronda 1 sin resultados: rehacer los cruces importándolos de un texto.
-          if (isCurrent &&
-              !readOnly &&
-              round.number == 1 &&
-              round.phase == RoundPhase.swiss &&
-              tournament.status == TournamentStatus.swiss &&
-              list.every((m) => m.isBye || !m.result.isReported))
-            Center(
-              child: TextButton.icon(
-                onPressed: () => _importFirstRound(context, ref),
-                icon: const Icon(Icons.content_paste_go, size: 20),
-                label: const Text('Importar cruces desde texto'),
-              ),
-            ),
           const SizedBox(height: 8),
           if (!isCurrent && editable)
             Padding(
@@ -411,7 +496,7 @@ class _MatchesSliver extends ConsumerWidget {
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ),
-          for (final m in list)
+          for (final m in shown)
             MatchScoreCard(
               key: ValueKey(m.id),
               match: m,
@@ -420,15 +505,10 @@ class _MatchesSliver extends ConsumerWidget {
               deckNames: deckNames,
               editable: editable && !m.isBye,
               canClear: isCurrent,
-            ),
-          if (isCurrent && !readOnly)
-            Center(
-              child: TextButton.icon(
-                onPressed: () => _undoRound(context, ref),
-                icon: Icon(Icons.undo, size: 20, color: AppColors.loss),
-                label: Text('Deshacer ${title.toLowerCase()}',
-                    style: TextStyle(color: AppColors.loss)),
-              ),
+              // Con resultado (o solo consulta): una línea; se abre al tocarla.
+              compact: m.isBye || !editable || (m.result.isReported && !_open.contains(m.id)),
+              onToggle: () => setState(() => _open.contains(m.id) ? _open.remove(m.id) : _open.add(m.id)),
+              highlightPlayerId: me,
             ),
         ]);
       },
@@ -437,7 +517,7 @@ class _MatchesSliver extends ConsumerWidget {
 
   /// Reemplaza los cruces de la ronda 1 (aún sin resultados) por los de un
   /// texto: se deshace la ronda y se vuelve a generar con esos cruces.
-  Future<void> _importFirstRound(BuildContext context, WidgetRef ref) async {
+  Future<void> _importFirstRound(BuildContext context) async {
     final picked = await Navigator.of(context)
         .push<({List<(String, String?)> pairs, Map<String, int> tables})>(
       MaterialPageRoute(
@@ -463,7 +543,7 @@ class _MatchesSliver extends ConsumerWidget {
     }, success: 'Cruces de la ronda 1 importados');
   }
 
-  Future<void> _undoRound(BuildContext context, WidgetRef ref) async {
+  Future<void> _undoRound(BuildContext context) async {
     final isFirstTop = round.phase == RoundPhase.topCut &&
         tournament.status == TournamentStatus.topCut &&
         round.bracketSize == tournament.topCutSize;
@@ -498,6 +578,7 @@ class _AdvanceFab extends ConsumerWidget {
     required this.activePlayers,
     required this.busy,
     required this.onRun,
+    required this.onShowPending,
   });
 
   final Tournament tournament;
@@ -505,10 +586,29 @@ class _AdvanceFab extends ConsumerWidget {
   final int activePlayers;
   final bool busy;
   final Future<void> Function(Future<void> Function() action, {String? success}) onRun;
+  final VoidCallback onShowPending;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = tournament;
+    // Ronda en juego sin terminar: en vez de avanzar, "Faltan N" (lleva a
+    // las mesas pendientes). Avanzar se ofrece al completar la ronda.
+    final round = currentRound;
+    if (round != null && t.status != TournamentStatus.finished && t.status != TournamentStatus.draft) {
+      final ms = ref.watch(roundMatchesProvider(round.id)).value;
+      final left = ms?.where((m) => !m.isBye && !m.result.isReported).length ?? 0;
+      if (left > 0) {
+        return FloatingActionButton.extended(
+          heroTag: 'advance-${t.id}',
+          backgroundColor: AppColors.surfaceHighest,
+          foregroundColor: AppColors.textPrimary,
+          onPressed: onShowPending,
+          icon: const Icon(Icons.pending_actions),
+          label: Text('Faltan $left',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        );
+      }
+    }
     final service = ref.read(tournamentServiceProvider);
     final registered = ref.watch(registeredProvider(t.id)).value ?? const <RegisteredPlayer>[];
 

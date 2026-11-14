@@ -35,8 +35,7 @@ class DeckListPage extends ConsumerWidget {
     final canEdit = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
     return Scaffold(
       appBar: AppBar(
-        title: Text('LISTA · ${target.playerName.toUpperCase()}',
-            overflow: TextOverflow.ellipsis),
+        title: NameTitle('Lista de ${target.playerName}'),
         actions: [
           if (saved != null && cards != null) ...[
             IconButton(
