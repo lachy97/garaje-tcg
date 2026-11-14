@@ -331,10 +331,12 @@ el de pago). `npm run backup:info` muestra la marca actual.
 npx wrangler d1 time-travel restore garage-tcg --bookmark=MARCA_DEL_ARCHIVO
 ```
 
-o a una hora concreta (hora de Cuba, ojo al `-05:00` / `-04:00` en verano):
+o a una hora concreta: primero se pide la marca de esa hora (hora de Cuba:
+`-05:00` en invierno, `-04:00` en verano) y luego se restaura con ella
 
 ```powershell
-npx wrangler d1 time-travel restore garage-tcg --timestamp=2026-11-14T15:00:00-05:00
+npx wrangler d1 time-travel info garage-tcg --timestamp="2026-11-14T15:00:00-05:00"
+npx wrangler d1 time-travel restore garage-tcg --bookmark=MARCA_QUE_MOSTRO
 ```
 
 Se pierde **todo** lo que cambió después en el servidor (de todos los
