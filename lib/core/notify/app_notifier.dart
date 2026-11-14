@@ -12,6 +12,7 @@ import '../db/app_database.dart';
 import '../db/database_provider.dart';
 import '../play/play.dart';
 import '../registrations/registrations.dart';
+import 'tournament_keeper.dart';
 
 /// Avisos en el teléfono sin servicios de Google: los genera la propia app
 /// cuando sincroniza (cada 30 s con la app abierta o recién cerrada). Si el
@@ -106,6 +107,29 @@ final notifyEnabledProvider = NotifierProvider<NotifyEnabledController, bool>(No
 
 const _seenKey = 'notify.seen';
 
+/// Mantener la app activa (aviso fijo) durante los torneos en juego.
+const _backgroundKey = 'notify.background';
+
+class KeepAliveController extends Notifier<bool> {
+  @override
+  bool build() {
+    SharedPreferences.getInstance().then((p) {
+      final v = p.getBool(_backgroundKey);
+      if (v != null && ref.mounted && v != state) state = v;
+    });
+    return true;
+  }
+
+  Future<void> set(bool on) async {
+    state = on;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_backgroundKey, on);
+    if (!on) await TournamentKeeper.set(false);
+  }
+}
+
+final keepAliveProvider = NotifierProvider<KeepAliveController, bool>(KeepAliveController.new);
+
 /// Revisa si hay algo nuevo que avisar. No lanza nunca.
 bool _checking = false;
 
@@ -114,10 +138,17 @@ Future<void> checkNotifications(Ref ref) async {
   _checking = true;
   try {
     final prefs = await SharedPreferences.getInstance();
-    if (!(prefs.getBool(NotifyEnabledController.key) ?? true)) return;
+    if (!(prefs.getBool(NotifyEnabledController.key) ?? true)) {
+      await TournamentKeeper.set(false);
+      return;
+    }
+    var playing = 0; // mesas mías en torneos en juego
     final session = ref.read(sessionProvider).value;
     final http = ref.read(authApiProvider);
-    if (session == null || http is! HttpAuthApi) return;
+    if (session == null || http is! HttpAuthApi) {
+      await TournamentKeeper.set(false);
+      return;
+    }
     final seen = (prefs.getStringList(_seenKey) ?? const <String>[]).toSet();
     final fresh = <String>[];
 
@@ -134,6 +165,7 @@ Future<void> checkNotifications(Ref ref) async {
     // ── Jugador: mi mesa, el tiempo y el resultado del rival ──
     if (pid != null) {
       final tables = await ref.read(myTablesProvider(pid).future);
+      playing = tables.length;
       for (final t in tables) {
         final base = '${t.tournamentId}:${t.roundLabel}';
         await notify(
@@ -222,6 +254,14 @@ Future<void> checkNotifications(Ref ref) async {
         continue;
       }
     }
+
+    // Servicio "Torneo en curso": mientras juego, llevo o arbitro un torneo
+    // en juego, para que la app siga avisando minimizada.
+    final background = prefs.getBool(_backgroundKey) ?? true;
+    await TournamentKeeper.set(
+      background && (playing > 0 || live.isNotEmpty),
+      text: live.isNotEmpty ? live.map((t) => t.name).join(', ') : 'Siguiendo tu mesa y tus avisos',
+    );
 
     if (fresh.isNotEmpty) {
       final all = [...seen, ...fresh];

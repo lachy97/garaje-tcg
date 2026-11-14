@@ -229,6 +229,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
               ),
+              NeonCard(
+                padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: ref.watch(keepAliveProvider),
+                  onChanged: ref.watch(notifyEnabledProvider)
+                      ? (v) => ref.read(keepAliveProvider.notifier).set(v)
+                      : null,
+                  title: const Text('Avisar con la app minimizada durante el torneo'),
+                  subtitle: Text(
+                    'Mientras juegas, llevas o arbitras un torneo en juego, un aviso fijo '
+                    '"Torneo en curso" mantiene la app activa. Se quita solo al terminar. '
+                    'Gasta algo más de batería.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ),
+              ),
               const SectionLabel('Apariencia'),
               NeonCard(
                 child: Column(

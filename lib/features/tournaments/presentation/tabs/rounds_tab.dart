@@ -17,6 +17,7 @@ import 'match_score_card.dart';
 import 'pairing_editor.dart';
 import 'play_alerts.dart';
 import 'round_timer.dart';
+import 'sync_freshness.dart';
 
 /// Rondas: configuración (rondas Swiss / Top Cut), pairings, reporte de
 /// resultados y botón para avanzar el torneo.
@@ -380,6 +381,8 @@ class _MatchesSliver extends ConsumerWidget {
                 label: const Text('Cambiar cruces'),
               ),
             ),
+          // ¿Llegan los reportes de los jugadores? Última sincronización.
+          if (isCurrent && !readOnly) const SyncFreshness(),
           // Avisos desde los móviles: juez, resultados reportados, drops.
           if (isCurrent && !readOnly)
             PlayAlertsPanel(tournament: tournament, matches: list, names: names),

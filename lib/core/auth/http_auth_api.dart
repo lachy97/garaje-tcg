@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
+
 import 'account.dart';
 import 'auth_api.dart';
 import 'auth_rules.dart';
@@ -15,6 +17,13 @@ class HttpAuthApi implements AuthApi {
   HttpAuthApi(String baseUrl, {HttpClient? client, this.timeout = const Duration(seconds: 20)})
       : _base = Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/'),
         _client = client ?? (HttpClient()..connectionTimeout = timeout);
+
+  /// Número de compilación de esta app (se envía en cada llamada para que el
+  /// servidor pueda exigir una versión mínima). Lo pone main() al arrancar.
+  static int appBuild = 0;
+
+  /// El servidor pidió actualizar la app (versión demasiado vieja).
+  static final updateRequired = ValueNotifier<bool>(false);
 
   final Uri _base;
   final HttpClient _client;
@@ -40,6 +49,7 @@ class HttpAuthApi implements AuthApi {
     try {
       final req = await _client.openUrl(method, _base.resolve(path)).timeout(timeout);
       req.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      req.headers.set('X-App-Build', '$appBuild');
       if (token != null) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       if (body != null) {
         req.headers.contentType = ContentType.json;
@@ -54,6 +64,10 @@ class HttpAuthApi implements AuthApi {
         throw AuthException('Respuesta inesperada del servidor (${res.statusCode}).');
       }
       if (res.statusCode >= 400) {
+        if (data['code'] == 'update_required') {
+          updateRequired.value = true;
+          throw AuthException((data['error'] as String?) ?? 'Actualiza la app.');
+        }
         if (data['code'] == 'unverified' && data['email'] is String) {
           throw UnverifiedAccountException(data['email']! as String);
         }

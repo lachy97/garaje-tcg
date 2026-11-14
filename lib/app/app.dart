@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/account/start_screen.dart';
 import '../features/license/license_gate.dart';
+import '../core/auth/http_auth_api.dart';
 import 'router.dart';
 import 'theme.dart';
 import 'theme_mode.dart';
@@ -63,7 +64,53 @@ class GarajeTcgApp extends ConsumerWidget {
         maxScaleFactor: 1.3,
         // Sin sesión: primero la pantalla de inicio (iniciar sesión, crear
         // cuenta o seguir sin cuenta); después, la licencia.
-        child: StartGate(child: LicenseGate(child: child ?? const SizedBox())),
+        child: _UpdateBanner(
+          child: StartGate(child: LicenseGate(child: child ?? const SizedBox())),
+        ),
+      ),
+    );
+  }
+}
+
+/// Aviso fijo arriba si el servidor exige una versión más nueva de la app.
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: HttpAuthApi.updateRequired,
+      builder: (context, required, _) => Column(
+        children: [
+          if (required)
+            Material(
+              color: AppColors.loss,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.system_update, color: Colors.white),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Hay una versión nueva de Garage TCG. Instálala para seguir '
+                          'sincronizando, reportando e inscribiéndote.',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Expanded(
+            child: required ? MediaQuery.removePadding(context: context, removeTop: true, child: child) : child,
+          ),
+        ],
       ),
     );
   }

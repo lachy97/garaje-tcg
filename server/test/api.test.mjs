@@ -214,3 +214,18 @@ test('prueba de correo del administrador devuelve el error exacto', async () => 
   assert.equal(t.data.ok, false);
   assert.match(t.data.error, /GMAIL_USER/);
 });
+
+test('versión mínima de la app', async () => {
+  const env = { DB: makeD1(), ADMIN_EMAIL: 'lachy@gmail.com', DEV_CODES: '1', MIN_APP_BUILD: '50' };
+  const req = (build) => handle(new Request('https://api.test/v1/me', {
+    headers: build == null ? {} : { 'x-app-build': String(build) },
+  }), env, { iterations: 1000 });
+  let r = await req(49);
+  assert.equal(r.status, 426);
+  assert.equal((await r.json()).code, 'update_required');
+  assert.equal((await req(null)).status, 426, 'versiones sin cabecera = viejas');
+  r = await req(50);
+  assert.equal(r.status, 401, 'pasa la comprobación (falta la sesión)');
+  const h = await handle(new Request('https://api.test/v1/health'), env, { iterations: 1000 });
+  assert.equal(h.status, 200, 'la prueba de conexión no se bloquea');
+});

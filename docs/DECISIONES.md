@@ -341,3 +341,8 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Icono de los avisos**: silueta blanca de la casa del logo (`res/drawable-*/ic_notification.png`, tintada de verde), con `res/raw/keep.xml` para que la compilación de release no la quite.
 - **Jugadores del torneo**: la cabecera, las tarjetas (inscripción desde la app, check-in, jueces, penalizaciones) y el buscador ya no quedan fijos; todo se desplaza junto con la lista de inscritos.
 - Probado desde Cuba con internet (sin VPN): funciona.
+
+## Mejoras de estabilidad del torneo (14/11)
+- **¿Me llegan los reportes?** En la ronda actual, el organizador ve "Sincronizado hace 12 s". En ámbar a partir de 1 min; en rojo a partir de 2 min o si hay error ("los reportes de los jugadores no te llegan"), con **Reintentar**.
+- **Versión mínima de la app**: cada llamada envía `X-App-Build` (número de compilación de GitHub Actions; el prefijo de arquitectura de `--split-per-abi` se quita: 2045 y 1045 = 45). Si en el servidor se pone `MIN_APP_BUILD`, las versiones anteriores (o sin cabecera) reciben 426 `update_required` y la app muestra arriba, en rojo, "Hay una versión nueva…". La sesión no se cierra por eso. `/v1/health` no se bloquea.
+- **Avisos con la app minimizada**: mientras el teléfono juega, lleva o arbitra un torneo en juego, un servicio en primer plano (`flutter_foreground_task`, tipo `dataSync`) con el aviso fijo "Torneo en curso" evita que Android congele la app; se quita solo cuando ya no hay torneos en juego. Ajustes → Avisos → "Avisar con la app minimizada durante el torneo" (activado por defecto). Si se cierra la app desde Recientes, se detiene como antes.

@@ -120,7 +120,9 @@ class SessionController extends AsyncNotifier<Session?> {
     } on AuthNetworkException {
       // Sin conexión: se sigue con los datos guardados.
     } on AuthException {
-      await _store(null); // sesión anulada o vencida en el servidor
+      // Sesión anulada o vencida en el servidor (si el servidor pide
+      // actualizar la app, la sesión se mantiene).
+      if (!HttpAuthApi.updateRequired.value) await _store(null);
     } catch (_) {
       // Sin conexión: se sigue con los datos guardados.
     }

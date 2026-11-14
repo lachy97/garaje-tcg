@@ -5,7 +5,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.7.0';
+export const VERSION = '1.8.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -42,6 +42,20 @@ export async function handle(request, env, opts) {
     if ((path === '/v1/health' || path === '/') && m === 'GET') {
       const db = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts').first();
       return json({ ok: true, service: 'garage-tcg', version: VERSION, time: new Date().toISOString(), db: db ? 'ok' : 'error' });
+    }
+
+    // Versión mínima de la app (secreto o variable MIN_APP_BUILD = número de
+    // compilación de GitHub Actions). Las versiones viejas reciben un aviso
+    // para actualizar en vez de fallar a medias.
+    const minBuild = Number(env.MIN_APP_BUILD ?? 0);
+    if (minBuild > 0) {
+      const build = Number(request.headers.get('x-app-build') ?? 0) || 0;
+      if (build < minBuild) {
+        return json({
+          error: 'Hay una versión nueva de Garage TCG: instálala para seguir usando la app en línea.',
+          code: 'update_required',
+        }, 426);
+      }
     }
 
     const body = await readBody(request);

@@ -42,6 +42,8 @@ dependencies:
   wakelock_plus: ^1.2.8
   # Avisos en el teléfono (sin Google: los genera la propia app al sincronizar)
   flutter_local_notifications: ^19.0.0
+  # Aviso fijo "Torneo en curso": mantiene la app activa minimizada
+  flutter_foreground_task: ^9.2.0
 
 dev_dependencies:
   flutter_test:

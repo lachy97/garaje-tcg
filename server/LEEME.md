@@ -210,6 +210,20 @@ npm run db:jueces
 npm run deploy
 ```
 
+## 15 · Versión mínima de la app
+
+Cuando todos hayan instalado una versión nueva y quieras que las viejas
+dejen de usar el servidor (p. ej. porque cambió algo importante), pon el
+número de compilación de GitHub Actions (el `#` de la ejecución que generó la
+APK) como mínimo:
+
+```powershell
+npx wrangler secret put MIN_APP_BUILD
+```
+
+Las versiones anteriores verán "Hay una versión nueva de Garage TCG". Para
+quitarlo: `npx wrangler secret delete MIN_APP_BUILD`.
+
 ## Útil
 
 | Para | Comando |
