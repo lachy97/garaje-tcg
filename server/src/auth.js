@@ -52,6 +52,50 @@ export class AuthService {
     this.iterations = opts.iterations;
     this.opts = opts;
     this.devCodes = env.DEV_CODES === '1';
+    /** IP de quien llama (la pone index.js con CF-Connecting-IP). */
+    this.ip = '';
+  }
+
+  // ───────────────────── Límites por IP ─────────────────────
+
+  /**
+   * Como mucho [max] veces cada [minutes] minutos para [key] (p. ej.
+   * "login:1.2.3.4"). Si no está la tabla (falta la migración 0008), no
+   * limita: mejor eso que dejar a todos fuera.
+   */
+  async limit(key, max, minutes, message) {
+    if (!this.ip && key.endsWith(':')) return;
+    try {
+      const now = this.now();
+      await this.db.prepare('DELETE FROM rate_log WHERE key = ? AND at < ?').bind(key, now - minutes * MIN).run();
+      const n = await this.db.prepare('SELECT COUNT(*) AS n FROM rate_log WHERE key = ?').bind(key).first();
+      if ((n?.n ?? 0) >= max) throw new ApiError(429, message);
+      await this.db.prepare('INSERT INTO rate_log (key, at) VALUES (?, ?)').bind(key, now).run();
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
+      if (!String(e?.message ?? e).includes('no such table')) throw e;
+    }
+  }
+
+  /** Solo comprueba (sin contar este intento). */
+  async limited(key, max, minutes) {
+    try {
+      const n = await this.db
+        .prepare('SELECT COUNT(*) AS n FROM rate_log WHERE key = ? AND at >= ?')
+        .bind(key, this.now() - minutes * MIN)
+        .first();
+      return (n?.n ?? 0) >= max;
+    } catch {
+      return false;
+    }
+  }
+
+  /** l***y@gmail.com: para decir a dónde fue el código sin revelar el correo. */
+  static maskEmail(email) {
+    const [user, domain] = String(email).split('@');
+    if (!domain) return '***';
+    const shown = user.length <= 2 ? user[0] : `${user[0]}***${user[user.length - 1]}`;
+    return `${shown}@${domain}`;
   }
 
   // ───────────────────── Datos ─────────────────────
@@ -212,6 +256,8 @@ export class AuthService {
   // ───────────────────── Cuenta ─────────────────────
 
   async register({ username, email, password, nickname, phone }) {
+    // Contra el registro masivo (gastaría el cupo de correos).
+    await this.limit(`register:${this.ip}`, 5, 60, 'Demasiadas cuentas nuevas desde esta conexión. Espera una hora.');
     for (const e of [
       R.validateUsername(username),
       R.validateEmail(email),
@@ -271,12 +317,14 @@ export class AuthService {
   }
 
   async resendVerification({ email }) {
+    await this.limit(`code:${this.ip}`, 10, 60, 'Demasiados códigos pedidos desde esta conexión. Espera un rato.');
     const a = await this.require(email);
     if (a.verified) throw bad('Esa cuenta ya está confirmada.');
     return { ok: true, ...(await this.issueCode(a.email, 'verify')) };
   }
 
   async verifyEmail({ email, code }) {
+    await this.limit(`verify:${this.ip}`, 30, 60, 'Demasiados intentos desde esta conexión. Espera un rato.');
     const a = await this.require(email);
     if (a.verified) throw bad('Esa cuenta ya está confirmada. Inicia sesión.');
     await this.checkCode(a.email, 'verify', code);
@@ -292,17 +340,33 @@ export class AuthService {
     const now = this.now();
     const since = now - R.LOGIN_FAIL_MINUTES * MIN;
     await this.db.prepare('DELETE FROM login_fail WHERE at < ?').bind(since).run();
+    // Los fallos se cuentan por usuario Y conexión: quien prueba contraseñas
+    // se bloquea a sí mismo, no al dueño de la cuenta (antes, 10 fallos de
+    // cualquiera dejaban fuera al organizador). Además, un tope por conexión
+    // para cualquier usuario y uno general alto por usuario.
+    const key = this.ip ? `${id}|${this.ip}` : id;
     const fails = await this.db
       .prepare('SELECT COUNT(*) AS n FROM login_fail WHERE identifier = ?')
-      .bind(id)
+      .bind(key)
       .first();
     if ((fails?.n ?? 0) >= R.MAX_LOGIN_FAILS) {
       throw new ApiError(429, 'Demasiados intentos. Espera 15 minutos o cambia la contraseña.');
     }
+    if (this.ip && (await this.limited(`loginfail:${this.ip}`, 30, R.LOGIN_FAIL_MINUTES))) {
+      throw new ApiError(429, 'Demasiados intentos desde esta conexión. Espera 15 minutos.');
+    }
+    const total = await this.db
+      .prepare("SELECT COUNT(*) AS n FROM login_fail WHERE identifier = ? OR identifier LIKE ? ESCAPE '\\'")
+      .bind(id, `${id.replace(/[\\%_]/g, (c) => `\\${c}`)}|%`)
+      .first();
+    if ((total?.n ?? 0) >= 100) {
+      throw new ApiError(429, 'Esta cuenta recibió demasiados intentos. Espera 15 minutos o cambia la contraseña.');
+    }
     const a = await this.findBy(id);
     const ok = a && safeEqual(await this.hash(String(password ?? ''), a.salt), a.hash);
     if (!ok) {
-      await this.db.prepare('INSERT INTO login_fail (identifier, at) VALUES (?, ?)').bind(id, now).run();
+      await this.db.prepare('INSERT INTO login_fail (identifier, at) VALUES (?, ?)').bind(key, now).run();
+      if (this.ip) await this.limit(`loginfail:${this.ip}`, 1000, R.LOGIN_FAIL_MINUTES, '');
       throw new ApiError(401, 'Usuario, Gmail o contraseña incorrectos.');
     }
     if (!a.verified) {
@@ -311,16 +375,22 @@ export class AuthService {
         email: a.email,
       });
     }
-    await this.db.prepare('DELETE FROM login_fail WHERE identifier = ?').bind(id).run();
+    await this.db.prepare('DELETE FROM login_fail WHERE identifier = ?').bind(key).run();
+    // Limpieza: sesiones vencidas de todos (ocupan sitio y no sirven).
+    await this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now).run();
     return { session: await this.newSession(a) };
   }
 
   async requestPasswordReset({ identifier }) {
+    await this.limit(`code:${this.ip}`, 10, 60, 'Demasiados códigos pedidos desde esta conexión. Espera un rato.');
     const a = await this.require(identifier);
-    return { ok: true, email: a.email, ...(await this.issueCode(a.email, 'reset')) };
+    // Con el usuario no se revela el Gmail completo (solo a dónde se envió).
+    const shown = this.devCodes ? a.email : AuthService.maskEmail(a.email);
+    return { ok: true, email: shown, ...(await this.issueCode(a.email, 'reset')) };
   }
 
   async resetPassword({ identifier, code, newPassword }) {
+    await this.limit(`verify:${this.ip}`, 30, 60, 'Demasiados intentos desde esta conexión. Espera un rato.');
     const e = R.validatePassword(newPassword);
     if (e) throw bad(e);
     const a = await this.require(identifier);
@@ -333,6 +403,13 @@ export class AuthService {
       // Por seguridad se cierran todas las sesiones.
       this.db.prepare('DELETE FROM sessions WHERE account_id = ?').bind(a.id),
     ]);
+    return { ok: true };
+  }
+
+  /** Cierra la sesión en todos los teléfonos de la cuenta (también este). */
+  async logoutAll(token) {
+    const me = await this.authenticate(token);
+    await this.db.prepare('DELETE FROM sessions WHERE account_id = ?').bind(me.id).run();
     return { ok: true };
   }
 

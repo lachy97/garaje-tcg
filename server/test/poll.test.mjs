@@ -64,12 +64,18 @@ test('/v1/poll: varias consultas y el latido en una sola petición', async () =>
   assert.equal((await call('POST', '/v1/poll', { gets: ['v1/me/judging'] })).status, 401);
 });
 
-test('CORS: la versión web puede llamar desde otro dominio', async () => {
+test('CORS: solo la versión web (y localhost) puede llamar desde el navegador', async () => {
   const env = { DB: makeD1(), DEV_CODES: '1' };
-  const pre = await handle(new Request('https://api.test/v1/poll', { method: 'OPTIONS' }), env, {});
+  const req = (origin, method = 'GET', path = '/v1/health') =>
+    handle(new Request(`https://api.test${path}`, { method, headers: origin ? { origin } : {} }), env, {});
+  const pre = await req('https://garage-tcg.pages.dev', 'OPTIONS', '/v1/poll');
   assert.equal(pre.status, 204);
-  assert.equal(pre.headers.get('access-control-allow-origin'), '*');
+  assert.equal(pre.headers.get('access-control-allow-origin'), 'https://garage-tcg.pages.dev');
   assert.match(pre.headers.get('access-control-allow-headers'), /authorization/);
-  const h = await handle(new Request('https://api.test/v1/health'), env, {});
-  assert.equal(h.headers.get('access-control-allow-origin'), '*');
+  assert.equal((await req('https://abc123.garage-tcg.pages.dev')).headers.get('access-control-allow-origin'), 'https://abc123.garage-tcg.pages.dev');
+  assert.equal((await req('https://evil.example')).headers.get('access-control-allow-origin'), null);
+  assert.equal((await req('https://garage-tcg.pages.dev.evil.example')).headers.get('access-control-allow-origin'), null);
+  const app = await req(null); // la app de Android no manda Origin
+  assert.equal(app.status, 200);
+  assert.equal(app.headers.get('x-content-type-options'), 'nosniff');
 });

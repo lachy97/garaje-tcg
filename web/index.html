@@ -29,11 +29,7 @@
 <body>
   <!-- Mientras carga (la primera vez tarda unos segundos) -->
   <div id="carga"><img src="icons/Icon-192.png" alt="Garage TCG"><div>Cargando Garage TCG…</div></div>
-  <script>
-    window.addEventListener('flutter-first-frame', function () {
-      var c = document.getElementById('carga'); if (c) c.remove();
-    });
-  </script>
+  <script src="carga.js"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

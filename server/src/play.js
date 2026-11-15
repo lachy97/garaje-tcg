@@ -302,7 +302,11 @@ export class PlayService {
     if (!t) throw new ApiError(404, 'Ese torneo no existe.');
     if (t.status !== 'draft' || Number(t.check_in ?? 0) !== 1) throw bad('El check-in de este torneo no está abierto.');
     const norm = (v) => String(v ?? '').trim().toUpperCase();
-    if (!norm(t.checkin_code) || norm(body?.code) !== norm(t.checkin_code)) throw bad('Código incorrecto.');
+    if (!norm(t.checkin_code) || norm(body?.code) !== norm(t.checkin_code)) {
+      // Contra probar códigos al azar: 10 fallos por cuenta cada 15 min.
+      await this.auth.limit(`checkin:${me.id}`, 10, 15, 'Demasiados códigos incorrectos. Espera 15 minutos o pídelo al organizador.');
+      throw bad('Código incorrecto.');
+    }
     const e = await this.db
       .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
       .bind(me.community_id, t.id, me.player_id)

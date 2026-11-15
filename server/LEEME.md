@@ -432,3 +432,15 @@ Limitaciones de la web:
 - No hay copias de seguridad, fotos propias de mazos ni descarga de cartas
   (las cartas se ven desde internet).
 - Llevar torneos, solo desde Android.
+
+## 21 · Seguridad (versión 1.13.0)
+
+Una vez, en el PC (con VPN):
+
+```powershell
+npm.cmd run db:seguridad
+npm.cmd run deploy
+```
+
+`/v1/health` debe decir `1.13.0`. Si se despliega sin la migración, el
+servidor funciona igual, pero sin los límites por conexión.

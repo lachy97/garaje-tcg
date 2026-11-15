@@ -159,6 +159,24 @@ class _LoggedIn extends ConsumerWidget {
           icon: Icon(Icons.logout, color: AppColors.loss),
           label: Text('Cerrar sesión', style: TextStyle(color: AppColors.loss)),
         ),
+        // Si perdiste un teléfono o alguien vio tu contraseña.
+        TextButton(
+          onPressed: () async {
+            final ok = await confirmDialog(
+              context,
+              title: 'Cerrar sesión en todos los teléfonos',
+              message: 'Se cierra tu cuenta en todos los teléfonos y navegadores donde '
+                  'esté abierta, también en este. Úsalo si perdiste un teléfono o crees que '
+                  'alguien sabe tu contraseña (y cámbiala después).',
+              confirm: 'Cerrar en todos',
+              danger: true,
+            );
+            if (!ok || !context.mounted) return;
+            await runGuarded(context, () => ref.read(sessionProvider.notifier).logoutAll());
+          },
+          child: Text('Cerrar sesión en todos los teléfonos',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ),
       ],
     );
   }

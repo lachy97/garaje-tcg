@@ -6,21 +6,38 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.12.0';
+export const VERSION = '1.13.0';
 
 /** La versión web (iPhone) llama desde otro dominio: se permite (las
  *  sesiones van en la cabecera Authorization, no en cookies). */
-const CORS = {
-  'access-control-allow-origin': '*',
+const CORS_BASE = {
   'access-control-allow-methods': 'GET, POST, OPTIONS',
   'access-control-allow-headers': 'authorization, content-type, x-app-build, x-device-id, x-device-name',
   'access-control-max-age': '86400',
+  vary: 'Origin',
 };
 
+/** Webs que pueden llamar al servidor: la versión web (y sus vistas
+ *  previas *.garage-tcg.pages.dev) y, para probar, localhost. La app de
+ *  Android no manda Origin y no le afecta. */
+export function allowedOrigin(origin) {
+  if (!origin) return null;
+  return /^https:\/\/([a-z0-9-]+\.)?garage-tcg\.pages\.dev$/.test(origin) ||
+    /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+    ? origin
+    : null;
+}
+
+/** Cabeceras de seguridad de todas las respuestas. */
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS },
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'no-referrer',
+    },
   });
 
 async function readBody(request) {
@@ -38,12 +55,26 @@ const bearer = (request) => {
   return h.startsWith('Bearer ') ? h.slice(7).trim() : null;
 };
 
-/** Atiende una petición. [opts] solo para tests (reloj, códigos, correo). */
+/** Atiende una petición y le pone las cabeceras CORS (por petición: un
+ *  Worker atiende varias a la vez). [opts] solo para tests. */
 export async function handle(request, env, opts) {
+  const res = await route(request, env, opts);
+  const origin = allowedOrigin(request.headers.get('origin'));
+  res.headers.set('vary', 'Origin');
+  if (origin) {
+    for (const [k, v] of Object.entries(CORS_BASE)) res.headers.set(k, v);
+    res.headers.set('access-control-allow-origin', origin);
+  }
+  return res;
+}
+
+async function route(request, env, opts) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const m = request.method;
+  const ip = request.headers.get('cf-connecting-ip') ?? '';
   const auth = new AuthService(env, opts);
+  auth.ip = ip;
   const sync = new SyncService(env, auth);
   const regs = new RegistrationService(env, auth);
   const play = new PlayService(env, auth);
@@ -51,7 +82,7 @@ export async function handle(request, env, opts) {
   const device = (request.headers.get('x-device-id') ?? '').slice(0, 64);
   const deviceName = request.headers.get('x-device-name');
   // Consulta previa del navegador (CORS).
-  if (m === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (m === 'OPTIONS') return new Response(null, { status: 204 });
   try {
     // Fase 0: prueba de conexión desde Cuba.
     if ((path === '/v1/health' || path === '/') && m === 'GET') {
@@ -85,6 +116,7 @@ export async function handle(request, env, opts) {
         case '/v1/auth/password/request': return json(await auth.requestPasswordReset(body));
         case '/v1/auth/password/reset': return json(await auth.resetPassword(body));
         case '/v1/auth/logout': return json(await auth.logout(token));
+        case '/v1/auth/logout-all': return json(await auth.logoutAll(token));
         case '/v1/poll': return json(await poll(request, env, opts, url, body, token, device, deviceName));
         case '/v1/sync/push': return json(await sync.push(token, body, device, deviceName));
         case '/v1/control/beat': return json(await control.beat(token, body, device, deviceName));
@@ -170,6 +202,7 @@ const MAX_POLL_GETS = 30;
 async function poll(request, env, opts, url, body, token, device, deviceName) {
   const authCache = new Map();
   const auth = new AuthService(env, { ...opts, authCache });
+  auth.ip = request.headers.get('cf-connecting-ip') ?? '';
   await auth.authenticate(token); // sesión vencida: 401 para todo
   const gets = (Array.isArray(body?.gets) ? body.gets : [])
     .filter((g) => typeof g === 'string' && g.startsWith('v1/') && g.length < 300)

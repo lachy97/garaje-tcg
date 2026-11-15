@@ -105,6 +105,17 @@ class SessionController extends AsyncNotifier<Session?> {
     await _store(null);
   }
 
+  /// Cierra la sesión en todos los teléfonos de la cuenta (necesita
+  /// conexión) y en este.
+  Future<void> logoutAll() async {
+    final s = state.value;
+    final api = _api;
+    if (s != null && api is HttpAuthApi) {
+      await api.request('POST', 'v1/auth/logout-all', body: const {}, token: s.token);
+    }
+    await logout();
+  }
+
   /// Trae del servidor el rol y la ficha vinculada y renueva la sesión por
   /// 30 días más (si hay conexión). Se llama al abrir la app y al volver a ella.
   Future<void> refreshAccount({bool onlyIfStale = false}) async {

@@ -404,3 +404,30 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Servidor**: CORS (`Access-Control-Allow-Origin: *` y respuesta a `OPTIONS`). Es seguro porque la sesión va en `Authorization`, no en cookies.
 - **Probado** con un servidor local: la web entra sin cuenta, inicia sesión, baja los datos y muestra "Mi mesa ahora" con cuenta atrás, reportar y llamar al juez.
 - **Despliegue**: workflow `build-web.yml`. Si están los secretos de Cloudflare publica solo; si no, deja la web como artefacto para publicarla a mano (LEEME §20).
+
+## Seguridad (15/11) — servidor 1.13.0, migración 0008
+- **Bloqueo de inicio de sesión sin daño al dueño**:
+  - Los fallos se cuentan por **usuario y conexión** (IP de Cloudflare `CF-Connecting-IP`): quien prueba contraseñas se bloquea a sí mismo (10 fallos en 15 min) y el organizador sigue entrando desde su teléfono.
+  - Además: tope de 30 fallos por conexión para cualquier usuario y de 100 por usuario sumando todas las conexiones.
+- **Límites por conexión** (tabla `rate_log`):
+  - 5 cuentas nuevas por hora.
+  - 10 códigos por correo por hora.
+  - 30 intentos de verificar o restablecer por hora.
+  - Check-in: 10 códigos incorrectos por cuenta cada 15 min.
+  - Sin la migración no limita (no deja a nadie fuera).
+- **"Olvidé mi contraseña" con el usuario** ya no devuelve el Gmail completo, solo `l***i@gmail.com`. Antes, con saber un usuario se averiguaba su correo.
+- **Cerrar sesión en todos los teléfonos** (Ajustes → Cuenta), por si se pierde un teléfono. Ruta `POST /v1/auth/logout-all`.
+- **Sesiones vencidas** se borran al iniciar sesión.
+- **CORS solo para la web propia** (`garage-tcg.pages.dev`, sus vistas previas y localhost para pruebas), en lugar de `*`. La app de Android no manda `Origin` y no le afecta. Las cabeceras se ponen por petición (un Worker atiende varias a la vez).
+- **Cabeceras de seguridad**:
+  - API: `nosniff`, `no-referrer`.
+  - Web (`web/_headers` de Cloudflare Pages):
+    - CSP estricta: solo scripts propios + `wasm-unsafe-eval` para el motor; conexiones solo al servidor, a las cartas y a fuentes.
+    - Sin iframes (`frame-ancestors 'none'`, `X-Frame-Options: DENY`).
+    - HSTS, `Permissions-Policy` y COOP.
+    - El script de carga pasó a `web/carga.js` porque la CSP no admite scripts en línea.
+  - Probado: la web carga, inicia sesión y sincroniza con la CSP activa.
+- **Pendiente (no urgente)**:
+  - Registro de acciones del administrador.
+  - Guardar la sesión cifrada en el teléfono (hoy va en el almacenamiento privado de la app, sin copia de seguridad de Android).
+  - Segundo factor para la cuenta admin.
