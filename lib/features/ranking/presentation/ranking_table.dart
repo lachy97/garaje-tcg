@@ -30,7 +30,10 @@ Color? rankingColor(int rank) => AppColors.isDark
 
 /// Tabla del ranking trimestral. La usan la pantalla y las imágenes exportadas.
 class RankingTable extends StatelessWidget {
-  const RankingTable({super.key, required this.rows, this.fixedWidth, this.forExport = false});
+  const RankingTable({super.key, required this.rows, this.fixedWidth, this.forExport = false, this.meId});
+
+  /// Jugador de este teléfono: su fila se marca en otro color.
+  final String? meId;
 
   final List<RankingRow> rows;
 
@@ -81,7 +84,7 @@ class RankingTable extends StatelessWidget {
       rows: [
         for (final r in rows)
           NeonTableRow(
-            accent: rankingColor(r.rank),
+            accent: !forExport && r.playerId == meId ? AppColors.draw : rankingColor(r.rank),
             // Ficha pública del jugador (no en la imagen exportada).
             onTap: forExport ? null : () => context.push('/jugadores/${r.playerId}'),
             cells: [
@@ -95,7 +98,7 @@ class RankingTable extends StatelessWidget {
                       : null,
                 ),
               ),
-              Text(r.nickname,
+              Text(!forExport && r.playerId == meId ? '${r.nickname} (tú)' : r.nickname,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: r.rank <= 4 ? FontWeight.w800 : FontWeight.w700,

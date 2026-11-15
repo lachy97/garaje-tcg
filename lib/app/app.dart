@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/account/start_screen.dart';
-import '../features/license/license_gate.dart';
 import '../core/auth/http_auth_api.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -65,7 +64,7 @@ class GarajeTcgApp extends ConsumerWidget {
         // Sin sesión: primero la pantalla de inicio (iniciar sesión, crear
         // cuenta o seguir sin cuenta); después, la licencia.
         child: _UpdateBanner(
-          child: StartGate(child: LicenseGate(child: child ?? const SizedBox())),
+          child: StartGate(child: child ?? const SizedBox()),
         ),
       ),
     );

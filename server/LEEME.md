@@ -373,3 +373,13 @@ npm run deploy
 Despliega **antes** de instalar la APK nueva. Para vigilar el consumo:
 panel de Cloudflare → Workers & Pages → `garage-tcg-api` → Metrics
 (peticiones del día; el límite gratis es 100.000).
+
+## 19 · Visitantes, hora de inicio y juez que no juega (versión 1.11.0)
+
+Sin migraciones. En el PC (con VPN):
+
+```powershell
+npm run deploy
+```
+
+`/v1/health` debe decir `1.11.0`. Despliega antes de instalar la APK nueva.

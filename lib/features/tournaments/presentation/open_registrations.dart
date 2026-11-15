@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
@@ -11,6 +10,7 @@ import '../../../core/registrations/registrations.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../decks/presentation/deck_picker.dart';
 import 'providers.dart';
+import 'start_time.dart';
 
 /// Último mazo con el que jugó la ficha vinculada (para proponerlo).
 final _myLastDeckProvider = FutureProvider.autoDispose.family<String?, String>((ref, playerId) async {
@@ -136,7 +136,9 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
         pid == null ? const <String>{} : ref.watch(playerTournamentIdsProvider(pid)).value ?? const <String>{};
     final enrolled = enrolledIds.contains(t.id);
     final status = r?.status;
-    final date = t.date == null ? '' : '${DateFormat.yMMMd('es').format(t.date!)} · ';
+    final date = t.date == null ? '' : '${formatStart(t.date!)} · ';
+    // Pasada la hora de inicio: ni pedir plaza ni darse de baja.
+    final started = t.date != null && hasStartTime(t.date!) && !DateTime.now().isBefore(t.date!);
     final info = '$date${t.swissRounds ?? '?'} rondas · '
         '${t.topCutSize == 0 ? 'sin Top' : 'Top ${t.topCutSize}'} · '
         '${t.capacity == null ? '${t.enrolled} inscrito(s)' : '${t.enrolled}/${t.capacity} plazas'}';
@@ -164,9 +166,11 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
       _ => (null, AppColors.textSecondary),
     };
 
-    final canRequest = !enrolled &&
+    final canRequest = !started &&
+        !enrolled &&
         (status == null || status == RegistrationStatus.rejected || status == RegistrationStatus.cancelled);
-    final canCancel = r != null &&
+    final canCancel = !started &&
+        r != null &&
         (status == RegistrationStatus.pending ||
             status == RegistrationStatus.waitlist ||
             status == RegistrationStatus.accepted ||
@@ -195,6 +199,11 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
           if (line != null) ...[
             const SizedBox(height: 8),
             Text(line, style: TextStyle(fontWeight: FontWeight.w700, color: color)),
+          ],
+          if (started) ...[
+            const SizedBox(height: 4),
+            Text('El torneo ya empezó: la inscripción y las bajas desde la app están cerradas.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
           if (enrolled && r == null) ...[
             const SizedBox(height: 4),

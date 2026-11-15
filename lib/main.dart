@@ -3,6 +3,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app/restartable_app.dart';
+import 'core/auth/auth_providers.dart';
 import 'core/auth/http_auth_api.dart';
 import 'core/sync/control.dart';
 import 'core/backup/pending_import.dart';
@@ -24,9 +25,10 @@ Future<void> main() async {
   } catch (_) {
     // Si falla se sigue con los datos que había.
   }
-  // Bloqueo de capturas (activo salvo que el administrador lo quite).
+  // Capturas permitidas: se quita el bloqueo (también para el próximo
+  // arranque, que lo leía MainActivity).
   try {
-    await ScreenProtection.apply(await ScreenProtection.isEnabled());
+    await ScreenProtection.setEnabled(false);
   } catch (_) {
     // MainActivity ya la activó al arrancar.
   }
@@ -39,6 +41,10 @@ Future<void> main() async {
   // Identificador de este teléfono (para pasar un torneo a otro teléfono).
   try {
     await DeviceIdentity.init();
+  } catch (_) {}
+  // Entró sin cuenta la última vez: directo a la app (solo consulta).
+  try {
+    await VisitorMode.init();
   } catch (_) {}
   runApp(const RestartableApp());
 }

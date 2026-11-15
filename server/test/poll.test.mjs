@@ -41,6 +41,25 @@ test('/v1/poll: varias consultas y el latido en una sola petición', async () =>
   assert.equal(r.data.results['v1/nada'].status, 404);
   assert.equal(r.data.beat.controls[0].mine, true);
 
+  // Visitante (sin cuenta): solo lo público.
+  await call('POST', '/v1/sync/push', { rows: [
+    { t: 'tournaments', id: 't2', changedAt: 2, data: { id: 't2', name: 'Terminado', status: 'finished' } },
+    { t: 'players', id: 'p1', changedAt: 2, data: { id: 'p1', nickname: 'Ana', phone: '555', full_name: 'Ana P' } },
+  ] }, org.token, 'A');
+  const pub = await call('GET', '/v1/public/pull?since=0');
+  assert.equal(pub.status, 200);
+  const ids = pub.data.rows.map((x) => x.id);
+  assert.ok(ids.includes('t2'));
+  assert.ok(!ids.includes('t1')); // en juego y no es suyo: no
+  const ana = pub.data.rows.find((x) => x.id === 'p1');
+  assert.equal(ana.data.phone, null);
+  assert.equal(ana.data.full_name, null);
+
+  // Ficha creada por el administrador: el organizador la puede corregir.
+  await call('POST', '/v1/sync/push', { rows: [{ t: 'players', id: 'p9', changedAt: 3, data: { id: 'p9', nickname: 'X' } }] }, admin.token, 'ADM');
+  const fix = await call('POST', '/v1/sync/push', { rows: [{ t: 'players', id: 'p9', changedAt: 4, data: { id: 'p9', nickname: 'Xavi' } }] }, org.token, 'A');
+  assert.equal(fix.data.accepted, 1);
+
   // Sin sesión: 401 para todo.
   assert.equal((await call('POST', '/v1/poll', { gets: ['v1/me/judging'] })).status, 401);
 });

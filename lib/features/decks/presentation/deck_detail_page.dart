@@ -81,7 +81,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
         final names = {for (final x in all) x.deckId: x.name};
         final title = d?.name ?? names[deckId] ?? 'Mazo';
         return DefaultTabController(
-          length: 4,
+          length: 5,
           child: Scaffold(
             appBar: AppBar(
               title: NameTitle(title),
@@ -96,7 +96,8 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
                   Tab(text: 'Resumen'),
                   Tab(text: 'Pilotos'),
                   Tab(text: 'Rivales'),
-                  Tab(text: 'Historial'),
+                  Tab(text: 'Torneos'),
+                  Tab(text: 'Partidas'),
                 ],
               ),
             ),
@@ -181,20 +182,12 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
                           _OpponentsTable(opponents: p.opponents),
                       ],
                     ),
-                    // 4) Historial
-                    ListView(
-                      padding: const EdgeInsets.only(bottom: 40),
-                      children: [
-                        picker,
-                        const SectionLabel('Torneos'),
-                        _Entries(seasonId: _scope, deckId: deckId),
-                        SectionLabel('Partidas (${p.games.length})'),
-                        if (p.games.isEmpty)
-                          const _Empty('Sin partidas.')
-                        else
-                          _GamesList(games: p.games),
-                      ],
-                    ),
+                    // 4) Torneos (con filtro de jugador y de Top)
+                    _Entries(seasonId: _scope, deckId: deckId, header: picker),
+                    // 5) Partidas (con filtro de jugador, rival y resultado)
+                    p.games.isEmpty
+                        ? ListView(children: [picker, const _Empty('Sin partidas.')])
+                        : _GamesList(games: p.games, header: picker),
                   ],
                 );
               },
@@ -463,9 +456,10 @@ class _OpponentsTableState extends State<_OpponentsTable> {
 /// Partidas del mazo, de la más reciente a la más antigua (las 30 últimas,
 /// con "Ver todas").
 class _GamesList extends StatefulWidget {
-  const _GamesList({required this.games});
+  const _GamesList({required this.games, required this.header});
 
   final List<DeckGameRow> games;
+  final Widget header;
 
   @override
   State<_GamesList> createState() => _GamesListState();
@@ -474,13 +468,63 @@ class _GamesList extends StatefulWidget {
 class _GamesListState extends State<_GamesList> {
   static const _initial = 30;
   bool _all = false;
+  String? _player;
+  String? _rival;
+
+  /// 'W' victorias, 'L' derrotas, null todas.
+  String? _result;
 
   @override
   Widget build(BuildContext context) {
     final day = DateFormat('dd/MM', 'es');
-    final list = _all ? widget.games : widget.games.take(_initial).toList();
-    return Column(
+    final players = {for (final g in widget.games) g.playerId: g.playerName};
+    final rivals = {for (final g in widget.games) g.opponentId: g.opponentName};
+    final filtered = [
+      for (final g in widget.games)
+        if ((_player == null || g.playerId == _player) &&
+            (_rival == null || g.opponentId == _rival) &&
+            (_result == null || g.outcome == _result))
+          g,
+    ];
+    final list = _all ? filtered : filtered.take(_initial).toList();
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 40),
       children: [
+        widget.header,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilterDropdown(
+                label: 'Jugador',
+                value: _player,
+                options: players,
+                onChanged: (v) => setState(() => _player = v),
+              ),
+              FilterDropdown(
+                label: 'Rival',
+                value: _rival,
+                options: rivals,
+                onChanged: (v) => setState(() => _rival = v),
+              ),
+              SegmentedButton<String?>(
+                segments: const [
+                  ButtonSegment(value: null, label: Text('Todas')),
+                  ButtonSegment(value: 'W', label: Text('Victorias')),
+                  ButtonSegment(value: 'L', label: Text('Derrotas')),
+                ],
+                selected: {_result},
+                showSelectedIcon: false,
+                onSelectionChanged: (v) => setState(() => _result = v.first),
+              ),
+            ],
+          ),
+        ),
+        SectionLabel('Partidas (${filtered.length})'),
+        if (filtered.isEmpty) const _Empty('Ninguna partida con esos filtros.'),
         for (final g in list)
           ListTile(
             dense: true,
@@ -505,10 +549,10 @@ class _GamesListState extends State<_GamesList> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-        if (widget.games.length > _initial)
+        if (filtered.length > _initial)
           TextButton(
             onPressed: () => setState(() => _all = !_all),
-            child: Text(_all ? 'Ver menos' : 'Ver todas (${widget.games.length})'),
+            child: Text(_all ? 'Ver menos' : 'Ver todas (${filtered.length})'),
           ),
       ],
     );
@@ -584,27 +628,62 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _Entries extends ConsumerWidget {
-  const _Entries({required this.seasonId, required this.deckId});
+class _Entries extends ConsumerStatefulWidget {
+  const _Entries({required this.seasonId, required this.deckId, required this.header});
 
   final String seasonId;
   final String deckId;
+  final Widget header;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Entries> createState() => _EntriesState();
+}
+
+class _EntriesState extends ConsumerState<_Entries> {
+  String? _player;
+  bool _onlyTop = false;
+
+  @override
+  Widget build(BuildContext context) {
     final day = DateFormat('dd/MM/yyyy');
     return AsyncView(
-      value: ref.watch(_deckEntriesProvider((seasonId, deckId))),
-      builder: (list) {
-        if (list.isEmpty) {
-          return Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Sin torneos terminados con este mazo.',
-                style: TextStyle(color: AppColors.textSecondary)),
-          );
-        }
-        return Column(
+      value: ref.watch(_deckEntriesProvider((widget.seasonId, widget.deckId))),
+      builder: (all) {
+        final players = {for (final e in all) e.playerId: e.playerName};
+        final list = [
+          for (final e in all)
+            if ((_player == null || e.playerId == _player) && (!_onlyTop || e.madeTop)) e,
+        ];
+        return ListView(
+          padding: const EdgeInsets.only(bottom: 40),
           children: [
+            widget.header,
+            if (all.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    FilterDropdown(
+                      label: 'Jugador',
+                      value: _player,
+                      options: players,
+                      onChanged: (v) => setState(() => _player = v),
+                    ),
+                    FilterChip(
+                      label: const Text('Solo Top'),
+                      selected: _onlyTop,
+                      onSelected: (v) => setState(() => _onlyTop = v),
+                    ),
+                  ],
+                ),
+              ),
+            SectionLabel('Torneos (${list.length})'),
+            if (all.isEmpty)
+              const _Empty('Sin torneos terminados con este mazo.')
+            else if (list.isEmpty)
+              const _Empty('Ningún torneo con esos filtros.'),
             for (final e in list)
               ListTile(
                 dense: true,

@@ -14,6 +14,8 @@ import '../data/player_profile_repository.dart';
 import '../domain/player_profile.dart';
 import '../../account/locked.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../decks/presentation/decks_page.dart' show decksProvider;
+import '../../ranking/presentation/season_picker.dart';
 import 'players_page.dart' show showPlayerForm;
 
 /// Perfil del jugador en tres pestañas: Resumen (datos, estadísticas, mazos
@@ -30,8 +32,11 @@ class PlayerProfilePage extends ConsumerStatefulWidget {
 }
 
 class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
-  /// Temporada elegida (año, trimestre); null = todas.
-  (int, int)? _season;
+  /// Temporada elegida (año, trimestre). Por defecto, la actual.
+  (int, int)? _picked;
+
+  /// "Todas las temporadas" elegido a mano.
+  bool _all = false;
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +70,7 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
             appBar: AppBar(
               title: NameTitle(p.nickname),
               actions: [
-                if (perms.isAdmin)
+                if (perms.canEditPlayers)
                   IconButton(
                     tooltip: 'Editar datos',
                     icon: const Icon(Icons.edit_outlined),
@@ -87,14 +92,39 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
             body: AsyncView(
               value: profile,
               builder: (all) {
-                final seasons = all.seasons;
-                final season = seasons.contains(_season) ? _season : null;
+                final now = DateTime.now();
+                final current = (now.year, quarterOf(now));
+                // La temporada actual siempre se puede elegir (aunque aún no
+                // haya jugado en ella).
+                final seasons = [
+                  if (!all.seasons.contains(current)) current,
+                  ...all.seasons,
+                ];
+                final season = _all ? null : (_picked ?? current);
                 final data = season == null ? all : all.forSeason(season.$1, season.$2);
                 final picker = _SeasonFilter(
                   seasons: seasons,
                   selected: season,
-                  onChanged: (v) => setState(() => _season = v),
+                  onChanged: (v) => setState(() {
+                    _all = v == null;
+                    _picked = v;
+                  }),
                 );
+                // Ficha del mazo (en la misma temporada) al tocar su nombre.
+                final deckIds = {
+                  for (final d in ref.watch(decksProvider).value ?? const <Deck>[]) d.name.toLowerCase(): d.id,
+                };
+                final seasonId = season == null
+                    ? kAllSeasons
+                    : (ref.watch(seasonListProvider).value ?? const <Season>[])
+                            .where((x) => x.year == season.$1 && x.quarter == season.$2)
+                            .firstOrNull
+                            ?.id ??
+                        kAllSeasons;
+                void openDeck(String name) {
+                  final id = deckIds[name.toLowerCase()];
+                  if (id != null) context.push('/mazos/ficha/$id?t=$seasonId');
+                }
                 return TabBarView(
                   children: [
                     // 1) Datos, estadísticas, mazos usados y penalizaciones.
@@ -104,12 +134,12 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
                         _Header(player: p, showPrivate: perms.canSeePersonalData(playerId)),
                         picker,
                         _StatsGrid(totals: data.totals),
-                        _ProfileHighlights(decks: data.decks, rivals: data.rivals),
+                        _ProfileHighlights(decks: data.decks, rivals: data.rivals, onDeck: openDeck),
                         const SectionLabel('Mazos usados'),
                         if (data.decks.isEmpty)
                           const _Empty('Todavía no ha jugado con ningún mazo.')
                         else
-                          _DecksTable(decks: data.decks),
+                          _DecksTable(decks: data.decks, onDeck: openDeck),
                         if (perms.canSeePersonalData(playerId)) _PlayerPenalties(playerId: playerId),
                       ],
                     ),
@@ -339,9 +369,12 @@ class _StatsGrid extends StatelessWidget {
 // ───────────────────────── Mazos ─────────────────────────
 
 class _DecksTable extends StatelessWidget {
-  const _DecksTable({required this.decks});
+  const _DecksTable({required this.decks, required this.onDeck});
 
   final List<DeckUsage> decks;
+
+  /// Abrir la ficha del mazo.
+  final ValueChanged<String> onDeck;
 
   @override
   Widget build(BuildContext context) {
@@ -359,10 +392,14 @@ class _DecksTable extends StatelessWidget {
       ],
       rows: [
         for (final d in decks)
-          NeonTableRow(cells: [
+          NeonTableRow(onTap: () => onDeck(d.deck), cells: [
             Text(d.deck,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700)),
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.neon,
+                    decoration: TextDecoration.underline,
+                    decorationColor: AppColors.neon.withValues(alpha: 0.5))),
             Text('${d.tournaments}×', style: TextStyle(color: AppColors.neon)),
             Text('${d.played}'),
             Text('${d.wins}', style: TextStyle(color: AppColors.win)),
@@ -642,10 +679,11 @@ class _PlayerPenalties extends ConsumerWidget {
 /// Mazo favorito, mejor mazo, rival más difícil y "víctima" favorita (con
 /// un mínimo de partidas para que no salga por una sola).
 class _ProfileHighlights extends StatelessWidget {
-  const _ProfileHighlights({required this.decks, required this.rivals});
+  const _ProfileHighlights({required this.decks, required this.rivals, required this.onDeck});
 
   final List<DeckUsage> decks;
   final List<HeadToHead> rivals;
+  final ValueChanged<String> onDeck;
 
   static const _minDeckGames = 3;
   static const _minRivalGames = 2;
@@ -698,10 +736,11 @@ class _ProfileHighlights extends StatelessWidget {
     final items = [
       if (favorite != null)
         tile(Icons.favorite_border, AppColors.neon, 'Mazo más jugado', favorite.deck,
-            '${favorite.played} PJ'),
+            '${favorite.played} PJ', onTap: () => onDeck(favorite.deck)),
       if (best != null && best.deck != favorite?.deck)
         tile(Icons.emoji_events_outlined, AppColors.win, 'Mejor mazo', best.deck,
-            '${best.wins}-${best.losses}-${best.draws} · ${pct(best.winrate)}'),
+            '${best.wins}-${best.losses}-${best.draws} · ${pct(best.winrate)}',
+            onTap: () => onDeck(best.deck)),
       if (toughest != null && toughest.wins < toughest.losses)
         tile(Icons.shield_outlined, AppColors.loss, 'Rival más difícil', toughest.name,
             '${toughest.wins}-${toughest.losses}-${toughest.draws}',

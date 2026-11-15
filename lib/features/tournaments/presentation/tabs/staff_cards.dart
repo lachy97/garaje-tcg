@@ -207,13 +207,27 @@ class _JudgesSheet extends ConsumerWidget {
                 value: ids.contains(a.id),
                 title: Text(a.nickname),
                 subtitle: Text('@${a.username} · ${a.role == 'judge' ? 'Juez' : a.role == 'admin' ? 'Administrador' : 'Organizador'}'),
-                onChanged: (v) => run(() async {
-                  if (v ?? false) {
-                    await api.addJudge(tournamentId, a.id);
-                  } else {
-                    await api.removeJudge(tournamentId, a.id);
-                  }
-                }),
+                onChanged: (v) async {
+                  final add = v ?? false;
+                  final ok = await confirmDialog(
+                    context,
+                    title: add ? 'Añadir juez' : 'Quitar juez',
+                    message: add
+                        ? '${a.nickname} será juez de este torneo: verá todas las partidas y podrá poner '
+                            'resultados, tiempo extra y penalizaciones. Un juez no puede jugar el torneo.'
+                        : '${a.nickname} dejará de ser juez de este torneo.',
+                    confirm: add ? 'Añadir' : 'Quitar',
+                    danger: !add,
+                  );
+                  if (!ok) return;
+                  await run(() async {
+                    if (add) {
+                      await api.addJudge(tournamentId, a.id);
+                    } else {
+                      await api.removeJudge(tournamentId, a.id);
+                    }
+                  });
+                },
               ),
             if (snap.hasData && all.isEmpty)
               const Padding(

@@ -161,3 +161,36 @@ test('un torneo borrado (borrado lógico) deja de salir abierto', async () => {
   assert.equal((await call('GET', '/v1/registrations/mine', null, ana.token)).data.open.length, 0);
   assert.equal((await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'X' }, ana.token)).status, 404);
 });
+
+test('hora de inicio: después no se pide plaza ni se da de baja; el juez no juega', async () => {
+  const { call, state, org, ana, leo, tour, admin } = await setup();
+  const start = Math.floor(state.now / 1000) + 3600; // dentro de 1 h (en segundos, como la app)
+  await tour({ online_registration: 1, auto_accept: 0, date: start });
+  const r = await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'Zombie' }, ana.token);
+  assert.equal(r.data.registration.status, 'pending');
+
+  // Leo es juez del torneo: no puede pedir plaza.
+  await call('POST', `/v1/admin/accounts/${leo.account.id}/role`, { role: 'judge' }, admin.token);
+  await call('POST', '/v1/tournaments/t1/judges', { accountId: leo.account.id }, org.token);
+  const j = await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'Goat' }, leo.token);
+  assert.equal(j.status, 400);
+  assert.match(j.data.error, /juez/);
+
+  // Pasada la hora de inicio: ni pedir ni darse de baja.
+  state.now += 2 * 3600 * 1000;
+  const c = await call('POST', `/v1/registrations/${r.data.registration.id}/cancel`, {}, ana.token);
+  assert.equal(c.status, 400);
+  assert.match(c.data.error, /empezó/);
+});
+
+test('no se puede añadir como juez a quien juega el torneo', async () => {
+  const { call, org, ana, admin } = await setup();
+  await call('POST', `/v1/admin/accounts/${ana.account.id}/role`, { role: 'judge' }, admin.token);
+  await call('POST', '/v1/sync/push', { rows: [
+    { t: 'tournaments', id: 't1', changedAt: 1, data: { id: 't1', name: 'Liga', status: 'draft' } },
+    { t: 'tournament_players', id: 'e1', changedAt: 1, data: { id: 'e1', tournament_id: 't1', player_id: 'p-ana' } },
+  ] }, org.token);
+  const r = await call('POST', '/v1/tournaments/t1/judges', { accountId: ana.account.id }, org.token);
+  assert.equal(r.status, 400);
+  assert.match(r.data.error, /juez no puede/);
+});

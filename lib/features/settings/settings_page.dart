@@ -13,13 +13,11 @@ import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
 import '../../core/backup/backup_codec.dart';
 import '../../core/backup/backup_service.dart';
-import '../../core/license/license_service.dart';
 import '../../core/auth/auth_providers.dart';
 import '../account/account_section.dart';
 import '../account/server_section.dart';
 import '../account/sync_section.dart';
 import '../decklists/presentation/card_data_section.dart';
-import '../license/license_widgets.dart';
 import 'merge_preview_page.dart';
 
 final _packageInfoProvider = FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
@@ -34,16 +32,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _busy = false;
-  bool? _adminUnlocked;
-
-  @override
-  void initState() {
-    super.initState();
-    // El Modo administrador solo existe en el teléfono del administrador.
-    ref.read(licenseServiceProvider.future).then((s) => s.isAdminDevice()).then((v) {
-      if (mounted) setState(() => _adminUnlocked = v);
-    });
-  }
 
   Future<void> _guard(Future<void> Function() action) async {
     if (_busy) return;
@@ -198,7 +186,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final license = ref.watch(licenseProvider);
     final info = ref.watch(_packageInfoProvider).value;
     final perms = ref.watch(permissionsProvider);
 
@@ -279,35 +266,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ],
                 ),
               ),
-              const SectionLabel('Licencia'),
-              NeonCard(
-                child: AsyncView(
-                  value: license,
-                  builder: (s) {
-                    final (text, color) = licenseSummary(s);
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (s.data != null && s.data!.holder.isNotEmpty)
-                          Text(s.data!.holder,
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w800)),
-                        Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 12),
-                        DeviceCodeCard(code: s.deviceCode),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: () => showActivateLicenseDialog(context, ref),
-                          icon: const Icon(Icons.vpn_key),
-                          label: Text(s.data == null
-                              ? 'Introducir licencia'
-                              : 'Introducir licencia nueva / renovación'),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
               if (perms.canBackup) ...[
               const SectionLabel('Copia de seguridad'),
               NeonCard(
@@ -350,7 +308,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 const SectionLabel('Servidor'),
                 const ServerSection(),
               ],
-              if (_adminUnlocked ?? false) ...[
+              if (perms.isAdmin && !perms.visitor) ...[
                 const SectionLabel('Administrador'),
                 NeonCard(
                   onTap: () => context.push('/ajustes/admin'),
@@ -358,7 +316,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     children: [
                       Icon(Icons.admin_panel_settings, color: AppColors.neon),
                       SizedBox(width: 12),
-                      Expanded(child: Text('Modo administrador (claves y licencias)')),
+                      Expanded(child: Text('Modo administrador (temporadas cerradas)')),
                       Icon(Icons.chevron_right),
                     ],
                   ),

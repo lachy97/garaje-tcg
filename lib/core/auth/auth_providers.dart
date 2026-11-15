@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../license/license_service.dart';
 import 'account.dart';
 import 'auth_api.dart';
 import 'http_auth_api.dart';
@@ -19,8 +19,7 @@ final authApiProvider = Provider<AuthApi>((ref) {
   if (kServerUrl.isNotEmpty) return HttpAuthApi(kServerUrl);
   return LocalAuthApi(
     _LazyFileStore(),
-    isAdminDevice: () async =>
-        (await ref.read(licenseServiceProvider.future)).isAdminDevice(),
+    isAdminDevice: () async => false,
   );
 });
 
@@ -101,6 +100,8 @@ class SessionController extends AsyncNotifier<Session?> {
       }
     }
     ref.read(rolePreviewProvider.notifier).set(null);
+    // Al cerrar sesión se vuelve a la pantalla de inicio.
+    await VisitorMode.set(false);
     await _store(null);
   }
 
@@ -151,13 +152,32 @@ final rolePreviewProvider = NotifierProvider<RolePreview, AppRole?>(RolePreview.
 /// Permisos de quien usa el teléfono ahora.
 final permissionsProvider = Provider<Permissions>((ref) {
   final session = ref.watch(sessionProvider).value;
-  if (session == null) return const Permissions.local();
-  final license = ref.watch(licenseProvider).value;
+  // Sin sesión: visitante (solo consulta).
+  if (session == null) return const Permissions.visitor();
   final real = session.account.role;
   final preview = real == AppRole.admin ? ref.watch(rolePreviewProvider) : null;
   return Permissions(
     role: preview ?? real,
-    hasLicense: license?.allowsUse ?? false,
     playerId: session.account.playerId,
   );
 });
+
+/// Entrar sin cuenta ("Entrar como visitante"): solo consulta lo público.
+/// Se lee al arrancar ([init]) para que no parpadee la pantalla de inicio.
+class VisitorMode {
+  VisitorMode._();
+
+  static const _key = 'visitor.mode';
+  static final on = ValueNotifier<bool>(false);
+
+  static Future<void> init() async {
+    final p = await SharedPreferences.getInstance();
+    on.value = p.getBool(_key) ?? false;
+  }
+
+  static Future<void> set(bool v) async {
+    on.value = v;
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_key, v);
+  }
+}

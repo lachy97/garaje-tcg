@@ -10,8 +10,9 @@ import '../../../core/play/play.dart';
 import '../domain/game_score.dart';
 import 'my_table.dart';
 
-/// Debajo de "Mi mesa ahora": reportar el resultado (el rival lo confirma),
-/// llamar al juez y retirarse del torneo.
+/// Debajo de "Mi mesa ahora": reportar el resultado (el rival lo confirma) y
+/// llamar al juez. Retirarse (drop) ya no se hace desde el teléfono: una vez
+/// empezado el torneo lo hace el organizador.
 class TableActions extends ConsumerStatefulWidget {
   const TableActions({super.key, required this.info});
 
@@ -107,18 +108,6 @@ class _TableActionsState extends ConsumerState<TableActions> {
         await api.judge(i.tournamentId, matchId: i.matchId, note: note.trim());
       }, 'El juez ya está avisado');
 
-  Future<void> _drop() => _run((api) async {
-        final ok = await confirmDialog(
-          context,
-          title: 'Retirarme del torneo',
-          message: 'Dejarás de jugar las rondas siguientes (drop). Esta ronda se juega o se '
-              'reporta igual. El organizador lo verá al sincronizar.',
-          confirm: 'Retirarme',
-          danger: true,
-        );
-        if (!ok) throw const ActionCancelled();
-        await api.drop(i.tournamentId);
-      }, 'Drop enviado al organizador');
 
   @override
   Widget build(BuildContext context) {
@@ -217,18 +206,6 @@ class _TableActionsState extends ConsumerState<TableActions> {
                   icon: const Icon(Icons.campaign_outlined, size: 18),
                   label: const Text('Llamar al juez'),
                 ),
-              PopupMenuButton<String>(
-                tooltip: 'Más',
-                icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
-                onSelected: (_) => _drop(),
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: 'drop',
-                    enabled: drop == null,
-                    child: const Text('Retirarme del torneo (drop)'),
-                  ),
-                ],
-              ),
             ],
           ),
         ],

@@ -176,7 +176,8 @@ Future<void> checkNotifications(Ref ref) async {
         );
         if (t.bye || t.score != null) continue;
         final start = t.timerStartedAt;
-        if (start != null) {
+        // En pausa: sin avisos de tiempo.
+        if (start != null && t.timerPausedAt == null) {
           final left = Duration(minutes: t.roundMinutes) - DateTime.now().difference(start);
           if (left <= Duration.zero) {
             await notify('time0:$base', 'Se acabó el tiempo', 'Mesa ${t.table ?? '?'}: reporta tu resultado.');
@@ -236,7 +237,8 @@ Future<void> checkNotifications(Ref ref) async {
       }
       for (final a in actions) {
         if (a.kind == PlayKind.judge && a.status == PlayStatus.open) {
-          await notify('judge:${a.id}', 'Llaman al juez', '${a.nickname ?? '?'} · ${t.name}${a.note == null ? '' : ': ${a.note}'}');
+          // Sin el nombre del torneo (sobra): quién llama y para qué.
+          await notify('judge:${a.id}', 'Llaman al juez', '${a.nickname ?? '?'}${a.note == null ? '' : ': ${a.note}'}');
         } else if (a.kind == PlayKind.report && a.status == PlayStatus.disputed) {
           await notify('disp:${a.id}', 'Resultado en disputa', 'Los jugadores no coinciden · ${t.name}');
         }

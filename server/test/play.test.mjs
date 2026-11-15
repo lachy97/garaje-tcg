@@ -76,10 +76,12 @@ test('reportes que no coinciden quedan en disputa; juez y drop', async () => {
 
   r = await call('POST', '/v1/play/judge', { tournamentId: 't1', matchId: 'm1', note: 'regla' }, leo.token);
   assert.equal(r.data.action.kind, 'judge');
+  // Con el torneo empezado el jugador ya no se retira desde la app.
   r = await call('POST', '/v1/play/drop', { tournamentId: 't1' }, ana.token);
+  assert.equal(r.status, 400);
   const list = await call('GET', '/v1/play?tournament=t1', null, org.token);
-  assert.deepEqual(list.data.actions.map((a) => a.kind).sort(), ['drop', 'judge', 'report']);
+  assert.deepEqual(list.data.actions.map((a) => a.kind).sort(), ['judge', 'report']);
   assert.equal((await call('GET', '/v1/play?tournament=t1', null, leo.token)).status, 403);
   const todo = await call('GET', '/v1/play/todo', null, org.token);
-  assert.deepEqual(todo.data.actions.map((a) => a.kind).sort(), ['drop', 'report']);
+  assert.deepEqual(todo.data.actions.map((a) => a.kind).sort(), ['report']);
 });

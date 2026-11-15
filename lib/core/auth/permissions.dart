@@ -7,15 +7,19 @@ import 'account.dart';
 ///   el del organizador que lleva los torneos: todo permitido.
 /// - Lo propio es siempre gratis: su ficha, sus torneos (abiertos o
 ///   terminados), el ranking y la tier list.
-/// - La licencia da las estadísticas de todos los mazos y, al organizador,
-///   llevar torneos. Los jueces usan la licencia del organizador del torneo.
-/// - Solo el administrador ve todas las fichas y la lista de jugadores.
+/// - Sin licencias (la app se paga aparte): lo que cada uno puede hacer
+///   depende solo de su rol. Las estadísticas de mazos las ven todos.
+/// - **Visitante** (sin cuenta): solo consulta lo público (ranking, tier
+///   list, mazos y torneos terminados o con inscripción abierta).
+/// - El administrador y los organizadores ven la lista de jugadores y pueden
+///   editar las fichas.
 class Permissions {
   const Permissions({
     required this.role,
-    required this.hasLicense,
+    this.hasLicense = true,
     this.playerId,
     this.local = false,
+    this.visitor = false,
   });
 
   /// Sin cuenta: todo permitido (como hasta ahora).
@@ -23,7 +27,16 @@ class Permissions {
       : role = AppRole.admin,
         hasLicense = true,
         playerId = null,
-        local = true;
+        local = true,
+        visitor = false;
+
+  /// Sin cuenta: solo consulta.
+  const Permissions.visitor()
+      : role = AppRole.player,
+        hasLicense = true,
+        playerId = null,
+        local = false,
+        visitor = true;
 
   final AppRole role;
   final bool hasLicense;
@@ -32,15 +45,22 @@ class Permissions {
   final String? playerId;
   final bool local;
 
+  /// Entró sin cuenta (solo consulta).
+  final bool visitor;
+
   bool get isAdmin => local || role == AppRole.admin;
-  bool get _organizer => role == AppRole.organizer && hasLicense;
+  bool get _organizer => role == AppRole.organizer;
 
   /// Ranking de la temporada y tier list: todos.
   bool get canSeeRanking => true;
   bool get canSeeTierList => true;
 
   /// Lista de todos los jugadores (pestaña Jugadores).
-  bool get canSeeAllPlayers => isAdmin;
+  bool get canSeeAllPlayers => isAdmin || _organizer;
+
+  /// Editar fichas de jugador (también la propia): administrador y
+  /// organizadores.
+  bool get canEditPlayers => isAdmin || _organizer;
 
   /// Ficha de un jugador: todos ven la ficha pública de cualquiera (apodo,
   /// torneos, mazos, winrate). Ver [canSeePersonalData] para lo privado.
@@ -53,7 +73,7 @@ class Permissions {
 
   /// Estadísticas de todos los mazos (matriz de enfrentamientos y ficha de
   /// cada mazo).
-  bool get canSeeDeckStats => isAdmin || hasLicense;
+  bool get canSeeDeckStats => true;
 
   /// Crear torneos y llevar los propios.
   bool get canCreateTournaments => isAdmin || _organizer;

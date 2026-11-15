@@ -83,20 +83,32 @@ class _DecksPageState extends ConsumerState<DecksPage> {
       appBar: AppBar(
         title: const Text('MAZOS'),
         actions: [
-          if (!_matrix && current != null && shareable != null && shareable.isNotEmpty)
-            IconButton(
-              tooltip: 'Compartir tier list',
-              onPressed: _exporting ? null : () => _share(current, shareable),
-              icon: _exporting
-                  ? const SizedBox(
-                      width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.share),
-            ),
-          if (perms.canCreateTournaments)
-            IconButton(
-              tooltip: 'Gestionar mazos',
-              onPressed: () => context.push('/mazos/gestionar'),
-              icon: const Icon(Icons.edit_note),
+          // Compartir y gestionar, juntos en un solo botón de ajustes.
+          if (_exporting)
+            const Padding(
+              padding: EdgeInsets.all(14),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if ((!_matrix && current != null && shareable != null && shareable.isNotEmpty) ||
+              perms.canCreateTournaments)
+            PopupMenuButton<String>(
+              tooltip: 'Opciones',
+              icon: const Icon(Icons.settings_outlined),
+              onSelected: (v) => v == 'share'
+                  ? _share(current!, shareable!)
+                  : context.push('/mazos/gestionar'),
+              itemBuilder: (_) => [
+                if (!_matrix && current != null && shareable != null && shareable.isNotEmpty)
+                  const PopupMenuItem(
+                    value: 'share',
+                    child: ListTile(leading: Icon(Icons.share), title: Text('Compartir tier list')),
+                  ),
+                if (perms.canCreateTournaments)
+                  const PopupMenuItem(
+                    value: 'manage',
+                    child: ListTile(leading: Icon(Icons.edit_note), title: Text('Gestionar mazos')),
+                  ),
+              ],
             ),
         ],
       ),

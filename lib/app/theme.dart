@@ -366,6 +366,15 @@ class AppTheme {
         labelStyle: TextStyle(color: p.textPrimary),
         checkmarkColor: p.neon,
       ),
+      // Menús desplegables (⋮) con borde: se distinguen del fondo oscuro.
+      popupMenuTheme: PopupMenuThemeData(
+        color: p.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: p.moss),
+        ),
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: p.surface,
         surfaceTintColor: Colors.transparent,

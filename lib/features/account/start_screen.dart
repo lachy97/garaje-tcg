@@ -22,9 +22,15 @@ class StartGate extends ConsumerWidget {
       return const Scaffold(body: Center(child: GlowLogo(size: 120)));
     }
     if (session.value != null) return child;
-    // Navigator propio: las pantallas de iniciar sesión se abren encima.
-    return Navigator(
-      onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const StartScreen()),
+    return ValueListenableBuilder<bool>(
+      valueListenable: VisitorMode.on,
+      // Visitante: la app en solo consulta.
+      builder: (context, visitor, _) => visitor
+          ? child
+          // Navigator propio: las pantallas de iniciar sesión se abren encima.
+          : Navigator(
+              onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => const StartScreen()),
+            ),
     );
   }
 }
@@ -76,10 +82,17 @@ class StartScreen extends StatelessWidget {
                     icon: const Icon(Icons.person_add_alt),
                     label: const Text('Crear cuenta'),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 14),
+                  TextButton.icon(
+                    onPressed: () => VisitorMode.set(true),
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('Entrar sin cuenta (solo ver)'),
+                  ),
+                  const SizedBox(height: 18),
                   Text(
-                    'Necesitas una cuenta para usar la app. Para crearla o iniciar sesión '
-                    'hace falta conexión (con VPN); después funciona sin conexión.',
+                    'Sin cuenta puedes ver el ranking, la tier list, los mazos y los torneos '
+                    'terminados. Para inscribirte, jugar y recibir avisos necesitas una cuenta '
+                    '(crearla o iniciar sesión pide conexión, con VPN si hace falta).',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),

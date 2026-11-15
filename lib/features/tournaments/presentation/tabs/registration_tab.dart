@@ -11,7 +11,11 @@ import '../../../decks/presentation/deck_image.dart';
 import '../../../decks/presentation/deck_picker.dart';
 import '../../../players/presentation/players_page.dart';
 import '../../application/tournament_service.dart';
+import '../../../../core/play/play.dart';
+import '../../../../core/registrations/registrations.dart';
+import '../../../../core/sync/sync_service.dart';
 import '../providers.dart';
+import '../start_time.dart';
 import 'online_registration.dart';
 import 'staff_cards.dart';
 import 'penalties.dart';
@@ -37,6 +41,10 @@ class RegistrationTab extends ConsumerStatefulWidget {
 class _RegistrationTabState extends ConsumerState<RegistrationTab> {
   /// Filtro de la lista (con muchos inscritos cuesta encontrar a alguien).
   String _query = '';
+
+  /// Opciones del torneo (inscripción desde la app, check-in, jueces,
+  /// fecha y hora) desplegadas.
+  bool _options = false;
 
   Tournament get tournament => widget.tournament;
 
@@ -96,14 +104,34 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
                       icon: const Icon(Icons.person_add_alt_1),
                       label: const Text('Inscribir tarde'),
                     ),
+                  const SizedBox(width: 6),
+                  // Opciones del torneo, plegadas para que se vea la lista.
+                  IconButton.outlined(
+                    tooltip: _options ? 'Ocultar opciones' : 'Opciones del torneo',
+                    onPressed: () => setState(() => _options = !_options),
+                    icon: Icon(_options ? Icons.expand_less : Icons.tune),
+                  ),
                 ],
               ),
             ),
-            // Inscripción desde la app (solo en inscripción y con servidor).
-            OnlineRegistrationCard(tournament: tournament),
-            // Check-in el día del torneo y jueces del torneo.
-            CheckInCard(tournament: tournament, registered: list),
-            JudgesCard(tournament: tournament),
+            // Solicitudes pendientes: siempre a la vista (hay que atenderlas).
+            _PendingRequestsBanner(tournament: tournament),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              alignment: Alignment.topCenter,
+              child: !_options
+                  ? const SizedBox(width: double.infinity)
+                  : Column(
+                      children: [
+                        if (_open) _StartCard(tournament: tournament),
+                        // Inscripción desde la app (solo en inscripción y con servidor).
+                        OnlineRegistrationCard(tournament: tournament),
+                        // Check-in el día del torneo y jueces del torneo.
+                        CheckInCard(tournament: tournament, registered: list),
+                        JudgesCard(tournament: tournament),
+                      ],
+                    ),
+            ),
             PenaltiesSection(
               tournament: tournament,
               names: {for (final r in list) r.player.id: r.player.nickname},
@@ -148,6 +176,97 @@ class _RegistrationTabState extends ConsumerState<RegistrationTab> {
         tournament: tournament,
         late: late,
         alreadyIn: current.where((r) => r.entry.deletedAt == null).map((r) => r.player.id).toSet(),
+      ),
+    );
+  }
+}
+
+/// Día y hora de inicio (cambiables mientras dure la inscripción).
+class _StartCard extends ConsumerWidget {
+  const _StartCard({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = tournament;
+    Future<void> save(DateTime? d) async {
+      if (d == null || !context.mounted) return;
+      await runGuarded(context, () async {
+        await ref.read(tournamentsDaoProvider).updateSettings(t.id, date: d);
+        // Se publica enseguida (los jugadores ven la hora al inscribirse).
+        await ref.read(syncControllerProvider.notifier).sync();
+      });
+    }
+
+    return NeonCard(
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      child: Row(
+        children: [
+          Icon(Icons.schedule, color: AppColors.neon),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(formatStart(t.date, long: true), style: const TextStyle(fontWeight: FontWeight.w800)),
+                Text(
+                  hasStartTime(t.date)
+                      ? 'Desde esa hora no se puede pedir plaza ni darse de baja desde la app.'
+                      : 'Sin hora de inicio: ponla para cerrar la inscripción desde la app a esa hora.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Cambiar día',
+            onPressed: () async => save(await pickStartDay(context, t.date)),
+            icon: const Icon(Icons.edit_calendar),
+          ),
+          IconButton(
+            tooltip: 'Cambiar hora',
+            onPressed: () async => save(await pickStartTime(context, t.date)),
+            icon: const Icon(Icons.more_time),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "3 solicitudes por revisar" (inscripción desde la app).
+class _PendingRequestsBanner extends ConsumerWidget {
+  const _PendingRequestsBanner({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = tournament;
+    if (t.status != TournamentStatus.draft || !t.onlineRegistration) return const SizedBox.shrink();
+    final list = ref.watch(tournamentRequestsProvider(t.id)).value ?? const <RegistrationRequest>[];
+    final pending = list.where((r) => r.status == RegistrationStatus.pending).length;
+    if (pending == 0) return const SizedBox.shrink();
+    return NeonCard(
+      glow: true,
+      padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => FractionallySizedBox(heightFactor: 0.85, child: RequestsSheet(tournament: t)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.how_to_reg, color: AppColors.neon),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(pending == 1 ? '1 solicitud por revisar' : '$pending solicitudes por revisar',
+                style: const TextStyle(fontWeight: FontWeight.w800)),
+          ),
+          const Icon(Icons.chevron_right),
+        ],
       ),
     );
   }
@@ -450,6 +569,11 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
     final players = ref.watch(playersProvider(_query));
     final last = ref.watch(_lastDecksProvider(widget.tournament.id)).value ??
         const <String, Deck>{};
+    // Los jueces del torneo no pueden jugarlo.
+    final judges = {
+      for (final j in ref.watch(tournamentJudgesProvider(widget.tournament.id)).value ?? const <StaffAccount>[])
+        if (j.playerId != null) j.playerId!,
+    };
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.85,
       child: Padding(
@@ -486,7 +610,9 @@ class _RegisterSheetState extends ConsumerState<_RegisterSheet> {
               child: AsyncView(
                 value: players,
                 builder: (all) {
-                  final list = all.where((p) => !widget.alreadyIn.contains(p.id)).toList();
+                  final list = all
+                      .where((p) => !widget.alreadyIn.contains(p.id) && !judges.contains(p.id))
+                      .toList();
                   if (list.isEmpty) {
                     return const EmptyState(
                       icon: Icons.people_outline,

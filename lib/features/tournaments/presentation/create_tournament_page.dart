@@ -8,6 +8,7 @@ import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/database_provider.dart';
 import '../domain/tournament_rules.dart';
+import 'start_time.dart';
 import 'tabs/rounds_tab.dart' show TopCutSelector;
 
 class CreateTournamentPage extends ConsumerStatefulWidget {
@@ -21,7 +22,11 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
   final _formKey = GlobalKey<FormState>();
   late final _name = TextEditingController(
       text: 'Torneo ${DateFormat('dd/MM', 'es').format(DateTime.now())}');
-  DateTime _date = DateTime.now();
+  // Hoy a las 14:00 (se cambia abajo).
+  DateTime _date = () {
+    final n = DateTime.now();
+    return DateTime(n.year, n.month, n.day, 14);
+  }();
   int _rounds = 3;
   int _topCut = 0;
   int _minutes = TournamentRules.defaultRoundMinutes;
@@ -34,12 +39,12 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
   }
 
   Future<void> _pickDate() async {
-    final d = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
+    final d = await pickStartDay(context, _date);
+    if (d != null) setState(() => _date = d);
+  }
+
+  Future<void> _pickTime() async {
+    final d = await pickStartTime(context, _date);
     if (d != null) setState(() => _date = d);
   }
 
@@ -93,6 +98,28 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
                   ),
                   Icon(Icons.edit_calendar, color: AppColors.textSecondary),
                 ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            NeonCard(
+              onTap: _pickTime,
+              child: Row(
+                children: [
+                  const Icon(Icons.schedule),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Empieza a las ${DateFormat.Hm('es').format(_date)}',
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  Icon(Icons.edit, color: AppColors.textSecondary),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+              child: Text(
+                'Desde esa hora los jugadores ya no pueden inscribirse ni darse de baja desde la app.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ),
             const SectionLabel('Rondas Swiss antes del Top Cut'),

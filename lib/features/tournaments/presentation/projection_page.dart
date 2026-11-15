@@ -100,7 +100,7 @@ class _ProjectionPageState extends ConsumerState<ProjectionPage> {
                     ),
                     if (round?.timerStartedAt != null && t != null)
                       RoundCountdown(
-                          start: round!.timerStartedAt!, minutes: t.roundMinutes, fontSize: 44 * scale),
+                          start: round!.timerStartedAt!, minutes: t.roundMinutes, fontSize: 44 * scale, pausedAt: round.timerPausedAt),
                     IconButton(
                       tooltip: _auto ? 'Dejar fija esta vista' : 'Cambiar sola cada 20 s',
                       onPressed: () => setState(() => _auto = !_auto),

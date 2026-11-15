@@ -89,6 +89,38 @@ class NameTitle extends StatelessWidget {
   }
 }
 
+/// Filtro desplegable "Jugador: Todos ▾" (opciones id → nombre).
+class FilterDropdown extends StatelessWidget {
+  const FilterDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String? value;
+  final Map<String, String> options;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = options.entries.toList()..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    return DropdownButton<String?>(
+      value: options.containsKey(value) ? value : null,
+      hint: Text('$label: todos'),
+      underline: const SizedBox.shrink(),
+      borderRadius: BorderRadius.circular(12),
+      items: [
+        DropdownMenuItem(value: null, child: Text('$label: todos')),
+        for (final e in sorted) DropdownMenuItem(value: e.key, child: Text('$label: ${e.value}')),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}
+
 /// Botón de compartir: el mismo icono en toda la app (a la derecha del título
 /// de la sección o en la barra superior).
 class ShareButton extends StatelessWidget {

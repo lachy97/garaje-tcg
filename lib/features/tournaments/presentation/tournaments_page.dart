@@ -15,7 +15,22 @@ import '../../../core/play/play.dart';
 import 'check_in.dart';
 import 'my_table.dart';
 import 'open_registrations.dart';
+import '../../../core/utils/season_utils.dart';
+import '../../ranking/presentation/season_picker.dart';
 import 'providers.dart';
+
+/// Filtro de la lista de torneos: temporada (null = la actual; kAllSeasons =
+/// todas) y orden por fecha.
+class TournamentsFilter extends Notifier<({String? season, bool newestFirst})> {
+  @override
+  ({String? season, bool newestFirst}) build() => (season: null, newestFirst: true);
+
+  void setSeason(String? id) => state = (season: id, newestFirst: state.newestFirst);
+  void toggleOrder() => state = (season: state.season, newestFirst: !state.newestFirst);
+}
+
+final tournamentsFilterProvider =
+    NotifierProvider<TournamentsFilter, ({String? season, bool newestFirst})>(TournamentsFilter.new);
 
 class TournamentsPage extends ConsumerWidget {
   const TournamentsPage({super.key});
@@ -47,6 +62,8 @@ class TournamentsPage extends ConsumerWidget {
                 if (!openIds.contains(t.id) &&
                     ((mine?.contains(t.id) ?? false) ||
                         judging.contains(t.id) ||
+                        // Visitante: también los que tienen la inscripción abierta.
+                        (perms.visitor && t.status == TournamentStatus.draft && t.onlineRegistration) ||
                         (t.status == TournamentStatus.finished && finished++ < 10)))
                   t,
             ];
@@ -108,7 +125,8 @@ class TournamentsPage extends ConsumerWidget {
                         icon: Icons.error_outline, title: 'No se pudo cargar', subtitle: '$e'),
                   ),
                 ],
-                data: (list) {
+                data: (all) {
+                  var list = all;
                   if (list.isEmpty && openIds.isNotEmpty) {
                     return [const SliverToBoxAdapter(child: SizedBox(height: 96))];
                   }
@@ -127,6 +145,45 @@ class TournamentsPage extends ConsumerWidget {
                       ),
                     ];
                   }
+                  // Temporada y orden. Los torneos en juego salen siempre.
+                  final filter = ref.watch(tournamentsFilterProvider);
+                  final seasons = ref.watch(seasonListProvider).value ?? const <Season>[];
+                  final season = seasons.isEmpty || filter.season == kAllSeasons
+                      ? null
+                      : pickSeason(seasons, filter.season);
+                  bool inSeason(Tournament t) =>
+                      season == null || (t.date.year == season.year && quarterOf(t.date) == season.quarter);
+                  list = [
+                    for (final t in list)
+                      if (t.status == TournamentStatus.swiss ||
+                          t.status == TournamentStatus.topCut ||
+                          inSeason(t))
+                        t,
+                  ]..sort((a, b) => filter.newestFirst ? b.date.compareTo(a.date) : a.date.compareTo(b.date));
+                  final bar = SliverToBoxAdapter(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: seasons.isEmpty
+                              ? const SizedBox.shrink()
+                              : SeasonPicker(
+                                  seasons: seasons,
+                                  selected: season ?? pickSeason(seasons, null),
+                                  allowAll: true,
+                                  allSelected: season == null,
+                                  onChanged: (v) => ref
+                                      .read(tournamentsFilterProvider.notifier)
+                                      .setSeason(v?.id ?? kAllSeasons),
+                                ),
+                        ),
+                        IconButton(
+                          tooltip: filter.newestFirst ? 'Más recientes primero' : 'Más antiguos primero',
+                          onPressed: () => ref.read(tournamentsFilterProvider.notifier).toggleOrder(),
+                          icon: Icon(filter.newestFirst ? Icons.arrow_downward : Icons.arrow_upward),
+                        ),
+                      ],
+                    ),
+                  );
                   // Agrupados: en juego primero, luego inscripción y terminados.
                   final live = [
                     for (final t in list)
@@ -144,6 +201,14 @@ class TournamentsPage extends ConsumerWidget {
                         ],
                       ];
                   return [
+                    bar,
+                    if (list.isEmpty)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 32),
+                          child: EmptyState(icon: Icons.event_busy, title: 'Sin torneos en esta temporada'),
+                        ),
+                      ),
                     ...group('En juego', live),
                     ...group('Inscripción abierta', draft),
                     ...group('Terminados', done),

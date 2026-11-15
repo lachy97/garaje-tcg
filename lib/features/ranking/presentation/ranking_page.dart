@@ -31,6 +31,10 @@ class _RankingPageState extends ConsumerState<RankingPage> {
   bool _exporting = false;
   String? _seasonId; // null = trimestre actual
 
+  /// Filtros: texto (nombre o mazo) y mazo jugado.
+  String _query = '';
+  String? _deck;
+
   Future<void> _export(Season season, List<RankingRow> rows) async {
     setState(() => _exporting = true);
     try {
@@ -110,11 +114,52 @@ class _RankingPageState extends ConsumerState<RankingPage> {
                   )
                 else ...[
                   _MyPlace(rows: list),
-                  RankingTable(rows: list),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              prefixIcon: Icon(Icons.search),
+                              hintText: 'Jugador',
+                            ),
+                            onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilterDropdown(
+                          label: 'Mazo',
+                          value: _deck,
+                          options: {
+                            for (final r in list)
+                              if (r.lastDeck != null) r.lastDeck!: r.lastDeck!,
+                          },
+                          onChanged: (v) => setState(() => _deck = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Builder(builder: (context) {
+                    final shown = [
+                      for (final r in list)
+                        if ((_query.isEmpty || r.nickname.toLowerCase().contains(_query)) &&
+                            (_deck == null || r.lastDeck == _deck))
+                          r,
+                    ];
+                    return shown.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: EmptyState(icon: Icons.search_off, title: 'Nadie coincide'),
+                          )
+                        : RankingTable(rows: shown, meId: ref.watch(permissionsProvider).playerId);
+                  }),
                   Padding(
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Text(
-                      'En verde, los 8 primeros (más claro, mejor puesto). '
+                      'En verde, los 8 primeros (más claro, mejor puesto); en amarillo, tú. '
+                      'Mazo = el último que jugó en la temporada. '
                       'Desempates: puntos → mejor posición → winrate → menos torneos. '
                       'PJ = partidas jugadas (sin BYE). Desliza la tabla para ver todas '
                       'las columnas.',

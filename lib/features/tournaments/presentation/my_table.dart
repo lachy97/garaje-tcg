@@ -23,6 +23,7 @@ class MyTableInfo {
     required this.opponentDeck,
     required this.score,
     required this.timerStartedAt,
+    this.timerPausedAt,
     required this.roundMinutes,
     required this.matchId,
     required this.iAmP1,
@@ -58,6 +59,9 @@ class MyTableInfo {
   /// Marcador visto desde mí ("2-1"), null si aún no hay resultado.
   final String? score;
   final DateTime? timerStartedAt;
+
+  /// Reloj en pausa desde (null = corriendo).
+  final DateTime? timerPausedAt;
   final int roundMinutes;
 }
 
@@ -80,7 +84,7 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
   return db
       .customSelect(
         'SELECT t.id AS tid, t.name AS tname, t.round_minutes AS rm, m.id AS mid, '
-        'r.number AS rnum, r.phase AS rphase, r.bracket_size AS rbs, r.timer_started_at AS rts, '
+        'r.number AS rnum, r.phase AS rphase, r.bracket_size AS rbs, r.timer_started_at AS rts, r.timer_paused_at AS rtp, '
         'm.table_number AS tbl, m.is_bye AS bye, m.result AS res, m.is_third_place AS third, '
         'm.extra_minutes AS ex, '
         'm.player1_id AS p1, m.games1 AS g1, m.games_draw AS gd, m.games2 AS g2, '
@@ -127,6 +131,7 @@ final myTablesProvider = StreamProvider.autoDispose.family<List<MyTableInfo>, St
                   opponentDeck: r.readNullable<String>('opdeck'),
                   score: score,
                   timerStartedAt: r.readNullable<DateTime>('rts'),
+                  timerPausedAt: r.readNullable<DateTime>('rtp'),
                   roundMinutes: r.read<int>('rm') + r.read<int>('ex'),
                   extraMinutes: r.read<int>('ex'),
                   matchId: r.read<String>('mid'),
@@ -325,7 +330,7 @@ class _MyTableCard extends StatelessWidget {
                   ),
                 ),
                 if (i.timerStartedAt != null && i.score == null)
-                  RoundCountdown(start: i.timerStartedAt!, minutes: i.roundMinutes),
+                  RoundCountdown(start: i.timerStartedAt!, minutes: i.roundMinutes, pausedAt: i.timerPausedAt),
               ],
             ),
             // Reportar / confirmar el resultado, llamar al juez, drop.
@@ -339,9 +344,12 @@ class _MyTableCard extends StatelessWidget {
 
 /// Tiempo que queda de ronda (se actualiza cada segundo).
 class RoundCountdown extends StatefulWidget {
-  const RoundCountdown({super.key, required this.start, required this.minutes, this.fontSize = 14});
+  const RoundCountdown({super.key, required this.start, required this.minutes, this.fontSize = 14, this.pausedAt});
 
   final DateTime start;
+
+  /// En pausa desde (el tiempo queda congelado).
+  final DateTime? pausedAt;
   final int minutes;
   final double fontSize;
 
@@ -368,19 +376,23 @@ class _RoundCountdownState extends State<RoundCountdown> {
 
   @override
   Widget build(BuildContext context) {
-    final left = Duration(minutes: widget.minutes) - DateTime.now().difference(widget.start);
+    final paused = widget.pausedAt != null;
+    final left = Duration(minutes: widget.minutes) - (widget.pausedAt ?? DateTime.now()).difference(widget.start);
     final over = left.isNegative;
     final s = left.inSeconds.abs();
     final text = '${over ? '+' : ''}${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
-    final color = over
-        ? AppColors.loss
-        : left.inMinutes < 5
-            ? AppColors.draw
-            : AppColors.neon;
+    final color = paused
+        ? AppColors.textSecondary
+        : over
+            ? AppColors.loss
+            : left.inMinutes < 5
+                ? AppColors.draw
+                : AppColors.neon;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(over ? Icons.alarm : Icons.timer_outlined, size: widget.fontSize * 1.25, color: color),
+        Icon(paused ? Icons.pause : over ? Icons.alarm : Icons.timer_outlined,
+            size: widget.fontSize * 1.25, color: color),
         SizedBox(width: widget.fontSize * 0.3),
         Text(text,
             style: TextStyle(

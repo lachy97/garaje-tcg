@@ -182,7 +182,10 @@ export class SyncService {
       if (seen.has(key)) continue; // repetida en el mismo envío: vale la primera
       seen.add(key);
       const e = existing.get(key);
-      if (e && e.owner_id !== me.id && !isAdmin) {
+      // Las fichas de jugador son de toda la comunidad: los organizadores
+      // pueden corregir cualquiera (también la suya).
+      const sharedPlayer = r.t === 'players' && me.role === 'organizer';
+      if (e && e.owner_id !== me.id && !isAdmin && !sharedPlayer) {
         rejected.push({ t: r.t, id: r.id, reason: 'not_owner' });
         continue;
       }
@@ -239,7 +242,11 @@ export class SyncService {
    * entero, aunque sus filas sean anteriores a [since].
    */
   async pull(token, params) {
-    const me = await this.auth.authenticate(token);
+    // Sin sesión (visitante): lo mismo que un jugador sin ficha: catálogo,
+    // ranking, tier list y torneos terminados o con inscripción abierta.
+    const me = token
+      ? await this.auth.authenticate(token)
+      : { id: null, role: 'visitor', player_id: null, community_id: 'garaje' };
     const since = Math.max(0, Math.trunc(Number(params.get('since') ?? 0)) || 0);
     const limit = Math.min(MAX_PULL_ROWS, Math.max(1, Math.trunc(Number(params.get('limit') ?? MAX_PULL_ROWS)) || MAX_PULL_ROWS));
     const community = me.community_id;

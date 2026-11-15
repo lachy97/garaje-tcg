@@ -130,9 +130,11 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
     bool? checkIn,
     String? checkinCode,
     String? listVisibility,
+    DateTime? date,
   }) {
     return (update(tournaments)..where((t) => t.id.equals(id))).write(
       TournamentsCompanion(
+        date: Value.absentIfNull(date),
         onlineRegistration: Value.absentIfNull(onlineRegistration),
         autoAccept: Value.absentIfNull(autoAccept),
         capacity: Value.absentIfNull(capacity),
@@ -150,10 +152,11 @@ class TournamentsDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Pone en marcha (o reinicia) el reloj de una ronda. null = lo detiene.
-  Future<void> setRoundTimer(String roundId, DateTime? startedAt) {
+  Future<void> setRoundTimer(String roundId, DateTime? startedAt, {DateTime? pausedAt}) {
     return (update(rounds)..where((r) => r.id.equals(roundId))).write(
       RoundsCompanion(
         timerStartedAt: Value(startedAt),
+        timerPausedAt: Value(pausedAt),
         updatedAt: Value(DateTime.now()),
       ),
     );

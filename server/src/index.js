@@ -6,7 +6,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.10.0';
+export const VERSION = '1.11.0';
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -122,6 +122,8 @@ export async function handle(request, env, opts) {
       if (path === '/v1/me') return json(await auth.me(token));
       if (path === '/v1/admin/accounts') return json(await auth.listAccounts(token));
       if (path === '/v1/sync/pull') return json(await sync.pull(token, url.searchParams));
+      // Visitantes (sin cuenta): solo lo público, en solo lectura.
+      if (path === '/v1/public/pull') return json(await sync.pull(null, url.searchParams));
       if (path === '/v1/sync/status') return json(await sync.status(token));
       if (path === '/v1/registrations/mine') return json(await regs.mine(token));
       if (path === '/v1/play/mine') return json(await play.mine(token, url.searchParams.get('tournament')));

@@ -175,6 +175,14 @@ export class PlayService {
   /** Retirarse del torneo (drop). Lo aplica el teléfono del organizador. */
   async drop(token, body) {
     const me = await this.auth.authenticate(token);
+    // Una vez empezado el torneo el jugador ya no se retira desde la app:
+    // lo hace el organizador (o el juez se lo pide).
+    await this.playing(me, body?.tournamentId);
+    throw bad('Desde que empieza el torneo no puedes retirarte desde la app: avisa al organizador o al juez.');
+  }
+
+  /** (Antes: drop pedido desde el móvil. Se deja por si se vuelve a usar.) */
+  async _dropRequest(me, body) {
     const { t, entry } = await this.playing(me, body?.tournamentId);
     if (entry.dropped) throw bad('Ya estás retirado.');
     const open = await this.db
@@ -384,7 +392,7 @@ export class PlayService {
     const me = await this.auth.authenticate(token);
     if (me.role !== 'admin' && me.role !== 'organizer') throw new ApiError(403, 'Solo organizadores.');
     const q = await this.db
-      .prepare("SELECT id, username, nickname, role FROM accounts WHERE community_id = ? AND role IN ('judge', 'organizer', 'admin') ORDER BY nickname")
+      .prepare("SELECT id, username, nickname, role, player_id AS playerId FROM accounts WHERE community_id = ? AND role IN ('judge', 'organizer', 'admin') ORDER BY nickname")
       .bind(me.community_id)
       .all();
     return { accounts: q.results ?? [] };
@@ -394,7 +402,7 @@ export class PlayService {
     await this.manager(token, tournamentId);
     const q = await this.db
       .prepare(
-        `SELECT a.id, a.username, a.nickname, a.role FROM tournament_staff s JOIN accounts a ON a.id = s.account_id
+        `SELECT a.id, a.username, a.nickname, a.role, a.player_id AS playerId FROM tournament_staff s JOIN accounts a ON a.id = s.account_id
           WHERE s.tournament_id = ? ORDER BY a.nickname`,
       )
       .bind(tournamentId)
@@ -410,6 +418,15 @@ export class PlayService {
       .first();
     if (!a) throw new ApiError(404, 'Esa cuenta no existe.');
     if (!['judge', 'organizer', 'admin'].includes(a.role)) throw bad('Esa cuenta no tiene rol de juez.');
+    // Un juez no puede jugar el torneo que arbitra.
+    const acc = await this.db.prepare('SELECT player_id FROM accounts WHERE id = ?').bind(a.id).first();
+    if (acc?.player_id) {
+      const e = await this.db
+        .prepare("SELECT 1 AS x FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0 AND json_extract(data, '$.deleted_at') IS NULL")
+        .bind(me.community_id, tournamentId, acc.player_id)
+        .first();
+      if (e) throw bad('Esa persona está inscrita como jugador en este torneo: un juez no puede jugarlo.');
+    }
     await this.db
       .prepare('INSERT OR IGNORE INTO tournament_staff (community_id, tournament_id, account_id, created_at) VALUES (?, ?, ?, ?)')
       .bind(me.community_id, tournamentId, a.id, this.auth.now())

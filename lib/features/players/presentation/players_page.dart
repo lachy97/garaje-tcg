@@ -39,12 +39,19 @@ class _PlayersPageState extends ConsumerState<PlayersPage> {
       if (mine != null) return PlayerProfilePage(playerId: mine);
       return Scaffold(
         appBar: AppBar(title: const Text('MI FICHA')),
-        body: const EmptyState(
-          icon: Icons.link_off,
-          title: 'Tu cuenta aún no tiene ficha',
-          subtitle: 'El administrador la vincula con tu ficha de jugador '
-              '(torneos, mazos y ranking).',
-        ),
+        body: perms.visitor
+            ? const EmptyState(
+                icon: Icons.person_outline,
+                title: 'Entraste sin cuenta',
+                subtitle: 'Crea una cuenta o inicia sesión en Ajustes para tener tu ficha '
+                    '(torneos, mazos y ranking). Las fichas de los demás se abren desde el ranking.',
+              )
+            : const EmptyState(
+                icon: Icons.link_off,
+                title: 'Tu cuenta aún no tiene ficha',
+                subtitle: 'El administrador la vincula con tu ficha de jugador '
+                    '(torneos, mazos y ranking).',
+              ),
       );
     }
     final players = ref.watch(playersProvider(_query));

@@ -38,11 +38,11 @@ class _LoggedOut extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Sin cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const Text('Visitante (sin cuenta)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
         Text(
-          'Este teléfono funciona en modo local, como hasta ahora: todo lo que '
-          'hay en él se puede ver y editar.',
+          'Solo consulta: ranking, tier list, mazos y torneos terminados o con la '
+          'inscripción abierta. Con una cuenta puedes inscribirte, jugar y recibir avisos.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
         if (simulated) ...[

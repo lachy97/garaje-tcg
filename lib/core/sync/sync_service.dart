@@ -106,16 +106,22 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     _stop();
     ref.onDispose(_stop);
 
+    // Entrar o salir del modo visitante cambia lo que se sincroniza.
+    void onVisitor() => ref.invalidateSelf();
+    VisitorMode.on.addListener(onVisitor);
+    ref.onDispose(() => VisitorMode.on.removeListener(onVisitor));
+
     final String? reason;
     if (api is! HttpAuthApi) {
       reason = 'La app aún no está conectada al servidor.';
-    } else if (session == null) {
+    } else if (session == null && !VisitorMode.on.value) {
       reason = 'Inicia sesión con una cuenta de organizador.';
     } else {
       reason = null;
     }
     if (reason != null) return SyncStatus(reason: reason);
-    final role = session!.account.role;
+    final role = session?.account.role;
+    // Visitante (sin sesión) y jugadores: solo bajan.
     final download = role != AppRole.admin && role != AppRole.organizer;
 
     _timer = Timer.periodic(interval, (_) => sync(force: false));
@@ -136,15 +142,20 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
+    // Al minimizar y volver se sincroniza, pero no más de una vez cada
+    // [lifecycleCooldown] (minimizar y abrir seguido no repite la consulta).
+    final recent = _lastRun != null && DateTime.now().difference(_lastRun!) < lifecycleCooldown;
     if (s == AppLifecycleState.resumed) {
       _foreground = true;
-      sync();
+      if (!recent) sync();
     }
     if (s == AppLifecycleState.paused) {
       _foreground = false;
-      sync(); // lo último antes de salir
+      if (!recent) sync(); // lo último antes de salir
     }
   }
+
+  static const lifecycleCooldown = Duration(seconds: 30);
 
   /// Cada cuánto sincronizar: rápido solo cuando hay un torneo en juego (el
   /// plan gratis del servidor admite 100.000 peticiones al día).
@@ -214,7 +225,12 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     if (!ref.mounted || !state.enabled || _busy) return;
     final session = ref.read(sessionProvider).value;
     final api = ref.read(authApiProvider);
-    if (session == null || api is! HttpAuthApi) return;
+    if (api is! HttpAuthApi) return;
+    if (session == null) {
+      // Visitante: solo lo público.
+      if (VisitorMode.on.value) await _syncVisitor(api, force: force);
+      return;
+    }
     if (!force && _lastRun != null) {
       try {
         // Margen de 3 s: el temporizador no cae justo a los 30 s.
@@ -336,6 +352,44 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       rethrow;
     } catch (_) {
       // Servidor sin esta función u otro fallo: no frena la subida.
+    }
+  }
+
+  // ───────────────────── Visitante (sin cuenta) ─────────────────────
+
+  /// Baja lo público (ranking, tier list, mazos, torneos terminados o con
+  /// inscripción abierta). Cada 5 min, o al momento si se pide a mano.
+  Future<void> _syncVisitor(HttpAuthApi api, {required bool force}) async {
+    if (!force && _lastRun != null && DateTime.now().difference(_lastRun!) < const Duration(minutes: 5)) {
+      return;
+    }
+    _lastRun = DateTime.now();
+    _busy = true;
+    state = state.copyWith(running: true);
+    try {
+      const seqKey = 'pull_seq:visitor';
+      var since = int.tryParse(await _state(seqKey) ?? '') ?? 0;
+      var total = 0;
+      while (ref.mounted) {
+        final res = await api.request('GET', 'v1/public/pull?since=$since');
+        final rows = [
+          for (final r in (res['rows'] as List?) ?? const []) (r as Map).cast<String, Object?>(),
+        ];
+        if (rows.isNotEmpty) await _apply(rows);
+        total += rows.length;
+        since = (res['seq'] as num?)?.toInt() ?? since;
+        await _setState(seqKey, '$since');
+        if (res['more'] != true) break;
+      }
+      if (ref.mounted) {
+        state = state.copyWith(running: false, pending: 0, lastSync: DateTime.now(), lastSent: total, clearError: true);
+      }
+    } on AuthException catch (e) {
+      if (ref.mounted) state = state.copyWith(running: false, lastError: e.message);
+    } catch (e) {
+      if (ref.mounted) state = state.copyWith(running: false, lastError: 'Error al sincronizar: $e');
+    } finally {
+      _busy = false;
     }
   }
 

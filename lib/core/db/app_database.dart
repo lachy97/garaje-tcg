@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -151,6 +151,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 14) {
             // v14: visibilidad de las listas de mazo
             await m.addColumn(tournaments, tournaments.listVisibility);
+          }
+          if (from < 15) {
+            // v15: pausa del reloj de ronda
+            await m.addColumn(rounds, rounds.timerPausedAt);
           }
         },
         beforeOpen: (details) async {

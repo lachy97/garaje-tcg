@@ -117,19 +117,23 @@ class PlayAction {
 
 /// Cuenta que puede ser juez de un torneo.
 class StaffAccount {
-  const StaffAccount({required this.id, required this.username, required this.nickname, required this.role});
+  const StaffAccount({required this.id, required this.username, required this.nickname, required this.role, this.playerId});
 
   factory StaffAccount.fromJson(Map<String, Object?> j) => StaffAccount(
         id: j['id']! as String,
         username: (j['username'] as String?) ?? '',
         nickname: (j['nickname'] as String?) ?? '',
         role: (j['role'] as String?) ?? '',
+        playerId: j['playerId'] as String?,
       );
 
   final String id;
   final String username;
   final String nickname;
   final String role;
+
+  /// Ficha de jugador de la cuenta (un juez no puede jugar su torneo).
+  final String? playerId;
 }
 
 class PlayApi {

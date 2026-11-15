@@ -26,6 +26,20 @@ export class RegistrationService {
     return { id: r.id, owner: r.owner_id, data: JSON.parse(r.data) };
   }
 
+  /** Hora de inicio del torneo (ms) o null. La app guarda la fecha en
+   *  segundos desde 1970 (con la hora de inicio). */
+  static startMs(t) {
+    const d = t.data.date;
+    if (typeof d === 'number' && d > 0) return d * 1000;
+    const p = typeof d === 'string' ? Date.parse(d) : NaN;
+    return Number.isFinite(p) ? p : null;
+  }
+
+  started(t) {
+    const s = RegistrationService.startMs(t);
+    return t.data.status !== 'draft' || (s != null && this.auth.now() >= s);
+  }
+
   static isOpen(t) {
     return t.data.status === 'draft' && Number(t.data.online_registration ?? 0) === 1;
   }
@@ -135,6 +149,12 @@ export class RegistrationService {
     if (!RegistrationService.isOpen(t)) {
       throw bad('La inscripción desde la app de este torneo está cerrada.');
     }
+    if (this.started(t)) throw bad('El torneo ya empezó: la inscripción está cerrada.');
+    const judge = await this.db
+      .prepare('SELECT 1 AS x FROM tournament_staff WHERE tournament_id = ? AND account_id = ?')
+      .bind(t.id, me.id)
+      .first();
+    if (judge) throw bad('Eres juez de este torneo: un juez no puede jugarlo.');
     const deck = typeof body?.deckName === 'string' ? body.deckName.trim().slice(0, DECK_MAX) : '';
     if (!deck) throw bad('Elige tu mazo.');
     if (await this.enrolled(me.community_id, t.id, me.player_id)) {
@@ -238,7 +258,7 @@ export class RegistrationService {
     const r = await this.byId(id);
     if (r.account_id !== me.id) throw new ApiError(403, 'Esa solicitud no es tuya.');
     const t = await this.tournament(me.community_id, r.tournament_id);
-    if (t.data.status !== 'draft') throw bad('El torneo ya empezó: habla con el organizador.');
+    if (this.started(t)) throw bad('El torneo ya empezó: ya no puedes darte de baja. Habla con el organizador.');
     if (r.status === 'pending' || r.status === 'accepted' || r.status === 'waitlist') {
       return { registration: await this.setStatus(id, 'cancelled') };
     }

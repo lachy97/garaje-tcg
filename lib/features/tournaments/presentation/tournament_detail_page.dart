@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
@@ -11,6 +10,7 @@ import '../../../core/sync/control.dart';
 import '../../decklists/presentation/top_cut_lists_page.dart';
 import 'judge_floor_page.dart';
 import 'projection_page.dart';
+import 'start_time.dart';
 import 'providers.dart';
 import 'tabs/control_banner.dart';
 import 'tabs/registration_tab.dart';
@@ -212,7 +212,7 @@ class _Header extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final locked = ref.watch(tournamentLockedProvider(t.id)).value ?? false;
     final parts = [
-      DateFormat.yMMMd('es').format(t.date),
+      formatStart(t.date),
       '${t.swissRounds} rondas',
       t.topCutSize == 0 ? 'Sin Top' : 'Top ${t.topCutSize}',
     ];

@@ -191,6 +191,19 @@ class TournamentService {
   /// Detiene el reloj (vuelve a "sin iniciar").
   Future<void> stopRoundTimer(String roundId) => _dao.setRoundTimer(roundId, null);
 
+  /// Pausa el reloj (el tiempo restante queda congelado).
+  Future<void> pauseRoundTimer(Round r) async {
+    if (r.timerStartedAt == null || r.timerPausedAt != null) return;
+    await _dao.setRoundTimer(r.id, r.timerStartedAt, pausedAt: DateTime.now());
+  }
+
+  /// Reanuda: el inicio se corre lo que duró la pausa.
+  Future<void> resumeRoundTimer(Round r) async {
+    final start = r.timerStartedAt, paused = r.timerPausedAt;
+    if (start == null || paused == null) return;
+    await _dao.setRoundTimer(r.id, start.add(DateTime.now().difference(paused)));
+  }
+
   void _ensureNotStarted(Tournament t) {
     if (t.status != TournamentStatus.draft) {
       throw const TournamentException(

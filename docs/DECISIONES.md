@@ -373,3 +373,22 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Intervalo adaptativo**: 30 s solo con un torneo en juego y la app abierta (60 s minimizada); con inscripción desde la app abierta, 60 s / 5 min; sin torneos, 2 min / 5 min. Arrastrar para actualizar, Reintentar, volver a la app y Tomar el control sincronizan al momento.
 - **Resultado estimado**: jugador, 1 petición cada 30 s durante el torneo; organizador, 2–3. Con 32 jugadores durante 6 h, unas 25.000 al día.
 - Compatible: con un servidor anterior (sin `/v1/poll`, 404) la app vuelve a pedir cada parte por separado.
+
+## Cambios tras el piloto (15/11) — servidor 1.11.0, esquema local v15
+- **Sin licencias** (la app se cobra semanal, fuera de la app): lo que cada uno puede hacer depende solo del rol. Todos ven las estadísticas de mazos. Fuera la pantalla de licencia, la sección de Ajustes y el bloqueo por licencia. El Modo administrador queda solo para reabrir temporadas y lo ve la cuenta admin. Los archivos de `core/license` siguen en el proyecto sin usarse (`license_config.dart` no se toca).
+- **Capturas permitidas**: al arrancar se quita el bloqueo (FLAG_SECURE) y se guarda así para el próximo inicio.
+- **Visitante sin cuenta**: "Entrar sin cuenta (solo ver)" en la pantalla de inicio. Ve ranking, tier list, mazos, fichas públicas y torneos terminados o con inscripción abierta. Baja de `GET /v1/public/pull` (sin sesión; mismos filtros que un jugador sin ficha) cada 5 min. No puede crear, editar ni inscribirse. El antiguo "modo local" (sin cuenta = todo permitido) desaparece. Cerrar sesión vuelve a la pantalla de inicio.
+- **Organizador**: ve la lista de Jugadores y puede editar las fichas (también la suya). El servidor acepta cambios de organizadores en `players` aunque la ficha la haya creado otro.
+- **Sincronizar al minimizar/volver**: como mucho una vez cada 30 s.
+- **Hora de inicio**: el torneo guarda día y hora en `date`; al crearlo, 14:00 por defecto, y se cambia en Opciones. Desde esa hora (o si ya empezó) el servidor no deja pedir plaza ni darse de baja. Los torneos antiguos (00:00) se consideran sin hora en la app.
+- **Drop desde el teléfono eliminado**: una vez empezado el torneo el jugador no se retira desde la app (el servidor lo rechaza). Lo hace el organizador.
+- **El juez no juega**: el servidor no deja añadir como juez a quien está inscrito, ni pedir plaza a un juez del torneo. En "Inscribir" no salen los jueces.
+- **Opciones del torneo** (fecha y hora, inscripción desde la app, check-in, jueces) plegadas en un botón junto a "Inscribir". Las solicitudes pendientes siguen a la vista.
+- **Jueces**: confirmación al añadir o quitar.
+- **Pausa del reloj** (v15 `rounds.timer_paused_at`): pausar congela el tiempo en todos los teléfonos y al reanudar se corre el inicio. Sin avisos de tiempo en pausa.
+- **Torneos**: filtro por temporada (los en juego salen siempre) y orden por fecha (más recientes o más antiguos).
+- **Ficha**: por defecto la temporada actual; los nombres de mazo llevan a su ficha.
+- **Ficha del mazo**: pestañas Torneos (filtro por jugador y "Solo Top") y Partidas (filtros por jugador, rival y victoria/derrota).
+- **Ranking**: buscador por jugador, filtro por mazo (el último que jugó en la temporada) y la fila propia en amarillo con "(tú)".
+- **Mazos**: Compartir y Gestionar juntos en un botón de ajustes.
+- **Avisos**: la llamada al juez ya no lleva el nombre del torneo. Menús ⋮ con borde.

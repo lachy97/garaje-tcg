@@ -196,6 +196,10 @@ class Rounds extends Table with SyncColumns {
   /// Cuándo se puso en marcha el reloj de la ronda (v4). null = sin iniciar.
   DateTimeColumn get timerStartedAt => dateTime().nullable()();
 
+  /// Reloj en pausa desde este momento (v15). null = corriendo. Al
+  /// reanudar, [timerStartedAt] se corre lo que duró la pausa.
+  DateTimeColumn get timerPausedAt => dateTime().nullable()();
+
   @override
   List<Set<Column<Object>>> get uniqueKeys => [
         {tournamentId, number},

@@ -43,7 +43,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
   /// Mantiene la pantalla encendida mientras hay tiempo en marcha (solo en el
   /// teléfono que lleva el torneo).
   void _syncWakelock() {
-    final want = !widget.readOnly && widget.round.timerStartedAt != null;
+    final want = !widget.readOnly && widget.round.timerStartedAt != null && !_paused;
     if (want == _awake) return;
     _awake = want;
     // Si el teléfono no lo permite, no pasa nada.
@@ -52,10 +52,13 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
 
   Duration get _total => Duration(minutes: widget.minutes);
 
+  bool get _paused => widget.round.timerPausedAt != null;
+
   Duration? get _remaining {
     final start = widget.round.timerStartedAt;
     if (start == null) return null;
-    return _total - DateTime.now().difference(start);
+    // En pausa: el tiempo queda congelado en el momento de pausar.
+    return _total - (widget.round.timerPausedAt ?? DateTime.now()).difference(start);
   }
 
   @override
@@ -69,7 +72,8 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
   @override
   void didUpdateWidget(RoundTimer old) {
     super.didUpdateWidget(old);
-    if (old.round.timerStartedAt != widget.round.timerStartedAt) {
+    if (old.round.timerStartedAt != widget.round.timerStartedAt ||
+        old.round.timerPausedAt != widget.round.timerPausedAt) {
       _lastRemaining = _remaining;
     }
     _syncWakelock();
@@ -174,11 +178,14 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
 
     final over = remaining <= Duration.zero;
     final lastFive = !over && remaining <= const Duration(minutes: 5);
-    final color = over
-        ? AppColors.loss
-        : lastFive
-            ? AppColors.draw
-            : AppColors.neon;
+    final paused = _paused;
+    final color = paused
+        ? AppColors.textSecondary
+        : over
+            ? AppColors.loss
+            : lastFive
+                ? AppColors.draw
+                : AppColors.neon;
     final progress = over
         ? 1.0
         : 1 - remaining.inMilliseconds / _total.inMilliseconds;
@@ -195,7 +202,7 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
         children: [
           Row(
             children: [
-              Icon(over ? Icons.alarm : Icons.timer_outlined, color: color),
+              Icon(paused ? Icons.pause_circle_outline : over ? Icons.alarm : Icons.timer_outlined, color: color),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -212,15 +219,25 @@ class _RoundTimerState extends ConsumerState<RoundTimer> {
                       ),
                     ),
                     Text(
-                      over
-                          ? 'Se acabó el tiempo: pon los resultados'
-                          : 'Tiempo restante de ${widget.minutes} min',
+                      paused
+                          ? 'En pausa'
+                          : over
+                              ? 'Se acabó el tiempo: pon los resultados'
+                              : 'Tiempo restante de ${widget.minutes} min',
                       style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
               ),
               if (!widget.readOnly) ...[
+              IconButton(
+                tooltip: paused ? 'Reanudar' : 'Pausar',
+                onPressed: () => runGuarded(context, () {
+                  final service = ref.read(tournamentServiceProvider);
+                  return paused ? service.resumeRoundTimer(widget.round) : service.pauseRoundTimer(widget.round);
+                }),
+                icon: Icon(paused ? Icons.play_circle_outline : Icons.pause_circle_outline),
+              ),
               IconButton(
                 tooltip: 'Reiniciar tiempo',
                 onPressed: () => _start(restart: true),
