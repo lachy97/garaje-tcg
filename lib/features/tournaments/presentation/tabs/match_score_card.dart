@@ -242,39 +242,56 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
       ),
       child: Column(
         children: [
-          Text(title,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.1,
-                  color: AppColors.textSecondary)),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _PlayerHeader(
-                  name: p1,
-                  deck: widget.deckNames[m.deck1Id],
-                  highlight: p1Wins,
+          // Parte de arriba (mesa y jugadores): con resultado, al tocarla se
+          // vuelve a plegar en una línea.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: reported && widget.onToggle != null ? widget.onToggle : null,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                            color: AppColors.textSecondary)),
+                    if (reported && widget.onToggle != null)
+                      Icon(Icons.expand_less, size: 18, color: AppColors.textSecondary),
+                  ],
                 ),
-              ),
-              SizedBox(
-                width: 36,
-                child: Text('vs',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-              ),
-              Expanded(
-                child: _PlayerHeader(
-                  name: p2!,
-                  deck: widget.deckNames[m.deck2Id],
-                  highlight: p2Wins,
-                  alignEnd: true,
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _PlayerHeader(
+                        name: p1,
+                        deck: widget.deckNames[m.deck1Id],
+                        highlight: p1Wins,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 36,
+                      child: Text('vs',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                    ),
+                    Expanded(
+                      child: _PlayerHeader(
+                        name: p2!,
+                        deck: widget.deckNames[m.deck2Id],
+                        highlight: p2Wins,
+                        alignEnd: true,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           if (widget.editable) ...[
             const SizedBox(height: 10),
@@ -321,24 +338,12 @@ class _MatchScoreCardState extends ConsumerState<MatchScoreCard> {
                 style: TextStyle(fontSize: 12, color: AppColors.draw),
               ),
             ),
-          if (widget.editable && reported)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (widget.canClear)
-                  TextButton.icon(
-                    onPressed: enabled ? _clear : null,
-                    icon: Icon(Icons.undo, size: 18, color: AppColors.loss),
-                    label: Text('Borrar resultado',
-                        style: TextStyle(color: AppColors.loss, fontSize: 12)),
-                  ),
-                if (widget.onToggle != null)
-                  TextButton.icon(
-                    onPressed: widget.onToggle,
-                    icon: const Icon(Icons.expand_less, size: 18),
-                    label: const Text('Plegar', style: TextStyle(fontSize: 12)),
-                  ),
-              ],
+          if (widget.editable && widget.canClear && reported)
+            TextButton.icon(
+              onPressed: enabled ? _clear : null,
+              icon: Icon(Icons.undo, size: 18, color: AppColors.loss),
+              label: Text('Borrar resultado',
+                  style: TextStyle(color: AppColors.loss, fontSize: 12)),
             ),
         ],
       ),
