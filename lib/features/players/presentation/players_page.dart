@@ -32,19 +32,19 @@ class _PlayersPageState extends ConsumerState<PlayersPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Sin permiso para ver a todos: la pestaña es "Mi ficha".
+    // Sin permiso para ver a todos: la pestaña es "Mi perfil".
     final perms = ref.watch(permissionsProvider);
     if (!perms.canSeeAllPlayers) {
       final mine = perms.playerId;
       if (mine != null) return PlayerProfilePage(playerId: mine);
       return Scaffold(
-        appBar: AppBar(title: const Text('MI FICHA')),
+        appBar: AppBar(title: const Text('MI PERFIL')),
         body: perms.visitor
             ? const EmptyState(
                 icon: Icons.person_outline,
                 title: 'Entraste sin cuenta',
                 subtitle: 'Crea una cuenta o inicia sesión en Ajustes para tener tu ficha '
-                    '(torneos, mazos y ranking). Las fichas de los demás se abren desde el ranking.',
+                    '(torneos, mazos y ranking). Las fichas de los demás se abren desde Datos → Ranking.',
               )
             : const EmptyState(
                 icon: Icons.link_off,
@@ -59,7 +59,18 @@ class _PlayersPageState extends ConsumerState<PlayersPage> {
     final total = ref.watch(playersProvider('')).value?.length;
     final found = players.value?.length;
     return Scaffold(
-      appBar: AppBar(title: const Text('JUGADORES')),
+      appBar: AppBar(
+        title: const Text('JUGADORES'),
+        actions: [
+          // El perfil propio (organizadores y administración con ficha).
+          if (perms.playerId != null)
+            IconButton(
+              tooltip: 'Mi perfil',
+              icon: const Icon(Icons.account_circle_outlined),
+              onPressed: () => context.push('/jugadores/${perms.playerId}'),
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(

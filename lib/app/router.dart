@@ -9,7 +9,6 @@ import '../features/decks/presentation/decks_page.dart';
 import '../features/players/presentation/player_profile_page.dart';
 import '../features/players/presentation/players_page.dart';
 import '../features/license/admin_page.dart';
-import '../features/ranking/presentation/ranking_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/tournaments/presentation/create_tournament_page.dart';
 import '../features/tournaments/presentation/tournament_detail_page.dart';
@@ -59,9 +58,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 ),
               ],
             ),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(path: '/ranking', builder: (_, _) => const RankingPage()),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
@@ -195,19 +191,16 @@ class HomeShell extends ConsumerWidget {
                 icon: Icon(Icons.emoji_events_outlined),
                 selectedIcon: Icon(Icons.emoji_events),
                 label: 'Torneos'),
+            // Ranking, tier list y enfrentamientos juntos (un solo filtro de temporada).
             const NavigationDestination(
                 icon: Icon(Icons.leaderboard_outlined),
                 selectedIcon: Icon(Icons.leaderboard),
-                label: 'Ranking'),
-            const NavigationDestination(
-                icon: Icon(Icons.style_outlined),
-                selectedIcon: Icon(Icons.style),
-                label: 'Mazos'),
-            // Sin permiso para ver a todos, la pestaña es la ficha propia.
+                label: 'Datos'),
+            // Sin permiso para ver a todos, la pestaña es el perfil propio.
             NavigationDestination(
                 icon: Icon(allPlayers ? Icons.people_outline : Icons.person_outline),
                 selectedIcon: Icon(allPlayers ? Icons.people : Icons.person),
-                label: allPlayers ? 'Jugadores' : 'Mi ficha'),
+                label: allPlayers ? 'Jugadores' : 'Mi perfil'),
           ],
         ),
       ),

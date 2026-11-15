@@ -77,16 +77,17 @@ class _WelcomeSheet extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.neon)),
             const SizedBox(height: 12),
-            step(Icons.leaderboard_outlined, 'Ranking y tier list',
-                'El ranking de la temporada y los mazos del momento, siempre al día.'),
+            step(Icons.leaderboard_outlined, 'Datos',
+                'El ranking de la temporada, la tier list y los enfrentamientos entre mazos, '
+                    'siempre al día.'),
             step(Icons.emoji_events_outlined, 'Tus torneos',
                 'Los torneos en los que estás inscrito: cruces, mesa, tiempo de ronda y '
                     'clasificación en vivo.'),
-            step(Icons.person_outline, 'Tu ficha',
+            step(Icons.person_outline, 'Tu perfil',
                 account.playerId == null
                     ? 'Cuando el administrador vincule tu cuenta con tu ficha verás tu '
-                        'historial, mazos y rivales en "Mi ficha".'
-                    : 'Tu historial, tus mazos y tus rivales, en "Mi ficha".'),
+                        'historial, mazos y rivales en "Mi perfil".'
+                    : 'Tu historial, tus mazos y tus rivales, en "Mi perfil".'),
             step(Icons.vpn_lock_outlined, 'Conexión',
                 'Desde Cuba el servidor responde con VPN. Sin conexión ves lo último que '
                     'bajó; arrastra hacia abajo para actualizar.'),

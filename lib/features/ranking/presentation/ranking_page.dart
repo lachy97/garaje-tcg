@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,168 +13,145 @@ import '../../../core/utils/season_utils.dart';
 import '../domain/ranking_row.dart';
 import 'ranking_export.dart';
 import 'ranking_table.dart';
-import 'season_picker.dart';
 
 final seasonRankingProvider =
     StreamProvider.autoDispose.family<List<RankingRow>, String>((ref, seasonId) {
   return ref.watch(rankingDaoProvider).watchSeasonRanking(seasonId);
 });
 
-/// Ranking trimestral en tabla (se comparte como imagen desde la barra).
-class RankingPage extends ConsumerStatefulWidget {
-  const RankingPage({super.key});
+/// Mazos con los que jugó cada jugador en los torneos terminados de una
+/// temporada (para filtrar el ranking por mazo: cuenta cualquiera, no solo
+/// el último).
+final seasonPlayerDecksProvider =
+    StreamProvider.autoDispose.family<Map<String, Set<String>>, String>((ref, seasonId) {
+  final db = ref.watch(databaseProvider);
+  return db
+      .customSelect(
+        'SELECT DISTINCT tp.player_id AS p, d.name AS deck FROM tournament_players tp '
+        'JOIN tournaments t ON t.id = tp.tournament_id '
+        'JOIN decks d ON d.id = tp.deck_id '
+        "WHERE t.season_id = ? AND t.status = 'finished' AND t.deleted_at IS NULL "
+        'AND tp.deleted_at IS NULL',
+        variables: [Variable.withString(seasonId)],
+        readsFrom: {db.tournamentPlayers, db.tournaments, db.decks},
+      )
+      .watch()
+      .map((rows) {
+    final out = <String, Set<String>>{};
+    for (final r in rows) {
+      (out[r.read<String>('p')] ??= <String>{}).add(r.read<String>('deck'));
+    }
+    return out;
+  });
+});
+
+/// Ranking de una temporada (pestaña Ranking de Datos): mi puesto, filtros por
+/// jugador y por mazo jugado, y la tabla.
+class RankingView extends ConsumerStatefulWidget {
+  const RankingView({super.key, required this.season});
+
+  final Season season;
 
   @override
-  ConsumerState<RankingPage> createState() => _RankingPageState();
+  ConsumerState<RankingView> createState() => _RankingViewState();
 }
 
-class _RankingPageState extends ConsumerState<RankingPage> {
-  bool _exporting = false;
-  String? _seasonId; // null = trimestre actual
-
-  /// Filtros: texto (nombre o mazo) y mazo jugado.
+class _RankingViewState extends ConsumerState<RankingView> {
+  /// Filtros: nombre del jugador y mazo con el que jugó en la temporada.
   String _query = '';
   String? _deck;
 
-  Future<void> _export(Season season, List<RankingRow> rows) async {
-    setState(() => _exporting = true);
-    try {
-      await exportRankingImage(context, season: season, rows: rows);
-    } catch (e) {
-      if (mounted) showMessage(context, 'No se pudo compartir la imagen: $e', error: true);
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final seasons = ref.watch(seasonListProvider);
-    final list = seasons.value;
-    final s = list == null || list.isEmpty ? null : pickSeason(list, _seasonId);
-    final rows = s == null ? null : ref.watch(seasonRankingProvider(s.id)).value;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('RANKING'),
-        actions: [
-          if (s != null && rows != null && rows.isNotEmpty)
-            _exporting
-                ? const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  )
-                : ShareButton(tooltip: 'Compartir ranking', onPressed: () => _export(s, rows)),
-          // Cerrar la temporada: irreversible y 4 veces al año, en el menú.
-          if (s != null &&
-              rows != null &&
-              rows.isNotEmpty &&
-              s.status != SeasonStatus.closed &&
-              ref.watch(permissionsProvider).canCreateTournaments)
-            PopupMenuButton<String>(
-              tooltip: 'Más',
-              onSelected: (_) => _closeSeason(context, ref, s),
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'close',
-                  child: ListTile(
-                    leading: Icon(Icons.lock_outline, color: AppColors.loss),
-                    title: Text('Cerrar temporada ${seasonLabel(s.year, s.quarter)}'),
-                  ),
+    final season = widget.season;
+    final ranking = ref.watch(seasonRankingProvider(season.id));
+    final decksByPlayer = ref.watch(seasonPlayerDecksProvider(season.id)).value ?? const {};
+    return AsyncView(
+      value: ranking,
+      builder: (list) => SyncRefresh(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 32),
+          children: [
+            _SeasonStatusBar(season: season, hasRanking: list.isNotEmpty),
+            if (list.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 48),
+                child: EmptyState(
+                  icon: Icons.leaderboard_outlined,
+                  title: 'Aún no hay puntos este trimestre',
+                  subtitle: 'Los puntos se suman al finalizar cada torneo.',
                 ),
-              ],
-            ),
-        ],
-      ),
-      body: AsyncView(
-        value: seasons,
-        builder: (all) {
-          final season = pickSeason(all, _seasonId);
-          final ranking = ref.watch(seasonRankingProvider(season.id));
-          return AsyncView(
-            value: ranking,
-            builder: (list) => SyncRefresh(
-              child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 32),
-              children: [
-                SeasonPicker(
-                  seasons: all,
-                  selected: season,
-                  onChanged: (v) => setState(() => _seasonId = v?.id),
+              )
+            else ...[
+              _MyPlace(rows: list),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          prefixIcon: Icon(Icons.search),
+                          hintText: 'Jugador',
+                        ),
+                        onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterDropdown(
+                      label: 'Mazo',
+                      value: _deck,
+                      options: {
+                        for (final set in decksByPlayer.values)
+                          for (final d in set) d: d,
+                      },
+                      onChanged: (v) => setState(() => _deck = v),
+                    ),
+                  ],
                 ),
-                _SeasonStatusBar(season: season, hasRanking: list.isNotEmpty),
-                if (list.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 48),
-                    child: EmptyState(
-                      icon: Icons.leaderboard_outlined,
-                      title: 'Aún no hay puntos este trimestre',
-                      subtitle: 'Los puntos se suman al finalizar cada torneo.',
-                    ),
-                  )
-                else ...[
-                  _MyPlace(rows: list),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              prefixIcon: Icon(Icons.search),
-                              hintText: 'Jugador',
-                            ),
-                            onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilterDropdown(
-                          label: 'Mazo',
-                          value: _deck,
-                          options: {
-                            for (final r in list)
-                              if (r.lastDeck != null) r.lastDeck!: r.lastDeck!,
-                          },
-                          onChanged: (v) => setState(() => _deck = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Builder(builder: (context) {
-                    final shown = [
-                      for (final r in list)
-                        if ((_query.isEmpty || r.nickname.toLowerCase().contains(_query)) &&
-                            (_deck == null || r.lastDeck == _deck))
-                          r,
-                    ];
-                    return shown.isEmpty
-                        ? const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: EmptyState(icon: Icons.search_off, title: 'Nadie coincide'),
-                          )
-                        : RankingTable(rows: shown, meId: ref.watch(permissionsProvider).playerId);
-                  }),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Text(
-                      'En verde, los 8 primeros (más claro, mejor puesto); en amarillo, tú. '
-                      'Mazo = el último que jugó en la temporada. '
-                      'Desempates: puntos → mejor posición → winrate → menos torneos. '
-                      'PJ = partidas jugadas (sin BYE). Desliza la tabla para ver todas '
-                      'las columnas.',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            ),
-          );
-        },
+              ),
+              Builder(builder: (context) {
+                final shown = [
+                  for (final r in list)
+                    if ((_query.isEmpty || r.nickname.toLowerCase().contains(_query)) &&
+                        (_deck == null || (decksByPlayer[r.playerId]?.contains(_deck) ?? false)))
+                      r,
+                ];
+                return shown.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: EmptyState(icon: Icons.search_off, title: 'Nadie coincide'),
+                      )
+                    : RankingTable(rows: shown, meId: ref.watch(permissionsProvider).playerId);
+              }),
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(
+                  'En verde, los 8 primeros (más claro, mejor puesto); en amarillo, tú. '
+                  'Mazo = el último que jugó; el filtro de mazo incluye a todos los que lo '
+                  'jugaron en algún torneo de la temporada. '
+                  'Desempates: puntos → mejor posición → winrate → menos torneos. '
+                  'PJ = partidas jugadas (sin BYE). Desliza la tabla para ver todas '
+                  'las columnas.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
+  }
+}
+
+/// Compartir el ranking como imagen.
+Future<void> shareRanking(BuildContext context, Season season, List<RankingRow> rows) async {
+  try {
+    await exportRankingImage(context, season: season, rows: rows);
+  } catch (e) {
+    if (context.mounted) showMessage(context, 'No se pudo compartir la imagen: $e', error: true);
   }
 }
 
@@ -210,7 +188,8 @@ class _SeasonStatusBar extends ConsumerWidget {
   }
 }
 
-Future<void> _closeSeason(BuildContext context, WidgetRef ref, Season season) {
+/// Cerrar la temporada (irreversible: se guarda el ranking definitivo).
+Future<void> closeSeason(BuildContext context, WidgetRef ref, Season season) {
   final label = seasonLabel(season.year, season.quarter);
   return runGuarded(context, () async {
     final ok = await confirmDialog(

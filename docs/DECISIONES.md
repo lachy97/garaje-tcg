@@ -431,3 +431,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Registro de acciones del administrador.
   - Guardar la sesión cifrada en el teléfono (hoy va en el almacenamiento privado de la app, sin copia de seguridad de Android).
   - Segundo factor para la cuenta admin.
+
+## Pestaña "Datos" (15/11)
+- La barra de abajo queda en **3 pestañas**: **Torneos · Datos · Mi perfil**. "Mi ficha" pasa a llamarse "Mi perfil". Quien ve la lista de jugadores (organizadores y administración) tiene **Jugadores** en su lugar, con un botón arriba para abrir su propio perfil.
+- **Datos** reúne Ranking, Tier list y Enfrentamientos en pestañas, con **un solo selector de temporada** arriba para las tres. El histórico vale para la tier list y los enfrentamientos; el ranking es siempre de una temporada y lo dice si se elige el histórico.
+- El botón de ajustes de Datos cambia según la pestaña: compartir el ranking o la tier list, gestionar mazos y cerrar la temporada (desde Ranking, solo organizadores y admin).
+- **Filtro por mazo del ranking**: incluye a todos los que jugaron con ese mazo en al menos un torneo terminado de la temporada, no solo a quienes lo usaron por última vez (`seasonPlayerDecksProvider`, con prueba). La columna "Mazo" sigue mostrando el último.

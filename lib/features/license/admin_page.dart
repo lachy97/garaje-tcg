@@ -50,7 +50,7 @@ class _ClosedSeasons extends ConsumerWidget {
     final seasons = ref.watch(seasonListProvider).value ?? const <Season>[];
     final closed = seasons.where((s) => s.status == SeasonStatus.closed).toList();
     if (closed.isEmpty) {
-      return Text('No hay temporadas cerradas. Se cierran desde la pantalla de Ranking.',
+      return Text('No hay temporadas cerradas. Se cierran desde Datos → Ranking (botón de ajustes).',
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
     }
     return Column(
