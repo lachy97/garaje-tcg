@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' show sqrt;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:path_provider/path_provider.dart';
@@ -55,6 +56,16 @@ double _pixelRatioFor(double width, double height) {
 /// la tabla COMPLETA en una sola columna) y la comparte como foto, ajustada al
 /// máximo de WhatsApp HD.
 Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) async {
+  if (kIsWeb) {
+    // Versión web: la imagen va en memoria (no hay carpetas).
+    final r = await renderExportBytes(context, spec);
+    if (r == null) return;
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile.fromData(r.$1, mimeType: 'image/png', name: r.$2)],
+      text: spec.shareText,
+    ));
+    return;
+  }
   final file = await renderExportImage(context, spec);
   if (file == null) return;
   await SharePlus.instance.share(ShareParams(
@@ -66,6 +77,17 @@ Future<void> exportSingleImage<T>(BuildContext context, ExportSpec<T> spec) asyn
 /// Dibuja la imagen de [spec] y la guarda como PNG en la carpeta temporal,
 /// sin compartirla (para compartir varias juntas). null = se cerró la pantalla.
 Future<File?> renderExportImage<T>(BuildContext context, ExportSpec<T> spec) async {
+  final r = await renderExportBytes(context, spec);
+  if (r == null) return null;
+  final dir = await getTemporaryDirectory();
+  final file = File('${dir.path}/${r.$2}');
+  await file.writeAsBytes(r.$1, flush: true);
+  return file;
+}
+
+/// La imagen de [spec] en PNG y su nombre de archivo. null = se cerró la
+/// pantalla.
+Future<(Uint8List, String)?> renderExportBytes<T>(BuildContext context, ExportSpec<T> spec) async {
   await precacheImage(const AssetImage(BrandAssets.logo), context);
   for (final img in spec.preload) {
     if (!context.mounted) return null;
@@ -107,11 +129,7 @@ Future<File?> renderExportImage<T>(BuildContext context, ExportSpec<T> spec) asy
   final bytes = await _capture(context, page,
       width: width, pixelRatio: _pixelRatioFor(width, height));
   final stamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
-  final name = '${spec.fileBase}_$stamp.png';
-  final dir = await getTemporaryDirectory();
-  final file = File('${dir.path}/$name');
-  await file.writeAsBytes(bytes, flush: true);
-  return file;
+  return (bytes, '${spec.fileBase}_$stamp.png');
 }
 
 Future<Uint8List> _capture(

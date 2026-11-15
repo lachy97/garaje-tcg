@@ -63,3 +63,13 @@ test('/v1/poll: varias consultas y el latido en una sola petición', async () =>
   // Sin sesión: 401 para todo.
   assert.equal((await call('POST', '/v1/poll', { gets: ['v1/me/judging'] })).status, 401);
 });
+
+test('CORS: la versión web puede llamar desde otro dominio', async () => {
+  const env = { DB: makeD1(), DEV_CODES: '1' };
+  const pre = await handle(new Request('https://api.test/v1/poll', { method: 'OPTIONS' }), env, {});
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers.get('access-control-allow-origin'), '*');
+  assert.match(pre.headers.get('access-control-allow-headers'), /authorization/);
+  const h = await handle(new Request('https://api.test/v1/health'), env, {});
+  assert.equal(h.headers.get('access-control-allow-origin'), '*');
+});

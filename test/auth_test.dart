@@ -220,6 +220,13 @@ void main() {
       expect(juez.canManageTournament(isOwner: false), isFalse);
     });
 
+    test('versión web: el organizador consulta y arbitra, no lleva torneos', () {
+      const p = Permissions(role: AppRole.organizer, webReadOnly: true);
+      expect(p.canCreateTournaments || p.canManageTournament(isOwner: true) || p.canEditPlayers || p.canBackup, isFalse);
+      expect(p.canSeeAllPlayers && p.canSeeDeckStats, isTrue);
+      expect(p.canReportResults(isOwner: false, isJudge: true), isTrue);
+    });
+
     test('administrador con cuenta', () {
       const p = Permissions(role: AppRole.admin);
       expect(p.canSeeAllPlayers && p.canManageAccounts && p.canSeeDeckStats, isTrue);

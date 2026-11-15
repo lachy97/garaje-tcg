@@ -42,7 +42,14 @@ class AppDatabase extends _$AppDatabase {
   /// [executor] permite inyectar una BD en memoria para tests.
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
-  static QueryExecutor _open() => driftDatabase(name: kDatabaseName);
+  static QueryExecutor _open() => driftDatabase(
+        name: kDatabaseName,
+        // Versión web (iPhone): SQLite en WebAssembly, guardado en el navegador.
+        web: DriftWebOptions(
+          sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+          driftWorker: Uri.parse('drift_worker.js'),
+        ),
+      );
 
   bool _closed = false;
 

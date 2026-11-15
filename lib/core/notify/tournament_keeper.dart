@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 /// Mientras hay un torneo en juego que le importa a este teléfono (juega,
@@ -33,6 +34,7 @@ class TournamentKeeper {
 
   /// Enciende o apaga el servicio. No lanza.
   static Future<void> set(bool on, {String text = 'Siguiendo tus mesas y avisos'}) async {
+    if (kIsWeb) return; // la web no tiene servicio en primer plano
     try {
       _init();
       final running = await FlutterForegroundTask.isRunningService;

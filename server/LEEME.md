@@ -383,3 +383,52 @@ npm run deploy
 ```
 
 `/v1/health` debe decir `1.11.0`. Despliega antes de instalar la APK nueva.
+
+## 20 · Versión web (iPhone) — servidor 1.12.0
+
+La app también funciona en el navegador. Los iPhone la usan desde Safari y
+pueden añadirla a la pantalla de inicio. Con ella se puede ver, jugar
+(reportar, juez, inscribirse) y arbitrar; los torneos se siguen llevando
+desde la app de Android.
+
+**1. Servidor** (permite llamadas desde la web, CORS). En `server`, con VPN:
+
+```powershell
+npm run deploy
+```
+
+**2. Crear el sitio en Cloudflare Pages** (una sola vez):
+
+```powershell
+npx wrangler pages project create garage-tcg --production-branch=main
+```
+
+La dirección será `https://garage-tcg.pages.dev`.
+
+**3. Publicar automáticamente desde GitHub** (recomendado, una sola vez):
+
+- En Cloudflare: *My Profile → API Tokens → Create Token → Custom token*,
+  con el permiso **Account → Cloudflare Pages → Edit**. Copia el token.
+- El *Account ID* sale en la página principal de Workers & Pages (columna
+  derecha).
+- En GitHub: *Settings → Secrets and variables → Actions → New repository
+  secret*: `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`.
+- Copia `build-web.yml` en `.github/workflows/`.
+
+Desde entonces, cada `git push` publica la web sola (Actions → Build Web).
+
+**Sin los secretos (a mano):** descarga el artefacto `garage-tcg-web` de la
+ejecución de Actions, descomprímelo y:
+
+```powershell
+npx wrangler pages deploy garage-tcg-web --project-name=garage-tcg
+```
+
+**En el iPhone:** abrir `https://garage-tcg.pages.dev` en **Safari** → botón
+Compartir → **Añadir a pantalla de inicio**. Se abre como una app.
+
+Limitaciones de la web:
+- No hay avisos con la página cerrada: se ven al abrirla.
+- No hay copias de seguridad, fotos propias de mazos ni descarga de cartas
+  (las cartas se ven desde internet).
+- Llevar torneos, solo desde Android.

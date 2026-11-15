@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -122,7 +123,8 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     if (reason != null) return SyncStatus(reason: reason);
     final role = session?.account.role;
     // Visitante (sin sesión) y jugadores: solo bajan.
-    final download = role != AppRole.admin && role != AppRole.organizer;
+    // En la web (iPhone) todos bajan: los torneos se llevan desde Android.
+    final download = kIsWeb || (role != AppRole.admin && role != AppRole.organizer);
 
     _timer = Timer.periodic(interval, (_) => sync(force: false));
     WidgetsBinding.instance.addObserver(this);

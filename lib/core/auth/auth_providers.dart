@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -159,6 +159,7 @@ final permissionsProvider = Provider<Permissions>((ref) {
   return Permissions(
     role: preview ?? real,
     playerId: session.account.playerId,
+    webReadOnly: kIsWeb,
   );
 });
 

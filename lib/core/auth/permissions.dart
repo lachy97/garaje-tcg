@@ -20,6 +20,7 @@ class Permissions {
     this.playerId,
     this.local = false,
     this.visitor = false,
+    this.webReadOnly = false,
   });
 
   /// Sin cuenta: todo permitido (como hasta ahora).
@@ -28,7 +29,8 @@ class Permissions {
         hasLicense = true,
         playerId = null,
         local = true,
-        visitor = false;
+        visitor = false,
+        webReadOnly = false;
 
   /// Sin cuenta: solo consulta.
   const Permissions.visitor()
@@ -36,7 +38,8 @@ class Permissions {
         hasLicense = true,
         playerId = null,
         local = false,
-        visitor = true;
+        visitor = true,
+        webReadOnly = true;
 
   final AppRole role;
   final bool hasLicense;
@@ -47,6 +50,10 @@ class Permissions {
 
   /// Entró sin cuenta (solo consulta).
   final bool visitor;
+
+  /// Versión web (iPhone): se consulta, se juega y se arbitra, pero los
+  /// torneos se llevan desde la app de Android.
+  final bool webReadOnly;
 
   bool get isAdmin => local || role == AppRole.admin;
   bool get _organizer => role == AppRole.organizer;
@@ -60,7 +67,7 @@ class Permissions {
 
   /// Editar fichas de jugador (también la propia): administrador y
   /// organizadores.
-  bool get canEditPlayers => isAdmin || _organizer;
+  bool get canEditPlayers => !webReadOnly && (isAdmin || _organizer);
 
   /// Ficha de un jugador: todos ven la ficha pública de cualquiera (apodo,
   /// torneos, mazos, winrate). Ver [canSeePersonalData] para lo privado.
@@ -76,7 +83,7 @@ class Permissions {
   bool get canSeeDeckStats => true;
 
   /// Crear torneos y llevar los propios.
-  bool get canCreateTournaments => isAdmin || _organizer;
+  bool get canCreateTournaments => !webReadOnly && (isAdmin || _organizer);
 
   /// Ver un torneo: el administrador todos; el organizador los suyos; el
   /// juez aquellos donde lo añadieron; el jugador aquellos donde está (o
@@ -89,7 +96,8 @@ class Permissions {
       isAdmin || isOwner || isJudge || isEnrolled;
 
   /// Configurar el torneo (inscripción, rondas, cerrar…): su organizador.
-  bool canManageTournament({required bool isOwner}) => isAdmin || (_organizer && isOwner);
+  bool canManageTournament({required bool isOwner}) =>
+      !webReadOnly && (isAdmin || (_organizer && isOwner));
 
   /// Reportar resultados y poner penalizaciones: el organizador del torneo y
   /// sus jueces.
@@ -101,7 +109,7 @@ class Permissions {
   bool canSearchPlayersToEnroll({required bool isOwner}) => canManageTournament(isOwner: isOwner);
 
   /// Copias .gtcg: el administrador y los organizadores.
-  bool get canBackup => isAdmin || role == AppRole.organizer;
+  bool get canBackup => !webReadOnly && (isAdmin || role == AppRole.organizer);
 
   /// Cuentas y roles.
   bool get canManageAccounts => isAdmin && !local;

@@ -392,3 +392,15 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Ranking**: buscador por jugador, filtro por mazo (el último que jugó en la temporada) y la fila propia en amarillo con "(tú)".
 - **Mazos**: Compartir y Gestionar juntos en un botón de ajustes.
 - **Avisos**: la llamada al juez ya no lleva el nombre del torneo. Menús ⋮ con borde.
+
+## Versión web para iPhone (15/11) — servidor 1.12.0
+- **Por qué**: en iPhone no se instala una APK, y publicar en el App Store o en TestFlight pide una cuenta de Apple (99 USD/año) que desde Cuba no se puede sacar. Solución provisional: la **misma app de Flutter compilada para web**, publicada en Cloudflare Pages (`garage-tcg.pages.dev`). En Safari se puede "Añadir a pantalla de inicio". Android sigue igual.
+- **Mismo código**, con estas diferencias en la web (`kIsWeb`):
+  - **Base de datos**: SQLite en WebAssembly (`web/sqlite3.wasm` y `web/drift_worker.js`, compilado desde `tool/drift_worker.dart`), guardada en el navegador.
+  - **Conexión**: `fetch` del navegador (paquete `http`) en lugar de `dart:io`; Android usa exactamente el mismo código que antes (`core/platform/http_transport*.dart`).
+  - **Solo consulta, juego y arbitraje**: en la web nadie lleva torneos (`Permissions.webReadOnly`) y todos bajan datos. Los organizadores usan Android.
+  - **Sin** avisos del sistema, servicio en primer plano, copias de seguridad, fotos propias de mazos ni descarga de cartas. Las cartas se ven directamente desde GitHub Pages y compartir imágenes usa el menú de compartir del navegador.
+- **Motor de Flutter servido desde la propia web** (`--no-web-resources-cdn`): los servidores de Google están bloqueados en Cuba.
+- **Servidor**: CORS (`Access-Control-Allow-Origin: *` y respuesta a `OPTIONS`). Es seguro porque la sesión va en `Authorization`, no en cookies.
+- **Probado** con un servidor local: la web entra sin cuenta, inicia sesión, baja los datos y muestra "Mi mesa ahora" con cuenta atrás, reportar y llamar al juez.
+- **Despliegue**: workflow `build-web.yml`. Si están los secretos de Cloudflare publica solo; si no, deja la web como artefacto para publicarla a mano (LEEME §20).

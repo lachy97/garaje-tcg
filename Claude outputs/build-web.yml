@@ -1,0 +1,59 @@
+# Versión web de Garage TCG (para iPhone): se compila en GitHub y, si están
+# los secretos de Cloudflare, se publica en Cloudflare Pages
+# (https://garage-tcg.pages.dev). Sin secretos queda como artefacto
+# "garage-tcg-web" para publicarla a mano (server/LEEME.md §20).
+name: Build Web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # La misma versión de Flutter que la APK.
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.x
+          cache: true
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Código generado (Drift)
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      # --no-web-resources-cdn: el motor (CanvasKit) se sirve desde la propia
+      # web y no desde los servidores de Google (bloqueados en Cuba).
+      - name: Compilar web
+        run: >
+          flutter build web --release --no-web-resources-cdn
+          --build-number=${{ github.run_number }}
+
+      - name: Artefacto (para publicar a mano)
+        uses: actions/upload-artifact@v4
+        with:
+          name: garage-tcg-web
+          path: build/web
+          retention-days: 30
+
+      - name: Publicar en Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Sin secretos de Cloudflare: la web queda solo como artefacto"
+            exit 0
+          fi
+          npx --yes wrangler@4 pages deploy build/web --project-name=garage-tcg --branch=main --commit-dirty=true

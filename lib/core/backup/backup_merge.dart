@@ -2,10 +2,10 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../db/app_database.dart';
+import '../platform/native_db.dart' if (dart.library.js_interop) '../platform/native_db_web.dart';
 
 /// Resumen de una importación integrada.
 class MergeReport {
@@ -149,7 +149,7 @@ class BackupMerger {
     try {
       // La copia se abre aparte para llevarla al esquema actual (si viene de
       // una versión anterior, Drift la migra igual que al abrir la app).
-      final incoming = AppDatabase(NativeDatabase(file));
+      final incoming = AppDatabase(openNativeFile(file));
       await incoming.customSelect('SELECT 1').get();
       await incoming.close();
 

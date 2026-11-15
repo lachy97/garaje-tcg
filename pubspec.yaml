@@ -23,6 +23,8 @@ dependencies:
   go_router: ^16.0.0
   # Utilidades
   uuid: ^4.5.1
+  # Conexión al servidor desde la versión web (iPhone)
+  http: ^1.6.0
   intl: ^0.20.2
   shared_preferences: ^2.5.3
   package_info_plus: ^8.3.0

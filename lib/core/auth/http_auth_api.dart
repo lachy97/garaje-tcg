@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart' show ValueNotifier;
 
 import 'account.dart';
 import 'auth_api.dart';
 import 'auth_rules.dart';
+import '../platform/http_transport.dart' if (dart.library.js_interop) '../platform/http_transport_web.dart';
 
 /// Cliente del servidor real (server/ · Cloudflare Workers + D1).
 ///
@@ -14,9 +14,9 @@ import 'auth_rules.dart';
 /// códigos en la respuesta; se guardan en [outbox] para mostrarlos en la app
 /// mientras los correos no estén configurados.
 class HttpAuthApi implements AuthApi {
-  HttpAuthApi(String baseUrl, {HttpClient? client, this.timeout = const Duration(seconds: 20)})
+  HttpAuthApi(String baseUrl, {this.timeout = const Duration(seconds: 20)})
       : _base = Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/'),
-        _client = client ?? (HttpClient()..connectionTimeout = timeout);
+        _client = HttpTransport(timeout);
 
   /// Número de compilación de esta app (se envía en cada llamada para que el
   /// servidor pueda exigir una versión mínima). Lo pone main() al arrancar.
@@ -30,7 +30,8 @@ class HttpAuthApi implements AuthApi {
   static final updateRequired = ValueNotifier<bool>(false);
 
   final Uri _base;
-  final HttpClient _client;
+  /// dart:io en Android; fetch del navegador en la versión web.
+  final HttpTransport _client;
   final Duration timeout;
   final List<SentEmail> _dev = [];
 
@@ -50,48 +51,33 @@ class HttpAuthApi implements AuthApi {
     Map<String, Object?>? body,
     String? token,
   }) async {
-    try {
-      final req = await _client.openUrl(method, _base.resolve(path)).timeout(timeout);
-      req.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      req.headers.set('X-App-Build', '$appBuild');
-      if (deviceId != null) req.headers.set('X-Device-Id', deviceId!);
+    final headers = <String, String>{
+      'accept': 'application/json',
+      'x-app-build': '$appBuild',
+      if (deviceId != null) 'x-device-id': deviceId!,
       // Codificado: las cabeceras no admiten tildes.
-      if (deviceName != null) req.headers.set('X-Device-Name', Uri.encodeComponent(deviceName!));
-      if (token != null) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      if (body != null) {
-        req.headers.contentType = ContentType.json;
-        req.add(utf8.encode(jsonEncode(body)));
-      }
-      final res = await req.close().timeout(timeout);
-      final text = await res.transform(utf8.decoder).join().timeout(timeout);
-      Map<String, Object?> data;
-      try {
-        data = text.isEmpty ? {} : (jsonDecode(text) as Map).cast<String, Object?>();
-      } on FormatException {
-        throw AuthException('Respuesta inesperada del servidor (${res.statusCode}).');
-      }
-      if (res.statusCode >= 400) {
-        if (data['code'] == 'update_required') {
-          updateRequired.value = true;
-          throw AuthException((data['error'] as String?) ?? 'Actualiza la app.');
-        }
-        if (data['code'] == 'unverified' && data['email'] is String) {
-          throw UnverifiedAccountException(data['email']! as String);
-        }
-        throw AuthException((data['error'] as String?) ?? 'Error del servidor (${res.statusCode}).');
-      }
-      return data;
-    } on AuthException {
-      rethrow;
-    } on TimeoutException {
-      throw const AuthNetworkException('El servidor no responde. Revisa la conexión (o prueba con VPN).');
-    } on HandshakeException {
-      throw const AuthNetworkException('No se pudo conectar de forma segura con el servidor.');
-    } on SocketException {
-      throw const AuthNetworkException('Sin conexión con el servidor. Revisa los datos o el wifi, y que la VPN esté activada.');
-    } on HttpException catch (e) {
-      throw AuthNetworkException('Error de conexión: ${e.message}');
+      if (deviceName != null) 'x-device-name': Uri.encodeComponent(deviceName!),
+      if (token != null) 'authorization': 'Bearer $token',
+    };
+    final (status, text) = await _client.send(
+        method, _base.resolve(path), headers, body == null ? null : jsonEncode(body), timeout);
+    Map<String, Object?> data;
+    try {
+      data = text.isEmpty ? {} : (jsonDecode(text) as Map).cast<String, Object?>();
+    } on FormatException {
+      throw AuthException('Respuesta inesperada del servidor ($status).');
     }
+    if (status >= 400) {
+      if (data['code'] == 'update_required') {
+        updateRequired.value = true;
+        throw AuthException((data['error'] as String?) ?? 'Actualiza la app.');
+      }
+      if (data['code'] == 'unverified' && data['email'] is String) {
+        throw UnverifiedAccountException(data['email']! as String);
+      }
+      throw AuthException((data['error'] as String?) ?? 'Error del servidor ($status).');
+    }
+    return data;
   }
 
   /// Llamada a cualquier ruta de la API (la usa la sincronización).

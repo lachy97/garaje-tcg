@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -200,6 +201,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const AccountSection(),
               const SectionLabel('Sincronización'),
               const SyncSection(),
+              // Versión web: sin avisos del sistema.
+              if (!kIsWeb) ...[
               const SectionLabel('Avisos'),
               NeonCard(
                 padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
@@ -233,6 +236,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ),
                 ),
               ),
+              ],
               const SectionLabel('Apariencia'),
               NeonCard(
                 child: Column(
@@ -301,8 +305,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ),
               ],
-              const SectionLabel('Cartas'),
-              const CardDataSection(),
+              if (!kIsWeb) ...[
+                const SectionLabel('Cartas'),
+                const CardDataSection(),
+              ],
               // Conexión con el servidor y diagnóstico: solo administración.
               if (perms.isAdmin) ...[
                 const SectionLabel('Servidor'),

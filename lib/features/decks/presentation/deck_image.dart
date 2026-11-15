@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
@@ -12,6 +13,9 @@ const kDeckImageAspect = 1.0;
 ImageProvider? deckImageProvider(String? path) {
   if (path == null || path.isEmpty) return null;
   if (path.startsWith('assets/')) return AssetImage(path);
+  // Versión web: solo las imágenes del catálogo (las fotos propias están en
+  // el teléfono del organizador).
+  if (kIsWeb) return null;
   final real = AppPaths.resolve(path);
   if (real == null) return null;
   final f = File(real);

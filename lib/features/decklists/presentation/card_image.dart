@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,7 +48,9 @@ class _CardImageState extends ConsumerState<CardImage> {
     if (old.id != widget.id || old.size != widget.size) _load();
   }
 
-  void _load() => _file = ref.read(cardImageStoreProvider).get(widget.id, widget.size);
+  void _load() => _file = kIsWeb
+      ? Future<File?>.value()
+      : ref.read(cardImageStoreProvider).get(widget.id, widget.size);
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +60,15 @@ class _CardImageState extends ConsumerState<CardImage> {
     return SizedBox(
       width: widget.width,
       height: height,
-      child: FutureBuilder<File?>(
+      // Versión web: la imagen directamente del servidor de cartas.
+      child: kIsWeb
+          ? Image.network(
+              '${cardImageHosts.first}/${widget.size.dir}/${widget.id}.jpg',
+              fit: widget.fit,
+              errorBuilder: (_, _, _) => _placeholder(loading: false),
+              loadingBuilder: (_, child, progress) => progress == null ? child : _placeholder(loading: true),
+            )
+          : FutureBuilder<File?>(
         future: _file,
         builder: (context, snap) {
           final f = snap.data;

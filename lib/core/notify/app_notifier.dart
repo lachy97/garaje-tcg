@@ -1,5 +1,7 @@
 import 'dart:ui' show Color;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,7 +26,8 @@ class AppNotifier {
   static bool _ready = false;
 
   static Future<void> init() async {
-    if (_ready) return;
+    // Versión web: sin avisos del sistema (se ven al abrir la página).
+    if (_ready || kIsWeb) return;
     try {
       await _plugin.initialize(
         const InitializationSettings(android: AndroidInitializationSettings('ic_notification')),
@@ -37,6 +40,7 @@ class AppNotifier {
 
   /// Android 13+: pide permiso para mostrar avisos (una vez).
   static Future<void> requestPermission() async {
+    if (kIsWeb) return;
     await init();
     try {
       await _plugin

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Garage TCG: torneos, ranking y tier list de la comunidad.">
+
+  <!-- iPhone: "Añadir a pantalla de inicio" la abre como una app -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Garage TCG">
+  <meta name="theme-color" content="#000000">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Garage TCG</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; }
+    #carga { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 18px; color: #8CF04C; font: 600 15px -apple-system, system-ui, sans-serif; }
+    #carga img { width: 120px; height: 120px; border-radius: 26px; }
+  </style>
+</head>
+<body>
+  <!-- Mientras carga (la primera vez tarda unos segundos) -->
+  <div id="carga"><img src="icons/Icon-192.png" alt="Garage TCG"><div>Cargando Garage TCG…</div></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var c = document.getElementById('carga'); if (c) c.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

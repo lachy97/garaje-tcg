@@ -6,12 +6,21 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.11.0';
+export const VERSION = '1.12.0';
+
+/** La versión web (iPhone) llama desde otro dominio: se permite (las
+ *  sesiones van en la cabecera Authorization, no en cookies). */
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'authorization, content-type, x-app-build, x-device-id, x-device-name',
+  'access-control-max-age': '86400',
+};
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS },
   });
 
 async function readBody(request) {
@@ -41,6 +50,8 @@ export async function handle(request, env, opts) {
   const control = new ControlService(env, auth);
   const device = (request.headers.get('x-device-id') ?? '').slice(0, 64);
   const deviceName = request.headers.get('x-device-name');
+  // Consulta previa del navegador (CORS).
+  if (m === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   try {
     // Fase 0: prueba de conexión desde Cuba.
     if ((path === '/v1/health' || path === '/') && m === 'GET') {
