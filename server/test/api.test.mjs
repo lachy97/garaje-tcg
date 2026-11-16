@@ -263,3 +263,37 @@ test('admin borra una cuenta: la ficha se queda', async () => {
   const again = await call('POST', '/v1/auth/register', { username: 'leo2', email: 'leo@gmail.com', password: 'clave1234', nickname: 'Leo' });
   assert.notEqual(again.status, 409, 'el Gmail ya no está en uso');
 });
+
+test('versión mínima: la fija el administrador desde la app; la web no se bloquea', async () => {
+  const env = { DB: makeD1(), ADMIN_EMAIL: 'lachy@gmail.com', DEV_CODES: '1' };
+  const opts = { now: () => Date.UTC(2026, 10, 10, 12), iterations: 1000 };
+  const call = async (method, path, body, token, build = '60') => {
+    const res = await handle(new Request(`https://api.test${path}`, {
+      method,
+      headers: {
+        'content-type': 'application/json',
+        'x-app-build': build,
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    }), env, opts);
+    return { status: res.status, data: await res.json() };
+  };
+  const r = await call('POST', '/v1/auth/register', { username: 'lachy', email: 'lachy@gmail.com', password: 'clave1234', nickname: 'L' });
+  const admin = (await call('POST', '/v1/auth/verify', { email: 'lachy@gmail.com', code: r.data.devCode })).data.session;
+  const p = await call('POST', '/v1/auth/register', { username: 'leo', email: 'leo@gmail.com', password: 'clave1234', nickname: 'Leo' });
+  const leo = (await call('POST', '/v1/auth/verify', { email: 'leo@gmail.com', code: p.data.devCode })).data.session;
+  assert.equal((await call('POST', '/v1/admin/app-version', { minBuild: 60 }, leo.token)).status, 403);
+  let s = await call('POST', '/v1/admin/app-version', { minBuild: 60 }, admin.token);
+  assert.equal(s.data.minBuild, 60);
+  assert.equal((await call('GET', '/v1/me', null, leo.token, '59')).status, 426, 'versión anterior: bloqueada');
+  const old = await call('GET', '/v1/me', null, leo.token, '59');
+  assert.equal(old.data.minBuild, 60);
+  assert.equal((await call('GET', '/v1/me', null, leo.token, '60')).status, 200);
+  assert.equal((await call('GET', '/v1/me', null, leo.token, 'web')).status, 200, 'la web siempre es la última');
+  assert.equal((await call('GET', '/v1/health', null, null, '1')).status, 200, 'health siempre responde');
+  s = await call('GET', '/v1/admin/app-version', null, admin.token);
+  assert.equal(s.data.minBuild, 60);
+  assert.equal((await call('POST', '/v1/admin/app-version', { minBuild: 0 }, admin.token)).data.minBuild, 0);
+  assert.equal((await call('GET', '/v1/me', null, leo.token, '1')).status, 200, 'sin mínimo');
+});

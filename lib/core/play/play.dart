@@ -39,6 +39,17 @@ class ReportScore {
     return '${mine > theirs ? 'Ganas' : 'Pierdes'} ${label(asP1: asP1)}';
   }
 
+  /// Lo que dijo quien reportó, desde su lado: "Pedro ganó 2-1",
+  /// "Pedro perdió 0-2", "Pedro: empate 1-1-1". [asP1] = quien reportó es el
+  /// jugador 1 de la mesa.
+  String said(String who, {required bool asP1}) {
+    final mine = asP1 ? g1 : g2;
+    final theirs = asP1 ? g2 : g1;
+    final score = label(asP1: asP1);
+    if (mine == theirs) return '$who: empate $score';
+    return '$who ${mine > theirs ? 'ganó' : 'perdió'} $score';
+  }
+
   @override
   bool operator ==(Object other) =>
       other is ReportScore && other.g1 == g1 && other.gd == gd && other.g2 == g2;

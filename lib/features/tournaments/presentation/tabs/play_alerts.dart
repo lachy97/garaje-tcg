@@ -100,6 +100,19 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
       return '${widget.names[m.player1Id] ?? '?'} vs ${widget.names[m.player2Id] ?? '?'}';
     }
 
+    // Quién reportó y si es el jugador 1 de la mesa (el marcador se guarda
+    // desde el jugador 1; se enseña desde quien reportó).
+    String who(PlayAction a) => widget.names[a.playerId] ?? a.nickname ?? '?';
+    bool reporterP1(PlayAction a) => byMatch[a.matchId]?.player1Id == a.playerId;
+    String said(PlayAction a) => a.score == null ? '${who(a)} reportó' : a.score!.said(who(a), asP1: reporterP1(a));
+    String rivalSaid(PlayAction a) {
+      final m = byMatch[a.matchId];
+      final other = a.otherScore;
+      if (m == null || other == null) return 'el rival no está de acuerdo';
+      final rivalId = reporterP1(a) ? m.player2Id : m.player1Id;
+      return other.said(widget.names[rivalId] ?? 'el rival', asP1: !reporterP1(a));
+    }
+
     Widget tile(PlayAction a) {
       final busy = _busy == a.id;
       final (IconData icon, Color color, String title, String detail) = switch (a.kind) {
@@ -120,19 +133,18 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
                 Icons.report_problem_outlined,
                 AppColors.loss,
                 '${table(a)}No coinciden',
-                '${vs(a)}: ${a.nickname ?? '?'} dice ${a.score?.label(asP1: true)}, el rival '
-                    '${a.otherScore?.label(asP1: true) ?? 'no está de acuerdo'} (desde el jugador 1)',
+                '${vs(a)}: ${said(a)}; ${rivalSaid(a)}',
               ),
             PlayStatus.confirmed => (
                 Icons.check_circle_outline,
                 AppColors.neon,
-                '${table(a)}Confirmado ${a.score?.label(asP1: true)}',
+                '${table(a)}${said(a)} · confirmado',
                 '${vs(a)} · se pone solo al sincronizar',
               ),
             _ => (
                 Icons.hourglass_top,
                 AppColors.textSecondary,
-                '${table(a)}${a.nickname ?? '?'} reportó ${a.score?.label(asP1: true)}',
+                '${table(a)}${said(a)}',
                 '${vs(a)} · falta que confirme el rival',
               ),
           },
@@ -164,7 +176,7 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
                           TextButton(
                             onPressed: () => _apply(a),
                             // El rival no confirma: lo confirma el organizador.
-                            child: Text('Confirmar ${a.score!.label(asP1: true)}'),
+                            child: Text('Confirmar ${a.score!.label(asP1: reporterP1(a))}'),
                           ),
                         if (a.kind != PlayKind.drop)
                           TextButton(

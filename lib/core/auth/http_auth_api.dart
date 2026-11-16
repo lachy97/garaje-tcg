@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'account.dart';
 import 'auth_api.dart';
@@ -26,8 +27,48 @@ class HttpAuthApi implements AuthApi {
   static String? deviceId;
   static String? deviceName;
 
-  /// El servidor pidió actualizar la app (versión demasiado vieja).
+  /// El servidor pidió actualizar la app (versión demasiado vieja): la app
+  /// queda bloqueada en la pantalla de actualizar.
   static final updateRequired = ValueNotifier<bool>(false);
+
+  static const _minKey = 'update.minBuild';
+
+  /// Al arrancar: si el servidor ya pidió una versión mayor que esta, se
+  /// bloquea aunque no haya conexión. Con la versión nueva se olvida.
+  static Future<void> loadUpdateRequirement() async {
+    if (kIsWeb) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      final min = p.getInt(_minKey) ?? 0;
+      if (min > 0 && appBuild < min) {
+        updateRequired.value = true;
+        _pendingMin = true;
+      } else if (min > 0) {
+        await p.remove(_minKey);
+      }
+    } catch (_) {}
+  }
+
+  /// Bloqueada por lo guardado: si el servidor vuelve a aceptar esta versión
+  /// (el administrador bajó el mínimo), se olvida.
+  static bool _pendingMin = false;
+
+  static Future<void> _forgetMin() async {
+    _pendingMin = false;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.remove(_minKey);
+    } catch (_) {}
+  }
+
+  static Future<void> _rememberMin(Object? min) async {
+    final n = min is num ? min.toInt() : 0;
+    if (n <= 0 || kIsWeb) return;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setInt(_minKey, n);
+    } catch (_) {}
+  }
 
   final Uri _base;
   /// dart:io en Android; fetch del navegador en la versión web.
@@ -53,7 +94,8 @@ class HttpAuthApi implements AuthApi {
   }) async {
     final headers = <String, String>{
       'accept': 'application/json',
-      'x-app-build': '$appBuild',
+      // La versión web siempre es la última: no se le exige versión.
+      'x-app-build': kIsWeb ? 'web' : '$appBuild',
       if (deviceId != null) 'x-device-id': deviceId!,
       // Codificado: las cabeceras no admiten tildes.
       if (deviceName != null) 'x-device-name': Uri.encodeComponent(deviceName!),
@@ -79,6 +121,7 @@ class HttpAuthApi implements AuthApi {
     if (status >= 400) {
       if (data['code'] == 'update_required') {
         updateRequired.value = true;
+        unawaited(_rememberMin(data['minBuild']));
         throw AuthException((data['error'] as String?) ?? 'Actualiza la app.');
       }
       if (data['code'] == 'unverified' && data['email'] is String) {
@@ -86,6 +129,8 @@ class HttpAuthApi implements AuthApi {
       }
       throw AuthException((data['error'] as String?) ?? 'Error del servidor ($status).', status: status);
     }
+    // (/v1/health no comprueba la versión: no cuenta.)
+    if (_pendingMin && !path.contains('health')) unawaited(_forgetMin());
     return data;
   }
 

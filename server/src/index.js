@@ -6,7 +6,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.16.0';
+export const VERSION = '1.17.0';
 
 /** La versión web (iPhone) llama desde otro dominio: se permite (las
  *  sesiones van en la cabecera Authorization, no en cookies). */
@@ -97,16 +97,18 @@ async function route(request, env, opts) {
       }
     }
 
-    // Versión mínima de la app (secreto o variable MIN_APP_BUILD = número de
-    // compilación de GitHub Actions). Las versiones viejas reciben un aviso
-    // para actualizar en vez de fallar a medias.
-    const minBuild = Number(env.MIN_APP_BUILD ?? 0);
-    if (minBuild > 0) {
-      const build = Number(request.headers.get('x-app-build') ?? 0) || 0;
-      if (build < minBuild) {
+    // Versión mínima de la app Android: la que fija el administrador desde
+    // la app (Ajustes → Servidor) o la variable MIN_APP_BUILD (la mayor).
+    // Las anteriores no pueden usar el servidor: la app enseña la pantalla de
+    // actualizar. La versión web siempre es la última (cabecera "web").
+    const appBuild = request.headers.get('x-app-build');
+    if (appBuild !== 'web') {
+      const minBuild = await minAppBuild(env);
+      if (minBuild > 0 && (Number(appBuild ?? 0) || 0) < minBuild) {
         return json({
-          error: 'Hay una versión nueva de Garage TCG: instálala para seguir usando la app en línea.',
+          error: 'Hay una versión nueva de Garage TCG: es obligatorio instalarla para seguir usando la app.',
           code: 'update_required',
+          minBuild,
         }, 426);
       }
     }
@@ -139,6 +141,7 @@ async function route(request, env, opts) {
         case '/v1/play/penalty': return json(await play.penalty(token, body));
       }
       if (path === '/v1/decklists') return json(await sync.saveDeckList(token, body));
+      if (path === '/v1/admin/app-version') return json(await setMinAppBuild(env, auth, token, body));
       const pp = path.match(/^\/v1\/players\/([^/]+)\/profile$/);
       if (pp) return json(await sync.editPlayer(token, decodeURIComponent(pp[1]), body));
       const st = path.match(/^\/v1\/tournaments\/([^/]+)\/judges(?:\/([^/]+)\/remove)?$/);
@@ -175,6 +178,10 @@ async function route(request, env, opts) {
     if (m === 'GET') {
       if (path === '/v1/me') return json(await auth.me(token));
       if (path === '/v1/admin/accounts') return json(await auth.listAccounts(token));
+      if (path === '/v1/admin/app-version') {
+        await auth.requireAdmin(token);
+        return json({ minBuild: await minAppBuild(env, true), yourBuild: request.headers.get('x-app-build') });
+      }
       if (path === '/v1/sync/pull') return json(await sync.pull(token, url.searchParams));
       // Visitantes (sin cuenta): solo lo público, en solo lectura.
       if (path === '/v1/public/pull') return json(await sync.pull(null, url.searchParams));
@@ -201,6 +208,49 @@ async function route(request, env, opts) {
     const db = /D1|SQLITE|database|storage|overloaded|limit/i.test(msg);
     return json({ error: 'Error del servidor. Inténtalo de nuevo.', ...(db ? { code: 'db' } : {}) }, db ? 503 : 500);
   }
+}
+
+/** Versión mínima guardada (se lee como mucho una vez por minuto en cada
+ *  instancia del Worker: 1 fila leída). */
+const minCache = new WeakMap(); // por base de datos
+const MIN_CACHE_MS = 60 * 1000;
+
+export async function minAppBuild(env, fresh = false) {
+  const fixed = Number(env.MIN_APP_BUILD ?? 0) || 0;
+  const now = Date.now();
+  let c = minCache.get(env.DB);
+  if (fresh || !c || now - c.at > MIN_CACHE_MS) {
+    let value = 0;
+    try {
+      const r = await env.DB.prepare("SELECT value FROM app_settings WHERE key = 'min_app_build'").first();
+      value = Number(r?.value ?? 0) || 0;
+    } catch {
+      value = 0; // sin la migración 0010
+    }
+    c = { at: now, value };
+    minCache.set(env.DB, c);
+  }
+  return Math.max(fixed, c.value);
+}
+
+/** Administrador: fija la versión mínima (normalmente la que tiene él
+ *  instalada, recién publicada). body: { minBuild } (0 = sin mínimo). */
+async function setMinAppBuild(env, auth, token, body) {
+  await auth.requireAdmin(token);
+  const n = Math.trunc(Number(body?.minBuild));
+  if (!Number.isFinite(n) || n < 0 || n > 999) throw new ApiError(400, 'Versión no válida.');
+  try {
+    await env.DB.prepare(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ('min_app_build', ?, ?)
+       ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    ).bind(String(n), Date.now()).run();
+  } catch (e) {
+    if (String(e?.message ?? e).includes('no such table')) {
+      throw new ApiError(400, 'Falta la migración 0010 en el servidor (npm.cmd run db:ajustes).');
+    }
+    throw e;
+  }
+  return { minBuild: await minAppBuild(env, true) };
 }
 
 /** Máximo de consultas en un /v1/poll. */

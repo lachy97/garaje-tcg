@@ -267,6 +267,16 @@ Future<void> checkNotifications(Ref ref) async {
       if (t.status == TournamentStatus.swiss || t.status == TournamentStatus.topCut) live.add(t);
       if (mine && t.status == TournamentStatus.draft && t.onlineRegistration) draft.add(t);
     }
+    // "Pedro ganó 2-1": el marcador desde quien reportó (se guarda desde el
+    // jugador 1 de la mesa).
+    Future<String> said(PlayAction a) async {
+      final who = a.nickname ?? '?';
+      final score = a.score;
+      if (score == null) return '$who reportó';
+      final m = a.matchId == null ? null : await db.tournamentsDao.matchById(a.matchId!);
+      return score.said(who, asP1: m == null || m.player1Id == a.playerId);
+    }
+
     for (final t in live) {
       List<PlayAction> actions;
       try {
@@ -286,11 +296,11 @@ Future<void> checkNotifications(Ref ref) async {
           // Todos los reportes le llegan al organizador: si el rival no
           // confirma, lo puede confirmar él (Rondas → Avisos de los jugadores).
           await notify('rep:${a.id}', 'Resultado reportado',
-              '${a.nickname ?? '?'}: ${a.score?.label(asP1: true) ?? ''} · falta que confirme el rival',
+              '${await said(a)} · falta que confirme el rival',
               route: tournament(t.id), slot: 'mesa:${a.matchId}');
         } else if (a.kind == PlayKind.report && a.status == PlayStatus.confirmed && !judging.contains(t.id)) {
           await notify('ok:${a.id}', 'Resultado confirmado',
-              '${a.nickname ?? '?'}: ${a.score?.label(asP1: true) ?? ''} · se pone solo al sincronizar',
+              '${await said(a)} · se pone solo al sincronizar',
               route: tournament(t.id), slot: 'mesa:${a.matchId}');
         }
       }

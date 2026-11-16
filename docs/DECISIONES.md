@@ -508,3 +508,23 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Ya no hay ninguna sección de licencia en el código (se quitó el 15/11). Si sale, ese teléfono tiene un APK anterior.
   - "Servidor" y "Modo administrador" solo los ve la cuenta de administrador: ni otros roles, ni el administrador cuando ve la app como otro rol.
   - La app pasa a 0.3.0 (2) para distinguir el APK nuevo en Ajustes → Acerca de.
+
+## Reportes legibles y actualización obligatoria (16/11) — servidor 1.17.0, migración 0010
+- **Reportes desde quien reporta**: el organizador y el administrador ven "Pedro ganó 2-1", "Pedro perdió 0-2" o "Pedro: empate 1-1-1", en el panel de Rondas y en los avisos.
+  - El marcador se sigue guardando desde el jugador 1 de la mesa. `ReportScore.said()` le da la vuelta según quién reportó.
+  - Las disputas dicen lo que dice cada uno, y el botón "Confirmar 2-1" va también desde quien reportó.
+- **Actualización obligatoria**:
+  - El administrador, con el APK nuevo instalado, pulsa en Ajustes → Servidor → "Exigir mi versión (N)". El valor se guarda en D1 (`app_settings.min_app_build`, migración `0010_ajustes.sql`).
+  - Cuenta el mayor entre ese valor y la variable `MIN_APP_BUILD`. El Worker lo lee como mucho una vez por minuto (1 fila).
+  - Las compilaciones anteriores reciben 426 `update_required` con `minBuild`, y la app queda en una pantalla completa de "Actualización obligatoria".
+  - El bloqueo se recuerda en el teléfono, así que tampoco se puede usar sin conexión. Si el servidor vuelve a aceptar esa versión, se olvida.
+  - La versión web manda `x-app-build: web` y no se bloquea nunca (siempre es la última). También sirve de salida si el administrador se bloquea a sí mismo.
+  - `/v1/health` no comprueba la versión.
+  - Requisito: cada APK nuevo debe tener un número de compilación mayor (el que sale entre paréntesis en Ajustes → Acerca de).
+- **Actualizar desde la propia app** (pendiente, solo análisis):
+  - Alojar el APK donde se descargue desde Cuba sin VPN (Cloudflare R2, gratis hasta 10 GB y sin coste de descarga).
+  - Que el servidor diga cuál es la última versión (`/v1/app/latest`: compilación, enlace por arquitectura, SHA-256, tamaño, novedades).
+  - Que GitHub Actions lo publique al compilar.
+  - En la app: descarga con reanudación y comprobación de SHA-256, `REQUEST_INSTALL_PACKAGES` + FileProvider + un plugin para abrir el instalador, y elegir el APK de su arquitectura.
+  - Firmar siempre con la misma clave y subir el versionCode.
+  - El jugador da permiso una vez para "instalar apps desconocidas" y pulsa Instalar: Android no deja instalar en silencio fuera de Play Store.

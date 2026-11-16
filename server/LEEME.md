@@ -484,3 +484,17 @@ la app nueva (editar la ficha y cambiar el mazo inscrito usan rutas nuevas).
 
 Sin migración nueva. `npm.cmd run deploy` y `/v1/health` debe decir
 `1.16.0`. Desplegar antes de repartir la app 0.3.0.
+
+## 25 · Actualización obligatoria (versión 1.17.0)
+
+Una vez, en el PC (con VPN):
+
+```powershell
+npm.cmd run db:ajustes
+npm.cmd run deploy
+```
+
+`/v1/health` debe decir `1.17.0`. Cuando el APK nuevo esté en el grupo de
+WhatsApp y lo tengas instalado: Ajustes → Servidor → **Exigir mi versión**.
+Las versiones anteriores quedan bloqueadas hasta actualizar. La web nunca se
+bloquea. Para deshacerlo: "Quitar el mínimo" (también desde la web).

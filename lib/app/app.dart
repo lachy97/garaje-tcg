@@ -71,7 +71,8 @@ class GarajeTcgApp extends ConsumerWidget {
   }
 }
 
-/// Aviso fijo arriba si el servidor exige una versión más nueva de la app.
+/// Versión demasiado vieja: la app queda bloqueada hasta instalar la última
+/// (el servidor la exige; ver Ajustes → Servidor del administrador).
 class _UpdateBanner extends StatelessWidget {
   const _UpdateBanner({required this.child});
 
@@ -81,35 +82,52 @@ class _UpdateBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: HttpAuthApi.updateRequired,
-      builder: (context, required, _) => Column(
-        children: [
-          if (required)
-            Material(
-              color: AppColors.loss,
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.system_update, color: Colors.white),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Hay una versión nueva de Garage TCG. Instálala para seguir '
-                          'sincronizando, reportando e inscribiéndote.',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ],
-                  ),
+      builder: (context, required, _) => required ? const _UpdateRequiredScreen() : child,
+    );
+  }
+}
+
+class _UpdateRequiredScreen extends StatelessWidget {
+  const _UpdateRequiredScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.background,
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.system_update, size: 72, color: AppColors.neon),
+                const SizedBox(height: 18),
+                const Text('ACTUALIZACIÓN OBLIGATORIA',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                const SizedBox(height: 12),
+                Text(
+                  'Esta versión de Garage TCG ya no se puede usar. Instala la última versión '
+                  '(está en el grupo de WhatsApp de la comunidad) y vuelve a abrir la app. '
+                  'Tus datos no se pierden al actualizar.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textSecondary, height: 1.4),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text('Versión instalada: compilación ${HttpAuthApi.appBuild}',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const SizedBox(height: 20),
+                // Por si el administrador quitó el mínimo: vuelve a probar.
+                OutlinedButton.icon(
+                  onPressed: () => HttpAuthApi.updateRequired.value = false,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Volver a comprobar'),
+                ),
+              ],
             ),
-          Expanded(
-            child: required ? MediaQuery.removePadding(context: context, removeTop: true, child: child) : child,
           ),
-        ],
+        ),
       ),
     );
   }

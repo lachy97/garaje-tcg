@@ -42,6 +42,8 @@ Future<void> main() async {
     final info = await PackageInfo.fromPlatform();
     HttpAuthApi.appBuild = (int.tryParse(info.buildNumber) ?? 0) % 1000;
   } catch (_) {}
+  // Versión ya rechazada por el servidor: bloqueada también sin conexión.
+  await HttpAuthApi.loadUpdateRequirement();
   // Identificador de este teléfono (para pasar un torneo a otro teléfono).
   try {
     await DeviceIdentity.init();

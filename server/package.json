@@ -20,7 +20,8 @@
     "deploy": "wrangler deploy",
     "logs": "wrangler tail",
     "db:lecturas": "wrangler d1 execute garage-tcg --remote --file=migrations/0009_lecturas.sql",
-    "insights": "wrangler d1 insights garage-tcg --sort-by reads --limit 15"
+    "insights": "wrangler d1 insights garage-tcg --sort-by reads --limit 15",
+    "db:ajustes": "wrangler d1 execute garage-tcg --remote --file=migrations/0010_ajustes.sql"
   },
   "devDependencies": {
     "wrangler": "^4.40.0"

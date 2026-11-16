@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -145,6 +146,8 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
               label: const Text('Enviarme un correo de prueba'),
             ),
             const SizedBox(height: 10),
+            _MinVersion(api: real),
+            const SizedBox(height: 10),
           ],
           OutlinedButton.icon(
             onPressed: _busy ? null : _testOther,
@@ -167,6 +170,121 @@ class _ServerSectionState extends ConsumerState<ServerSection> {
                   Expanded(child: SelectableText(_result!)),
                 ],
               ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Administrador: versión mínima de la app. Al publicar un APK nuevo (y
+/// tenerlo instalado), "Exigir mi versión" obliga a todos a actualizar: las
+/// anteriores quedan bloqueadas en la pantalla de actualizar. La web no se
+/// bloquea nunca (siempre es la última).
+class _MinVersion extends ConsumerStatefulWidget {
+  const _MinVersion({required this.api});
+
+  final HttpAuthApi api;
+
+  @override
+  ConsumerState<_MinVersion> createState() => _MinVersionState();
+}
+
+class _MinVersionState extends ConsumerState<_MinVersion> {
+  int? _min;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  String? get _token => ref.read(sessionProvider).value?.token;
+
+  Future<void> _load() async {
+    try {
+      final r = await widget.api.request('GET', 'v1/admin/app-version', token: _token);
+      if (mounted) setState(() => _min = (r['minBuild'] as num?)?.toInt() ?? 0);
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'No se pudo leer: $e');
+    }
+  }
+
+  Future<void> _set(int n) async {
+    final mine = HttpAuthApi.appBuild;
+    final ok = await confirmDialog(
+      context,
+      title: n == 0 ? 'Quitar la versión mínima' : 'Exigir la compilación $n',
+      message: n == 0
+          ? 'Cualquier versión de la app podrá volver a usar el servidor.'
+          : 'Los teléfonos con una versión anterior a la $n quedarán bloqueados en la pantalla '
+              '"Actualización obligatoria" hasta instalar la nueva. '
+              'Hazlo cuando el APK nuevo ya esté en el grupo de WhatsApp.'
+              '${n > mine ? '\n\nOJO: tu propia app (compilación $mine) también quedará bloqueada.' : ''}',
+      confirm: n == 0 ? 'Quitar' : 'Exigir',
+      danger: n > 0,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final r = await widget.api.request('POST', 'v1/admin/app-version', body: {'minBuild': n}, token: _token);
+      if (mounted) {
+        setState(() => _min = (r['minBuild'] as num?)?.toInt() ?? n);
+        showMessage(context, n == 0 ? 'Sin versión mínima' : 'Versión mínima: compilación $n');
+      }
+    } on AuthException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+    } catch (e) {
+      if (mounted) showMessage(context, 'No se pudo: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mine = HttpAuthApi.appBuild;
+    final web = kIsWeb;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.textSecondary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Versión obligatoria de la app', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(
+            _error ??
+                (_min == null
+                    ? 'Leyendo…'
+                    : '${_min == 0 ? 'Sin mínimo: cualquier versión puede entrar.' : 'Mínimo: compilación $_min.'}'
+                        '${web ? '' : ' Tu app: compilación $mine.'}'),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+          if (_busy)
+            const Center(child: CircularProgressIndicator())
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (!web && mine > 0 && _min != mine)
+                  FilledButton.icon(
+                    onPressed: () => _set(mine),
+                    icon: const Icon(Icons.system_update),
+                    label: Text('Exigir mi versión ($mine)'),
+                  ),
+                if ((_min ?? 0) > 0)
+                  TextButton(onPressed: () => _set(0), child: const Text('Quitar el mínimo')),
+              ],
             ),
         ],
       ),
