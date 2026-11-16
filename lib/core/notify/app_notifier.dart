@@ -31,11 +31,37 @@ class AppNotifier {
     try {
       await _plugin.initialize(
         const InitializationSettings(android: AndroidInitializationSettings('ic_notification')),
+        onDidReceiveNotificationResponse: (r) => _handle(r.payload),
       );
       _ready = true;
+      // La app se abrió tocando un aviso.
+      final launch = await _plugin.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp ?? false) _handle(launch!.notificationResponse?.payload);
     } catch (_) {
       // Sin avisos en este teléfono: la app sigue igual.
     }
+  }
+
+  /// Abre una pantalla de la app (la pone el router al arrancar).
+  static void Function(String route)? _open;
+  static String? _pending;
+
+  static void _handle(String? route) {
+    if (route == null || route.isEmpty) return;
+    final open = _open;
+    if (open == null) {
+      _pending = route; // la app aún no está lista
+    } else {
+      open(route);
+    }
+  }
+
+  /// Al tocar un aviso se abre su pantalla (p. ej. las solicitudes del torneo).
+  static void attach(void Function(String route) open) {
+    _open = open;
+    final p = _pending;
+    _pending = null;
+    if (p != null) open(p);
   }
 
   /// Android 13+: pide permiso para mostrar avisos (una vez).
@@ -61,7 +87,8 @@ class AppNotifier {
     await requestPermission();
   }
 
-  static Future<void> show(String key, String title, String body) async {
+  /// [route]: pantalla que se abre al tocar el aviso.
+  static Future<void> show(String key, String title, String body, {String? route}) async {
     await init();
     if (!_ready) return;
     try {
@@ -69,6 +96,7 @@ class AppNotifier {
         key.hashCode & 0x7fffffff,
         title,
         body,
+        payload: route,
         const NotificationDetails(
           android: AndroidNotificationDetails(
             'garage_avisos',
@@ -156,11 +184,14 @@ Future<void> checkNotifications(Ref ref) async {
     final seen = (prefs.getStringList(_seenKey) ?? const <String>[]).toSet();
     final fresh = <String>[];
 
-    Future<void> notify(String key, String title, String body) async {
+    // [slot]: avisos que se sustituyen (reportado → confirmado de una mesa).
+    Future<void> notify(String key, String title, String body, {String? route, String? slot}) async {
       if (seen.contains(key) || fresh.contains(key)) return;
       fresh.add(key);
-      await AppNotifier.show(key, title, body);
+      await AppNotifier.show(slot ?? key, title, body, route: route);
     }
+
+    String tournament(String id) => '/torneos/${Uri.encodeComponent(id)}';
 
     final account = session.account;
     final play = PlayApi(http, session);
@@ -172,11 +203,12 @@ Future<void> checkNotifications(Ref ref) async {
       playing = tables.length;
       for (final t in tables) {
         final base = '${t.tournamentId}:${t.roundLabel}';
+        // Sin el mazo del rival: no se sabe hasta que termina el torneo.
         await notify(
           'table:$base',
           '${t.tournamentName} · ${t.roundLabel}',
-          t.bye ? 'Tienes BYE (ganas 2-0).' : 'Mesa ${t.table ?? '?'} contra ${t.opponent ?? '?'}'
-              '${t.opponentDeck == null ? '' : ' (${t.opponentDeck})'}.',
+          t.bye ? 'Tienes BYE (ganas 2-0).' : 'Mesa ${t.table ?? '?'} contra ${t.opponent ?? '?'}.',
+          route: '/torneos',
         );
         if (t.bye || t.score != null) continue;
         final start = t.timerStartedAt;
@@ -184,15 +216,18 @@ Future<void> checkNotifications(Ref ref) async {
         if (start != null && t.timerPausedAt == null) {
           final left = Duration(minutes: t.roundMinutes) - DateTime.now().difference(start);
           if (left <= Duration.zero) {
-            await notify('time0:$base', 'Se acabó el tiempo', 'Mesa ${t.table ?? '?'}: reporta tu resultado.');
+            await notify('time0:$base', 'Se acabó el tiempo', 'Mesa ${t.table ?? '?'}: reporta tu resultado.',
+                route: '/torneos');
           } else if (left <= const Duration(minutes: 5)) {
-            await notify('time5:$base', 'Quedan ${left.inMinutes + 1} minutos', 'Mesa ${t.table ?? '?'} · ${t.tournamentName}');
+            await notify('time5:$base', 'Quedan ${left.inMinutes + 1} minutos', 'Mesa ${t.table ?? '?'} · ${t.tournamentName}',
+                route: '/torneos');
           }
         }
         for (final a in await play.mine(t.tournamentId)) {
           if (a.kind == PlayKind.report && a.status == PlayStatus.proposed && a.playerId != pid && a.matchId == t.matchId) {
             await notify('confirm:${a.id}', '${a.nickname ?? 'Tu rival'} reportó el resultado',
-                '${a.score?.outcome(asP1: t.iAmP1) ?? ''}: confírmalo en Torneos.');
+                '${a.score?.outcome(asP1: t.iAmP1) ?? ''}: confírmalo en Torneos.',
+                route: '/torneos');
           }
         }
       }
@@ -242,9 +277,21 @@ Future<void> checkNotifications(Ref ref) async {
       for (final a in actions) {
         if (a.kind == PlayKind.judge && a.status == PlayStatus.open) {
           // Sin el nombre del torneo (sobra): quién llama y para qué.
-          await notify('judge:${a.id}', 'Llaman al juez', '${a.nickname ?? '?'}${a.note == null ? '' : ': ${a.note}'}');
+          await notify('judge:${a.id}', 'Llaman al juez', '${a.nickname ?? '?'}${a.note == null ? '' : ': ${a.note}'}',
+              route: tournament(t.id));
         } else if (a.kind == PlayKind.report && a.status == PlayStatus.disputed) {
-          await notify('disp:${a.id}', 'Resultado en disputa', 'Los jugadores no coinciden · ${t.name}');
+          await notify('disp:${a.id}', 'Resultado en disputa', 'Los jugadores no coinciden · ${t.name}',
+              route: tournament(t.id));
+        } else if (a.kind == PlayKind.report && a.status == PlayStatus.proposed && !judging.contains(t.id)) {
+          // Todos los reportes le llegan al organizador: si el rival no
+          // confirma, lo puede confirmar él (Rondas → Avisos de los jugadores).
+          await notify('rep:${a.id}', 'Resultado reportado',
+              '${a.nickname ?? '?'}: ${a.score?.label(asP1: true) ?? ''} · falta que confirme el rival',
+              route: tournament(t.id), slot: 'mesa:${a.matchId}');
+        } else if (a.kind == PlayKind.report && a.status == PlayStatus.confirmed && !judging.contains(t.id)) {
+          await notify('ok:${a.id}', 'Resultado confirmado',
+              '${a.nickname ?? '?'}: ${a.score?.label(asP1: true) ?? ''} · se pone solo al sincronizar',
+              route: tournament(t.id), slot: 'mesa:${a.matchId}');
         }
       }
     }
@@ -253,7 +300,9 @@ Future<void> checkNotifications(Ref ref) async {
         final reqs = await RegistrationsApi(http, session).forTournament(t.id);
         for (final r in reqs) {
           if (r.status == RegistrationStatus.pending) {
-            await notify('req:${r.id}', 'Nueva solicitud', '${r.nickname} quiere inscribirse en ${t.name}.');
+            // Al tocarlo se abren las solicitudes del torneo para aceptarla.
+            await notify('req:${r.id}', 'Nueva solicitud', '${r.nickname} quiere inscribirse en ${t.name}. Toca para responder.',
+                route: '${tournament(t.id)}?solicitudes=1');
           }
         }
       } on AuthException {

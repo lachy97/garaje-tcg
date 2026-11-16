@@ -231,5 +231,17 @@ void main() {
       const p = Permissions(role: AppRole.admin);
       expect(p.canSeeAllPlayers && p.canManageAccounts && p.canSeeDeckStats, isTrue);
     });
+
+    test('fichas: cada jugador edita la suya; organizador y admin cualquiera', () {
+      const p = Permissions(role: AppRole.player, playerId: 'me');
+      expect(p.canEditPlayerData('me'), isTrue);
+      expect(p.canEditPlayerData('otro'), isFalse);
+      expect(p.editsPlayersOnServer, isTrue, reason: 'el jugador guarda en el servidor');
+      const org = Permissions(role: AppRole.organizer);
+      expect(org.canEditPlayerData('otro') && !org.editsPlayersOnServer, isTrue);
+      const web = Permissions(role: AppRole.organizer, webReadOnly: true);
+      expect(web.canEditPlayerData('otro') && web.editsPlayersOnServer, isTrue);
+      expect(const Permissions.visitor().canEditPlayerData('x'), isFalse);
+    });
   });
 }

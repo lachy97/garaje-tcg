@@ -53,8 +53,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 GoRoute(
                   path: ':id',
                   parentNavigatorKey: _rootKey,
-                  builder: (_, state) =>
-                      TournamentDetailPage(tournamentId: state.pathParameters['id']!),
+                  builder: (_, state) => TournamentDetailPage(
+                    tournamentId: state.pathParameters['id']!,
+                    // Desde el aviso de una solicitud nueva: se abren las solicitudes.
+                    openRequests: state.uri.queryParameters['solicitudes'] == '1',
+                  ),
                 ),
               ],
             ),
@@ -116,7 +119,12 @@ class HomeShell extends ConsumerWidget {
     // Mantiene viva la subida automática de datos al servidor.
     ref.listen(syncControllerProvider, (_, _) {});
     // Permiso para los avisos del teléfono (una vez).
-    WidgetsBinding.instance.addPostFrameCallback((_) => AppNotifier.askOnce());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppNotifier.askOnce();
+      // Tocar un aviso abre su pantalla (Mi mesa, el torneo, sus solicitudes).
+      final router = ref.read(routerProvider);
+      AppNotifier.attach((route) => route == '/torneos' ? router.go(route) : router.push(route));
+    });
     final allPlayers = perms.canSeeAllPlayers;
     return PopScope(
       canPop: false,

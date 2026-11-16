@@ -70,7 +70,9 @@ class _PlayerProfilePageState extends ConsumerState<PlayerProfilePage> {
             appBar: AppBar(
               title: NameTitle(p.nickname),
               actions: [
-                if (perms.canEditPlayers)
+                // Datos de la ficha (no resultados): la propia, y los
+                // organizadores y el administrador cualquiera.
+                if (perms.canEditPlayerData(playerId))
                   IconButton(
                     tooltip: 'Editar datos',
                     icon: const Icon(Icons.edit_outlined),

@@ -146,6 +146,11 @@ export class RegistrationService {
   async request(token, body) {
     const me = await this.auth.authenticate(token);
     const t = await this.tournament(me.community_id, body?.tournamentId);
+    // Ya inscrito: cambia su mazo hasta la hora de inicio (lo aplica el
+    // teléfono del organizador al sincronizar, como una aceptada).
+    if (me.player_id && (await this.enrolled(me.community_id, t.id, me.player_id))) {
+      return this.changeDeck(me, t, body);
+    }
     if (!RegistrationService.isOpen(t)) {
       throw bad('La inscripción desde la app de este torneo está cerrada.');
     }
@@ -157,9 +162,6 @@ export class RegistrationService {
     if (judge) throw bad('Eres juez de este torneo: un juez no puede jugarlo.');
     const deck = typeof body?.deckName === 'string' ? body.deckName.trim().slice(0, DECK_MAX) : '';
     if (!deck) throw bad('Elige tu mazo.');
-    if (await this.enrolled(me.community_id, t.id, me.player_id)) {
-      throw bad('Ya estás inscrito en este torneo.');
-    }
     const auto = RegistrationService.autoAccept(t) && me.player_id;
     const now = this.auth.now();
     const old = await this.db
@@ -188,6 +190,36 @@ export class RegistrationService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(id, me.community_id, t.id, me.id, me.player_id ?? null, deck, status, now, now)
+      .run();
+    return { registration: RegistrationService.out(await this.byId(id)) };
+  }
+
+  /** Cambio de mazo de un jugador ya inscrito. */
+  async changeDeck(me, t, body) {
+    if (t.data.status !== 'draft' || this.started(t)) {
+      throw bad('El torneo ya empezó: el mazo ya no se puede cambiar. Habla con el organizador.');
+    }
+    const deck = typeof body?.deckName === 'string' ? body.deckName.trim().slice(0, DECK_MAX) : '';
+    if (!deck) throw bad('Elige tu mazo.');
+    const now = this.auth.now();
+    const old = await this.db
+      .prepare('SELECT id FROM registrations WHERE tournament_id = ? AND account_id = ?')
+      .bind(t.id, me.id)
+      .first();
+    if (old) {
+      await this.db
+        .prepare("UPDATE registrations SET deck_name = ?, status = 'accepted', reason = NULL, player_id = ?, updated_at = ? WHERE id = ?")
+        .bind(deck, me.player_id, now, old.id)
+        .run();
+      return { registration: RegistrationService.out(await this.byId(old.id)) };
+    }
+    const id = crypto.randomUUID();
+    await this.db
+      .prepare(
+        `INSERT INTO registrations (id, community_id, tournament_id, account_id, player_id, deck_name, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'accepted', ?, ?)`,
+      )
+      .bind(id, me.community_id, t.id, me.id, me.player_id, deck, now, now)
       .run();
     return { registration: RegistrationService.out(await this.byId(id)) };
   }

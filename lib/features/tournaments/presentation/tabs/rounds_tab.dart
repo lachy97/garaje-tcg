@@ -23,12 +23,17 @@ import 'sync_freshness.dart';
 /// Rondas: configuración (rondas Swiss / Top Cut), pairings, reporte de
 /// resultados y botón para avanzar el torneo.
 class RoundsTab extends ConsumerStatefulWidget {
-  const RoundsTab({super.key, required this.tournament, this.readOnly = false});
+  const RoundsTab({super.key, required this.tournament, this.readOnly = false, this.staff = false});
 
   final Tournament tournament;
 
   /// Solo consulta (jugadores): sin configurar, reportar ni avanzar.
   final bool readOnly;
+
+  /// Solo consulta, pero es el organizador (desde otro teléfono o la web),
+  /// el administrador o un juez: ve los reportes de los jugadores y los puede
+  /// confirmar (los pone el teléfono que lleva el torneo).
+  final bool staff;
 
   @override
   ConsumerState<RoundsTab> createState() => _RoundsTabState();
@@ -129,6 +134,7 @@ class _RoundsTabState extends ConsumerState<RoundsTab> {
                         names: names,
                         deckNames: deckNames,
                         readOnly: widget.readOnly,
+                        staff: widget.staff,
                         onlyPending: _onlyPending,
                         onOnlyPending: (v) => setState(() => _onlyPending = v),
                       ),
@@ -326,11 +332,13 @@ class _MatchesSliver extends ConsumerStatefulWidget {
     required this.onlyPending,
     required this.onOnlyPending,
     this.readOnly = false,
+    this.staff = false,
   });
 
   final Tournament tournament;
   final Round round;
   final bool readOnly;
+  final bool staff;
 
   /// Ronda en juego y se puede llevar el torneo desde este teléfono.
   final bool isCurrent;
@@ -484,7 +492,9 @@ class _MatchesSliverState extends ConsumerState<_MatchesSliver> {
           if (isCurrent && !readOnly) const SyncFreshness(),
           // Avisos desde los móviles: juez, resultados reportados, drops.
           if (isCurrent && !readOnly)
-            PlayAlertsPanel(tournament: tournament, matches: list, names: names),
+            PlayAlertsPanel(tournament: tournament, matches: list, names: names)
+          else if (isCurrent && widget.staff)
+            PlayAlertsPanel(tournament: tournament, matches: list, names: names, asJudge: true),
           const SizedBox(height: 8),
           if (!isCurrent && editable)
             Padding(

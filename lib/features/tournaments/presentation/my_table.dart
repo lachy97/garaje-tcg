@@ -308,8 +308,8 @@ class _MyTableCard extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                        Text(i.opponentDeck ?? 'Sin mazo',
-                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        // Sin el mazo del rival: no se enseña hasta que
+                        // termina el torneo.
                         HeadToHeadLine(info: i),
                       ],
                     ),

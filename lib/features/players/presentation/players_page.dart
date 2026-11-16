@@ -7,7 +7,10 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
+import '../../../core/auth/account.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/http_auth_api.dart';
+import '../../../core/sync/sync_service.dart';
 import '../../../core/db/database_provider.dart';
 import '../../ranking/domain/ranking_row.dart';
 import '../../ranking/presentation/ranking_page.dart';
@@ -255,10 +258,56 @@ class _PlayerFormDialogState extends ConsumerState<_PlayerFormDialog> {
     super.dispose();
   }
 
+  bool _busy = false;
+
+  /// El jugador (y la versión web) guarda en el servidor; el teléfono del
+  /// organizador, en su base y lo sube al sincronizar.
+  bool get _onServer => widget.player != null && ref.read(permissionsProvider).editsPlayersOnServer;
+
+  bool get _boss {
+    final perms = ref.read(permissionsProvider);
+    return perms.isAdmin || perms.role == AppRole.organizer;
+  }
+
+  Future<void> _saveOnServer(Player p) async {
+    final api = ref.read(authApiProvider);
+    final session = ref.read(sessionProvider).value;
+    if (api is! HttpAuthApi || session == null) {
+      showMessage(context, 'Necesitas conexión con el servidor para guardar.', error: true);
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await api.request('POST', 'v1/players/${Uri.encodeComponent(p.id)}/profile', token: session.token, body: {
+        'nickname': _nick.text.trim(),
+        'fullName': _name.text.trim(),
+        'konamiId': _konami.text.trim(),
+        'phone': _phone.text.trim(),
+        if (_boss) 'notes': _notes.text.trim(),
+      });
+      // Baja la ficha cambiada (y la cuenta, con el apodo nuevo).
+      await ref.read(syncControllerProvider.notifier).sync();
+      if (session.account.playerId == p.id) {
+        unawaitedRefresh(ref);
+      }
+      if (mounted) {
+        Navigator.pop(context);
+        showMessage(context, 'Datos guardados');
+      }
+    } on AuthException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+    } catch (e) {
+      if (mounted) showMessage(context, 'No se pudo guardar: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_busy || !_formKey.currentState!.validate()) return;
     final dao = ref.read(playersDaoProvider);
     final p = widget.player;
+    if (p != null && _onServer) return _saveOnServer(p);
     if (p == null) {
       final created = await dao.create(
         nickname: _nick.text,
@@ -326,20 +375,37 @@ class _PlayerFormDialogState extends ConsumerState<_PlayerFormDialog> {
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
               ),
+              if (!_onServer || _boss) ...[
               const SizedBox(height: 12),
               TextFormField(
                 controller: _notes,
                 maxLines: 2,
                 decoration: const InputDecoration(labelText: 'Notas (opcional)'),
               ),
+              ],
+              if (_onServer) ...[
+                const SizedBox(height: 8),
+                Text('Se guarda en el servidor: los resultados y estadísticas no cambian.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
             ],
           ),
         ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: _save, child: const Text('Guardar')),
+        FilledButton(
+          onPressed: _busy ? null : _save,
+          child: _busy
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Guardar'),
+        ),
       ],
     );
   }
+}
+
+/// Vuelve a pedir la cuenta (apodo nuevo) sin esperar.
+void unawaitedRefresh(WidgetRef ref) {
+  ref.read(sessionProvider.notifier).refreshAccount().catchError((_) {});
 }

@@ -4,15 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/app_database.dart';
+import '../../../core/auth/account.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/play/play.dart';
 import '../../../core/sync/control.dart';
 import '../../decklists/presentation/top_cut_lists_page.dart';
 import 'judge_floor_page.dart';
+import 'my_entry_card.dart';
 import 'projection_page.dart';
 import 'start_time.dart';
 import 'providers.dart';
 import 'tabs/control_banner.dart';
+import 'tabs/online_registration.dart' show RequestsSheet;
 import 'tabs/registration_tab.dart';
 import 'tabs/rounds_tab.dart';
 import 'tabs/standings_tab.dart';
@@ -24,9 +27,12 @@ import 'tabs/summary_tab.dart';
 ///   corregir algo, el botón "Editar torneo" de la barra muestra de nuevo las
 ///   pestañas de Jugadores, Rondas y Clasificación.
 class TournamentDetailPage extends ConsumerStatefulWidget {
-  const TournamentDetailPage({super.key, required this.tournamentId});
+  const TournamentDetailPage({super.key, required this.tournamentId, this.openRequests = false});
 
   final String tournamentId;
+
+  /// Abrir las solicitudes de inscripción nada más entrar (aviso tocado).
+  final bool openRequests;
 
   @override
   ConsumerState<TournamentDetailPage> createState() => _TournamentDetailPageState();
@@ -35,6 +41,24 @@ class TournamentDetailPage extends ConsumerStatefulWidget {
 class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
   /// Torneo terminado: mostrar las pestañas de edición en vez del resumen.
   bool _editing = false;
+
+  /// Las solicitudes ya se abrieron (desde el aviso).
+  bool _requestsShown = false;
+
+  void _maybeOpenRequests(Tournament t) {
+    if (!widget.openRequests || _requestsShown) return;
+    _requestsShown = true;
+    if (t.status != TournamentStatus.draft) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => FractionallySizedBox(heightFactor: 0.85, child: RequestsSheet(tournament: t)),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +72,7 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
             body: const EmptyState(icon: Icons.search_off, title: 'Torneo no encontrado'),
           );
         }
+        _maybeOpenRequests(t);
         final finished = t.status == TournamentStatus.finished;
         final title = NameTitle(t.name);
         // Los torneos de este teléfono los creó su organizador (hasta que
@@ -96,10 +121,21 @@ class _TournamentDetailPageState extends ConsumerState<TournamentDetailPage> {
               body: Column(
                 children: [
                   if (locked) ControlBanner(control: control),
+                  // Inscrito y sin empezar: puede cambiar su mazo.
+                  if (t.status == TournamentStatus.draft) MyEntryCard(tournament: t),
                   Expanded(
                     child: TabBarView(
                       children: [
-                        RoundsTab(tournament: t, readOnly: true),
+                        RoundsTab(
+                          tournament: t,
+                          readOnly: true,
+                          // Organizador (desde otro teléfono o la web), admin o
+                          // juez: ve los reportes y puede confirmarlos.
+                          // (Solo le llegan los torneos que lleva o arbitra.)
+                          staff: ref.watch(permissionsProvider).isAdmin ||
+                              ref.watch(permissionsProvider).role == AppRole.organizer ||
+                              (ref.watch(judgingProvider).value?.contains(t.id) ?? false),
+                        ),
                         StandingsTab(tournament: t),
                       ],
                     ),

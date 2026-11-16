@@ -108,12 +108,18 @@ test('aceptar solas: con ficha al momento; sin ficha queda para el organizador',
   const todo = await call('GET', '/v1/registrations/todo', null, org.token);
   assert.deepEqual(todo.data.registrations.map((x) => x.nickname), ['ana']);
 
-  // Ya inscrita (fila subida por el organizador): no puede volver a pedir.
+  // Ya inscrita (fila subida por el organizador): cambia el mazo; lo aplica
+  // el teléfono del organizador (vuelve a "aceptada").
   await call('POST', '/v1/sync/push', {
     rows: [{ t: 'tournament_players', id: 'tp1', changedAt: 300, data: { id: 'tp1', tournament_id: 't1', player_id: 'p-ana' } }],
   }, org.token);
-  r = await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'Zombie' }, ana.token);
-  assert.equal(r.status, 400);
+  await call('POST', `/v1/registrations/${(await call('GET', '/v1/registrations/todo', null, org.token)).data.registrations[0].id}/done`, null, org.token);
+  r = await call('POST', '/v1/registrations', { tournamentId: 't1', deckName: 'Branded' }, ana.token);
+  assert.equal(r.status, 200);
+  assert.equal(r.data.registration.status, 'accepted');
+  assert.equal(r.data.registration.deckName, 'Branded');
+  const again = await call('GET', '/v1/registrations/todo', null, org.token);
+  assert.deepEqual(again.data.registrations.map((x) => x.deckName), ['Branded']);
 
   // Al empezar el torneo se cierra.
   await tour({ online_registration: 1, auto_accept: 1, status: 'swiss' }, 400);

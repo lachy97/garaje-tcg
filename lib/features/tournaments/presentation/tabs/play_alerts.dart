@@ -59,7 +59,7 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
     }
   }
 
-  /// Pone el resultado reportado (aunque el rival aún no lo haya confirmado).
+  /// Confirma el resultado reportado (aunque el rival no lo haya confirmado).
   Future<void> _apply(PlayAction a) => _run(a, (api) async {
         if (widget.asJudge) {
           await api.judgeResult(widget.tournament.id, a.matchId!, score: a.score!.game);
@@ -68,7 +68,7 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
         await ref.read(tournamentServiceProvider).reportScore(a.matchId!, a.score!.game);
         await api.done(a.id);
         await ref.read(syncControllerProvider.notifier).sync();
-      }, widget.asJudge ? 'Enviado: lo pone el organizador al sincronizar' : 'Resultado puesto');
+      }, widget.asJudge ? 'Confirmado: lo pone el teléfono que lleva el torneo al sincronizar' : 'Resultado confirmado');
 
   String _ago(DateTime t) {
     final m = DateTime.now().difference(t).inMinutes;
@@ -163,7 +163,8 @@ class _PlayAlertsPanelState extends ConsumerState<PlayAlertsPanel> {
                         if (canApply)
                           TextButton(
                             onPressed: () => _apply(a),
-                            child: Text('Poner ${a.score!.label(asP1: true)}'),
+                            // El rival no confirma: lo confirma el organizador.
+                            child: Text('Confirmar ${a.score!.label(asP1: true)}'),
                           ),
                         if (a.kind != PlayKind.drop)
                           TextButton(

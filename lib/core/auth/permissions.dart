@@ -69,6 +69,16 @@ class Permissions {
   /// organizadores.
   bool get canEditPlayers => !webReadOnly && (isAdmin || _organizer);
 
+  /// Editar los datos de una ficha (apodo, nombre, teléfono, Konami ID; no
+  /// resultados ni estadísticas): la propia, y el administrador y los
+  /// organizadores cualquiera.
+  bool canEditPlayerData(String id) =>
+      !visitor && (isAdmin || _organizer || (playerId != null && id == playerId));
+
+  /// Esos cambios se guardan en el servidor (no en este teléfono): el
+  /// jugador y la versión web. Llegan a todos al sincronizar.
+  bool get editsPlayersOnServer => !canEditPlayers;
+
   /// Ficha de un jugador: todos ven la ficha pública de cualquiera (apodo,
   /// torneos, mazos, winrate). Ver [canSeePersonalData] para lo privado.
   bool canSeePlayerProfile(String id) => true;

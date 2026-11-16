@@ -231,3 +231,59 @@ test('lecturas: no se completa otra vez un torneo que ya se veía', async () => 
   assert.ok(late.rows.some((x) => x.id === 'mw'), 'inscripción nueva: torneo completo');
   assert.ok(late.rows.some((x) => x.id === 'tw'));
 });
+
+test('mazos ocultos hasta que termina el torneo (salvo el propio)', async () => {
+  const { call, admin, org, player } = await setup();
+  await call('POST', `/v1/admin/accounts/${player.account.id}/player`, { playerId: 'p1' }, admin.token);
+  const push = (rows) => call('POST', '/v1/sync/push', { rows }, org.token);
+  const pull = async (since) => (await call('GET', `/v1/sync/pull?since=${since}`, null, player.token)).data;
+  await push([
+    row('tournaments', 'tm', 1, { id: 'tm', status: 'swiss', list_visibility: 'open' }),
+    row('tournament_players', 'e1', 1, { id: 'e1', tournament_id: 'tm', player_id: 'p1', deck_id: 'dA', created_at: 1, updated_at: 1 }),
+    row('tournament_players', 'e2', 1, { id: 'e2', tournament_id: 'tm', player_id: 'p2', deck_id: 'dB', created_at: 1, updated_at: 1 }),
+    row('matches', 'mm', 1, { id: 'mm', tournament_id: 'tm', player1_id: 'p1', player2_id: 'p2', deck1_id: 'dA', deck2_id: 'dB' }),
+    row('deck_lists', 'l1', 1, { id: 'l1', tournament_id: 'tm', player_id: 'p1', deck_id: 'dA' }),
+    row('deck_lists', 'l2', 1, { id: 'l2', tournament_id: 'tm', player_id: 'p2', deck_id: 'dB' }),
+  ]);
+  const a = await pull(0);
+  const by = (res, id) => res.rows.find((x) => x.id === id);
+  assert.equal(by(a, 'e1').data.deck_id, 'dA', 'el suyo sí');
+  assert.equal(by(a, 'e2').data.deck_id, null, 'el del rival no');
+  assert.equal(by(a, 'mm').data.deck1_id, 'dA');
+  assert.equal(by(a, 'mm').data.deck2_id, null);
+  assert.ok(by(a, 'l1') && !by(a, 'l2'), 'solo su lista');
+  // El organizador lo ve todo.
+  const o = (await call('GET', '/v1/sync/pull?since=0', null, org.token)).data;
+  assert.equal(by(o, 'e2').data.deck_id, 'dB');
+  // Termina: llega todo.
+  await push([row('tournaments', 'tm', 2, { id: 'tm', status: 'finished', list_visibility: 'open' })]);
+  const b = await pull(a.seq);
+  assert.equal(by(b, 'e2').data.deck_id, 'dB');
+  assert.equal(by(b, 'mm').data.deck2_id, 'dB');
+  assert.ok(by(b, 'l2'));
+});
+
+test('ficha: el jugador edita la suya; organizador y admin cualquiera', async () => {
+  const { call, admin, org, player } = await setup();
+  await call('POST', '/v1/sync/push', {
+    rows: [
+      row('players', 'p1', 1, { id: 'p1', nickname: 'Leo', notes: 'privado', updated_at: 1 }),
+      row('players', 'p2', 1, { id: 'p2', nickname: 'Ana', updated_at: 1 }),
+    ],
+  }, org.token);
+  await call('POST', `/v1/admin/accounts/${player.account.id}/player`, { playerId: 'p1' }, admin.token);
+  let r = await call('POST', '/v1/players/p1/profile', { nickname: 'Leo Z', phone: '5355', notes: 'hack' }, player.token);
+  assert.equal(r.status, 200);
+  assert.equal((await call('POST', '/v1/players/p2/profile', { nickname: 'X' }, player.token)).status, 403);
+  assert.equal((await call('POST', '/v1/players/p1/profile', { nickname: ' ' }, player.token)).status, 400);
+  const rows = (await call('GET', '/v1/sync/pull?since=0', null, org.token)).data.rows;
+  const p1 = rows.find((x) => x.id === 'p1').data;
+  assert.equal(p1.nickname, 'Leo Z');
+  assert.equal(p1.phone, '5355');
+  assert.equal(p1.notes, 'privado', 'el jugador no toca las notas');
+  const me = await call('GET', '/v1/me', null, player.token);
+  assert.equal(me.data.account.nickname, 'Leo Z');
+  r = await call('POST', '/v1/players/p2/profile', { nickname: 'Ana B', notes: 'ok' }, org.token);
+  assert.equal(r.status, 200);
+  assert.equal((await call('POST', '/v1/players/p2/profile', { nickname: 'Ana C' }, admin.token)).status, 200);
+});

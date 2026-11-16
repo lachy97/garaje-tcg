@@ -468,3 +468,14 @@ npm.cmd run insights
 ```
 
 También se ve en el panel de Cloudflare: D1 → garage-tcg → Metrics.
+
+## 23 · Fichas, mazos y resultados (versión 1.15.0)
+
+Sin migración nueva. En el PC (con VPN):
+
+```powershell
+npm.cmd run deploy
+```
+
+`/v1/health` debe decir `1.15.0`. Hay que desplegarlo **antes** de repartir
+la app nueva (editar la ficha y cambiar el mazo inscrito usan rutas nuevas).

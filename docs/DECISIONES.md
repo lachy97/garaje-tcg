@@ -471,3 +471,26 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Estimación: unas 10–30 filas por sincronización sin cambios (antes, cientos o miles).
 - **Cómo vigilarlo**: `npm.cmd run insights` (`wrangler d1 insights`) muestra las consultas que más filas leen. En el panel de Cloudflare: D1 → garage-tcg → Metrics → Rows read.
 - **Si aun así no alcanza**: con Workers Paid (5 USD/mes) D1 pasa a 25.000 millones de lecturas al mes.
+
+## Arreglos tras el primer evento (16/11) — servidor 1.15.0
+- **Fichas**: cada jugador edita los datos de la suya (apodo, nombre, teléfono, Konami ID) desde su perfil; organizadores y administrador, cualquiera. No toca resultados ni estadísticas.
+  - El jugador (y la versión web) guarda en el servidor: `POST /v1/players/:id/profile`. Las notas solo las cambian organizadores y el administrador.
+  - El cambio queda como un cambio más de la ficha (llega a todos al sincronizar) y actualiza el apodo y el teléfono de la cuenta vinculada.
+  - El organizador en Android sigue guardando en su teléfono, que lo sube.
+- **Solicitudes**: el botón ya no cuenta las aceptadas. Solo muestra las pendientes; si no hay, dice "Ver solicitudes".
+- **Avisos que abren su pantalla**:
+  - Una solicitud nueva abre el torneo con las solicitudes desplegadas, para aceptarla.
+  - El juez, las disputas y los reportes abren el torneo.
+  - Los avisos de mesa y de tiempo abren Torneos.
+- **Mazo de la inscripción**:
+  - Hasta la hora de inicio, el jugador inscrito puede cambiar su mazo, desde la tarjeta de inscripción abierta o desde el propio torneo ("Inscrito con X · Cambiar mazo").
+  - Va al servidor como una solicitud "aceptada" con el mazo nuevo, y el teléfono del organizador lo aplica al sincronizar (`registerPlayer` actualiza el mazo).
+  - El organizador ya podía cambiar el mazo en cualquier fase (tocar al jugador en Jugadores).
+- **Resultados**:
+  - El organizador y el administrador reciben un aviso por cada reporte ("falta que confirme el rival") y por cada resultado confirmado. Es el mismo aviso por mesa, que se sustituye.
+  - Si el rival no confirma, el organizador pulsa **Confirmar X** en Rondas → Avisos de los jugadores.
+  - Desde otro teléfono, la web, el administrador o un juez, el panel también sale y la confirmación va al servidor como resultado de juez; la pone el teléfono que lleva el torneo.
+- **Mazos ocultos hasta el final**: mientras el torneo no termina, el servidor no envía a los jugadores ni a los visitantes el mazo de los demás (inscripción, partidas y listas). Cada uno ve el suyo.
+  - El organizador del torneo y sus jueces lo ven todo.
+  - Al terminar, el torneo se envía entero otra vez.
+  - Mi mesa y su aviso ya no muestran el mazo del rival.

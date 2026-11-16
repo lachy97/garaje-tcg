@@ -319,7 +319,9 @@ export class SyncService {
     // inscripción); 'after' = solo con el torneo terminado.
     const hiddenLists = new Set();
     for (const t of tinfo.values()) {
-      if (t.lists === 'archetype' || (t.lists === 'after' && t.status !== 'finished')) hiddenLists.add(t.id);
+      // Hasta que termina el torneo no se sabe con qué juega cada uno (sí
+      // el propio): tampoco las listas, aunque el torneo las enseñe.
+      if (t.lists === 'archetype' || t.status !== 'finished') hiddenLists.add(t.id);
     }
     // Torneos donde es juez: todas las partidas y penalizaciones (sin cover,
     // notas ni teléfonos). Los jugadores y visitantes no arbitran.
@@ -378,11 +380,16 @@ export class SyncService {
         if (r.id !== pid && !isOrganizer) for (const k of PRIVATE_PLAYER) if (k in o.data) o.data[k] = null;
         rows.set(key, o);
       } else if (r.tournament_id && visible.has(r.tournament_id)) {
-        const mine = owned.has(r.tournament_id);
-        if (r.tbl === 'penalties' && r.player_id !== pid && !mine && !judged.has(r.tournament_id)) return;
-        if (r.tbl === 'deck_lists' && !mine && !judged.has(r.tournament_id) && hiddenLists.has(r.tournament_id)) return;
+        const tid = r.tournament_id;
+        const mine = owned.has(tid);
+        const staff = mine || judged.has(tid);
+        if (r.tbl === 'penalties' && r.player_id !== pid && !staff) return;
+        if (r.tbl === 'deck_lists' && !staff && r.player_id !== pid && hiddenLists.has(tid)) return;
         const o = out(r);
         if (!mine) for (const k of ORGANIZER_ONLY[r.tbl] ?? []) delete o.data[k];
+        // Torneo sin terminar: sin el mazo de los demás (al terminar se
+        // vuelve a enviar entero).
+        if (!staff && tinfo.get(tid)?.status !== 'finished') SyncService.hideDecks(r.tbl, o.data, pid);
         rows.set(key, o);
       }
     };
@@ -418,6 +425,61 @@ export class SyncService {
       for (const r of all.results ?? []) add(r);
     }
     return { rows: [...rows.values()], more, seq };
+  }
+
+  /**
+   * Edita los datos de una ficha de jugador (no resultados ni estadísticas).
+   * La propia ficha: su jugador. Cualquiera: organizadores y administrador.
+   * body: { nickname, fullName?, konamiId?, phone?, notes? } (notas: solo
+   * organizadores). Queda como un cambio más (llega a todos al sincronizar)
+   * y actualiza el apodo y el teléfono de la cuenta vinculada.
+   */
+  async editPlayer(token, playerId, body) {
+    const me = await this.auth.authenticate(token);
+    const boss = me.role === 'admin' || me.role === 'organizer';
+    if (!boss && me.player_id !== playerId) throw new ApiError(403, 'Solo puedes editar tu propia ficha.');
+    const community = me.community_id;
+    const r = await this.db
+      .prepare("SELECT data, changed_at FROM sync_rows WHERE community_id = ? AND tbl = 'players' AND id = ? AND deleted = 0")
+      .bind(community, playerId)
+      .first();
+    if (!r?.data) throw new ApiError(404, 'Esa ficha no existe o aún no está en el servidor.');
+    const text = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+    const nickname = text(body?.nickname, 40);
+    if (!nickname) throw bad('Escribe un nickname.');
+    const data = JSON.parse(r.data);
+    data.nickname = nickname;
+    if ('fullName' in (body ?? {})) data.full_name = text(body.fullName, 80);
+    if ('konamiId' in (body ?? {})) data.konami_id = text(body.konamiId, 30);
+    if ('phone' in (body ?? {})) data.phone = text(body.phone, 30);
+    if (boss && 'notes' in (body ?? {})) data.notes = text(body.notes, 500);
+    const now = this.auth.now();
+    // Las fechas de la app van en segundos.
+    data.updated_at = Math.floor(now / 1000);
+    const changed = Math.max(now, Number(r.changed_at ?? 0) + 1);
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE sync_rows SET data = ?1, changed_at = ?2, updated_by = ?3, received_at = ?4,
+                  seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_rows WHERE community_id = ?5)
+            WHERE community_id = ?5 AND tbl = 'players' AND id = ?6`,
+        )
+        .bind(JSON.stringify(data), changed, me.id, now, community, playerId),
+      this.db
+        .prepare('UPDATE accounts SET nickname = ?, phone = COALESCE(?, phone), updated_at = ? WHERE community_id = ? AND player_id = ?')
+        .bind(nickname, data.phone ?? null, new Date(now).toISOString(), community, playerId),
+    ]);
+    return { ok: true };
+  }
+
+  /** Quita los mazos de los rivales de una fila (deja el propio). */
+  static hideDecks(tbl, data, pid) {
+    if (tbl === 'tournament_players') {
+      if (data.player_id !== pid) data.deck_id = null;
+    } else if (tbl === 'matches') {
+      if (data.player1_id !== pid) data.deck1_id = null;
+      if (data.player2_id !== pid) data.deck2_id = null;
+    }
   }
 
   /** Inscripción recién creada (no una actualización de puestos o check-in

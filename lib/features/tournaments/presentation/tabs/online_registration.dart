@@ -133,9 +133,11 @@ class OnlineRegistrationCard extends ConsumerWidget {
                   : const Icon(Icons.inbox_outlined),
               label: Text(requests.hasError
                   ? 'Solicitudes (sin conexión)'
+                  // Solo cuentan las que esperan respuesta (las aceptadas
+                  // ya no piden nada).
                   : pending > 0
                       ? 'Solicitudes · $pending pendiente(s)'
-                      : 'Solicitudes (${list.length})'),
+                      : 'Ver solicitudes'),
             ),
           ],
         ],

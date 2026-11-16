@@ -6,7 +6,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.14.0';
+export const VERSION = '1.15.0';
 
 /** La versión web (iPhone) llama desde otro dominio: se permite (las
  *  sesiones van en la cabecera Authorization, no en cookies). */
@@ -138,6 +138,8 @@ async function route(request, env, opts) {
         case '/v1/play/extension': return json(await play.extension(token, body));
         case '/v1/play/penalty': return json(await play.penalty(token, body));
       }
+      const pp = path.match(/^\/v1\/players\/([^/]+)\/profile$/);
+      if (pp) return json(await sync.editPlayer(token, decodeURIComponent(pp[1]), body));
       const st = path.match(/^\/v1\/tournaments\/([^/]+)\/judges(?:\/([^/]+)\/remove)?$/);
       if (st) {
         const [, tid, acc] = st;

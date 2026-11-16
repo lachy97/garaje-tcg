@@ -112,7 +112,19 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
         final deck = await showDeckPicker(context, current: widget.request?.deckName ?? last);
         if (deck == null) throw const ActionCancelled();
         await ref.read(registrationsApiProvider)!.request(t.id, deck);
-      }, widget.request?.status == RegistrationStatus.pending ? 'Mazo cambiado' : 'Solicitud enviada');
+      }, _changing ? 'Mazo cambiado' : 'Solicitud enviada');
+
+  /// Ya pidió plaza o está inscrito: elegir mazo es cambiarlo.
+  bool get _changing {
+    final s = widget.request?.status;
+    return s == RegistrationStatus.pending ||
+        s == RegistrationStatus.waitlist ||
+        s == RegistrationStatus.accepted ||
+        s == RegistrationStatus.registered ||
+        _enrolled;
+  }
+
+  bool _enrolled = false;
 
   Future<void> _cancel(RegistrationRequest r) => _run(() async {
         final ok = await confirmDialog(
@@ -135,6 +147,7 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
     final enrolledIds =
         pid == null ? const <String>{} : ref.watch(playerTournamentIdsProvider(pid)).value ?? const <String>{};
     final enrolled = enrolledIds.contains(t.id);
+    _enrolled = enrolled;
     final status = r?.status;
     final date = t.date == null ? '' : '${formatStart(t.date!)} · ';
     // Pasada la hora de inicio: ni pedir plaza ni darse de baja.
@@ -169,6 +182,14 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
     final canRequest = !started &&
         !enrolled &&
         (status == null || status == RegistrationStatus.rejected || status == RegistrationStatus.cancelled);
+    // Hasta la hora de inicio el mazo se puede cambiar (también inscrito:
+    // lo aplica el teléfono del organizador).
+    final canChange = !started &&
+        (enrolled ||
+            status == RegistrationStatus.pending ||
+            status == RegistrationStatus.waitlist ||
+            status == RegistrationStatus.accepted ||
+            status == RegistrationStatus.registered);
     final canCancel = !started &&
         r != null &&
         (status == RegistrationStatus.pending ||
@@ -207,7 +228,7 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
           ],
           if (enrolled && r == null) ...[
             const SizedBox(height: 4),
-            Text('Para borrarte o cambiar el mazo, habla con el organizador.',
+            Text('Para borrarte, habla con el organizador.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
           if (canRequest && t.full) ...[
@@ -227,7 +248,7 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
               padding: EdgeInsets.only(top: 12),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (canRequest || canCancel) ...[
+          else if (canRequest || canCancel || canChange) ...[
             const SizedBox(height: 12),
             Row(
               children: [
@@ -239,9 +260,8 @@ class _OpenTournamentCardState extends ConsumerState<_OpenTournamentCard> {
                           style: TextStyle(color: AppColors.loss)),
                     ),
                   ),
-                if (canCancel && (status == RegistrationStatus.pending || status == RegistrationStatus.waitlist))
-                  const SizedBox(width: 10),
-                if (status == RegistrationStatus.pending || status == RegistrationStatus.waitlist)
+                if (canCancel && canChange) const SizedBox(width: 10),
+                if (canChange && !canRequest)
                   Expanded(
                     child: OutlinedButton(onPressed: _request, child: const Text('Cambiar mazo')),
                   ),
