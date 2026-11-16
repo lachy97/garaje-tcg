@@ -454,8 +454,8 @@ export class SyncService {
     if ('phone' in (body ?? {})) data.phone = text(body.phone, 30);
     if (boss && 'notes' in (body ?? {})) data.notes = text(body.notes, 500);
     const now = this.auth.now();
-    // Las fechas de la app van en segundos.
-    data.updated_at = Math.floor(now / 1000);
+    // Fechas como las guarda la app (texto ISO 8601).
+    data.updated_at = new Date(now).toISOString();
     const changed = Math.max(now, Number(r.changed_at ?? 0) + 1);
     await this.db.batch([
       this.db
@@ -511,14 +511,15 @@ export class SyncService {
       .bind(community, tid, pid)
       .first();
     const now = this.auth.now();
-    const secs = Math.floor(now / 1000);
+    // Fechas como las guarda la app (texto ISO 8601; un número la rompe).
+    const iso = new Date(now).toISOString();
     const prev = old?.data ? JSON.parse(old.data) : null;
     const id = old?.id ?? crypto.randomUUID();
     const data = {
       ...(prev ?? {}),
       id,
-      created_at: prev?.created_at ?? secs,
-      updated_at: secs,
+      created_at: typeof prev?.created_at === 'string' ? prev.created_at : iso,
+      updated_at: iso,
       deleted_at: null,
       tournament_id: tid,
       player_id: pid,
@@ -541,6 +542,44 @@ export class SyncService {
       .bind(community, id, JSON.stringify(data), changed, t.owner_id, me.id, now, tid, pid)
       .run();
     return { ok: true, id };
+  }
+
+  /**
+   * Administrador: cambia el nombre de varios torneos (p. ej. al formato
+   * "Torneo #1 · T4 2026"). body: { items: [{ id, name }] } (máx. 200).
+   * Queda como un cambio más de cada torneo (llega a todos al sincronizar).
+   */
+  async renameTournaments(token, body) {
+    const me = await this.auth.requireAdmin(token);
+    const community = me.community_id;
+    const items = (Array.isArray(body?.items) ? body.items : []).slice(0, 200);
+    const now = this.auth.now();
+    const iso = new Date(now).toISOString();
+    let renamed = 0;
+    for (const it of items) {
+      const id = String(it?.id ?? '');
+      const name = typeof it?.name === 'string' ? it.name.trim().slice(0, 80) : '';
+      if (!id || !name) continue;
+      const r = await this.db
+        .prepare("SELECT data, changed_at FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND id = ? AND deleted = 0")
+        .bind(community, id)
+        .first();
+      if (!r?.data) continue;
+      const data = JSON.parse(r.data);
+      if (data.name === name) continue;
+      data.name = name;
+      data.updated_at = iso;
+      await this.db
+        .prepare(
+          `UPDATE sync_rows SET data = ?1, changed_at = ?2, updated_by = ?3, received_at = ?4,
+                  seq = (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_rows WHERE community_id = ?5)
+            WHERE community_id = ?5 AND tbl = 'tournaments' AND id = ?6`,
+        )
+        .bind(JSON.stringify(data), Math.max(now, Number(r.changed_at ?? 0) + 1), me.id, now, community, id)
+        .run();
+      renamed++;
+    }
+    return { renamed };
   }
 
   /** Quita los mazos de los rivales de una fila (deja el propio). */

@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
 import '../../../core/db/database_provider.dart';
+import '../domain/tournament_names.dart';
 import '../domain/tournament_rules.dart';
 import 'start_time.dart';
 import 'tabs/rounds_tab.dart' show TopCutSelector;
@@ -20,13 +21,29 @@ class CreateTournamentPage extends ConsumerStatefulWidget {
 
 class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
   final _formKey = GlobalKey<FormState>();
-  late final _name = TextEditingController(
-      text: 'Torneo ${DateFormat('dd/MM', 'es').format(DateTime.now())}');
+  // Nombre por defecto: "Torneo #N · T4 2026" (el siguiente de la temporada
+  // de la fecha elegida). Se recalcula al cambiar la fecha mientras no se
+  // escriba otro a mano.
+  final _name = TextEditingController();
+  bool _nameEdited = false;
   // Hoy a las 14:00 (se cambia abajo).
   DateTime _date = () {
     final n = DateTime.now();
     return DateTime(n.year, n.month, n.day, 14);
   }();
+
+  @override
+  void initState() {
+    super.initState();
+    _suggestName();
+  }
+
+  Future<void> _suggestName() async {
+    if (_nameEdited) return;
+    final all = await ref.read(tournamentsDaoProvider).watchAll().first;
+    if (!mounted || _nameEdited) return;
+    _name.text = nextTournamentName(all, _date);
+  }
   int _rounds = 3;
   int _topCut = 0;
   int _minutes = TournamentRules.defaultRoundMinutes;
@@ -40,7 +57,10 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
 
   Future<void> _pickDate() async {
     final d = await pickStartDay(context, _date);
-    if (d != null) setState(() => _date = d);
+    if (d != null) {
+      setState(() => _date = d);
+      await _suggestName();
+    }
   }
 
   Future<void> _pickTime() async {
@@ -79,6 +99,7 @@ class _CreateTournamentPageState extends ConsumerState<CreateTournamentPage> {
             TextFormField(
               controller: _name,
               textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => _nameEdited = true,
               decoration: const InputDecoration(
                 labelText: 'Nombre del torneo',
                 prefixIcon: Icon(Icons.emoji_events_outlined),

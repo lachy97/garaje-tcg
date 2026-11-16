@@ -498,3 +498,13 @@ npm.cmd run deploy
 WhatsApp y lo tengas instalado: Ajustes → Servidor → **Exigir mi versión**.
 Las versiones anteriores quedan bloqueadas hasta actualizar. La web nunca se
 bloquea. Para deshacerlo: "Quitar el mínimo" (también desde la web).
+
+## 26 · Fechas de fichas y listas (versión 1.18.0)
+
+```powershell
+npm.cmd run db:fechas
+npm.cmd run deploy
+```
+
+`/v1/health` debe decir `1.18.0`. La migración corrige las fichas editadas
+y las listas subidas desde el servidor 1.15–1.17 (fechas como número).

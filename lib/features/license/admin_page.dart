@@ -7,7 +7,11 @@ import '../../app/widgets/common.dart';
 import '../../core/auth/auth_providers.dart';
 import '../../core/db/app_database.dart';
 import '../../core/db/database_provider.dart';
+import '../../core/auth/account.dart';
+import '../../core/auth/http_auth_api.dart';
+import '../../core/sync/sync_service.dart';
 import '../../core/utils/season_utils.dart';
+import '../tournaments/domain/tournament_names.dart';
 import '../ranking/presentation/season_picker.dart';
 
 /// Modo administrador: tareas poco frecuentes del administrador (reabrir
@@ -32,6 +36,8 @@ class AdminPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 40),
         children: const [
+          SectionLabel('Nombres de los torneos'),
+          NeonCard(child: _TournamentNames()),
           SectionLabel('Temporadas cerradas'),
           NeonCard(child: _ClosedSeasons()),
         ],
@@ -81,3 +87,104 @@ class _ClosedSeasons extends ConsumerWidget {
     );
   }
 }
+
+/// Pone a los torneos terminados el nombre de la comunidad ("Torneo #1 ·
+/// T4 2026"), numerados por fecha dentro de su temporada. Se ve antes lo que
+/// cambia; los de prueba se pueden dejar fuera (no cuentan para el número).
+/// Se guarda en el servidor y llega a todos al sincronizar.
+class _TournamentNames extends ConsumerStatefulWidget {
+  const _TournamentNames();
+
+  @override
+  ConsumerState<_TournamentNames> createState() => _TournamentNamesState();
+}
+
+class _TournamentNamesState extends ConsumerState<_TournamentNames> {
+  final Set<String> _skip = {};
+  bool _busy = false;
+
+  Future<void> _apply(List<(Tournament, String)> changes) async {
+    final api = ref.read(authApiProvider);
+    final session = ref.read(sessionProvider).value;
+    if (api is! HttpAuthApi || session == null) {
+      showMessage(context, 'Necesitas conexión con el servidor.', error: true);
+      return;
+    }
+    final ok = await confirmDialog(
+      context,
+      title: 'Renombrar ${changes.length} torneo(s)',
+      message: 'Se cambia solo el nombre (no los resultados ni el ranking). '
+          'Llega a todos los teléfonos al sincronizar.',
+      confirm: 'Renombrar',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final r = await api.request('POST', 'v1/admin/tournaments/rename', token: session.token, body: {
+        'items': [for (final (t, name) in changes) {'id': t.id, 'name': name}],
+      });
+      await ref.read(syncControllerProvider.notifier).sync();
+      if (mounted) showMessage(context, '${r['renamed'] ?? 0} torneo(s) renombrados');
+    } on AuthException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+    } catch (e) {
+      if (mounted) showMessage(context, 'No se pudo: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final all = ref.watch(_allTournamentsProvider).value ?? const <Tournament>[];
+    final finished = [
+      for (final t in all)
+        if (t.status == TournamentStatus.finished) t,
+    ]..sort((a, b) => a.date.compareTo(b.date));
+    final changes = renameProposals(all, skip: _skip);
+    final byId = {for (final (t, name) in changes) t.id: name};
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Formato: ${tournamentName(1, 2026, 4)}, numerados por fecha dentro de cada temporada. '
+          'Desmarca los torneos de prueba: no cuentan para el número ni se renombran.',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 6),
+        if (finished.isEmpty)
+          Text('No hay torneos terminados.', style: TextStyle(color: AppColors.textSecondary))
+        else
+          for (final t in finished)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: !_skip.contains(t.id),
+              onChanged: (v) => setState(() => v == true ? _skip.remove(t.id) : _skip.add(t.id)),
+              title: Text(byId[t.id] ?? t.name,
+                  style: TextStyle(fontWeight: FontWeight.w700, color: byId.containsKey(t.id) ? AppColors.neon : null)),
+              subtitle: Text(
+                _skip.contains(t.id)
+                    ? '${t.name} · no se toca'
+                    : byId.containsKey(t.id)
+                        ? 'Antes: ${t.name}'
+                        : 'Ya tiene el formato',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+        const SizedBox(height: 8),
+        _busy
+            ? const Center(child: CircularProgressIndicator())
+            : FilledButton.icon(
+                onPressed: changes.isEmpty ? null : () => _apply(changes),
+                icon: const Icon(Icons.drive_file_rename_outline),
+                label: Text(changes.isEmpty ? 'Todos tienen el formato' : 'Renombrar ${changes.length} torneo(s)'),
+              ),
+      ],
+    );
+  }
+}
+
+final _allTournamentsProvider = StreamProvider.autoDispose<List<Tournament>>(
+  (ref) => ref.watch(tournamentsDaoProvider).watchAll(),
+);

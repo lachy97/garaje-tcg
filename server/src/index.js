@@ -6,7 +6,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.17.0';
+export const VERSION = '1.18.0';
 
 /** La versión web (iPhone) llama desde otro dominio: se permite (las
  *  sesiones van en la cabecera Authorization, no en cookies). */
@@ -142,6 +142,7 @@ async function route(request, env, opts) {
       }
       if (path === '/v1/decklists') return json(await sync.saveDeckList(token, body));
       if (path === '/v1/admin/app-version') return json(await setMinAppBuild(env, auth, token, body));
+      if (path === '/v1/admin/tournaments/rename') return json(await sync.renameTournaments(token, body));
       const pp = path.match(/^\/v1\/players\/([^/]+)\/profile$/);
       if (pp) return json(await sync.editPlayer(token, decodeURIComponent(pp[1]), body));
       const st = path.match(/^\/v1\/tournaments\/([^/]+)\/judges(?:\/([^/]+)\/remove)?$/);

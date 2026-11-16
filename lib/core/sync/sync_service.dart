@@ -597,7 +597,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
           final cols = await _cols(t);
           final entries = [
             for (final e in data.entries)
-              if (e.key is String && cols.contains(e.key)) MapEntry(e.key as String, e.value),
+              if (e.key is String && cols.contains(e.key)) MapEntry(e.key as String, _value(e.key as String, e.value)),
           ];
           if (entries.isEmpty) continue;
           await _db.customStatement(
@@ -613,6 +613,17 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     }
     // Avisar a las pantallas de que cambiaron los datos.
     _db.markTablesUpdated(_db.allTables);
+  }
+
+  /// Las fechas de la base local son texto ISO 8601: si llega un número
+  /// (segundos o milisegundos), se convierte. Una fecha como número rompía
+  /// la pantalla que la leía ("Invalid date format …Z").
+  static Object? _value(String column, Object? v) {
+    if (v is num && column.endsWith('_at')) {
+      final ms = v < 1e11 ? v * 1000 : v;
+      return DateTime.fromMillisecondsSinceEpoch(ms.toInt(), isUtc: true).toIso8601String();
+    }
+    return v;
   }
 
   /// Filas actuales de la cola (o "borrada" si ya no existe).

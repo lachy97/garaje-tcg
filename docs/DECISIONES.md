@@ -528,3 +528,14 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - En la app: descarga con reanudación y comprobación de SHA-256, `REQUEST_INSTALL_PACKAGES` + FileProvider + un plugin para abrir el instalador, y elegir el APK de su arquitectura.
   - Firmar siempre con la misma clave y subir el versionCode.
   - El jugador da permiso una vez para "instalar apps desconocidas" y pulsa Instalar: Android no deja instalar en silencio fuera de Play Store.
+
+## Arreglos tras la 1.17 (16/11) — servidor 1.18.0, migración 0011
+- **Lista subida por un jugador no se veía** ("FormatException: Invalid date format 1794820567Z"):
+  - La base de la app guarda las fechas como **texto ISO 8601** (`build.yaml`: `store_date_time_values_as_text`), y el servidor 1.15–1.17 escribía `created_at`/`updated_at` como número en las fichas editadas y en las listas subidas.
+  - Arreglo en el servidor: ahora escribe texto ISO. La migración `0011_fechas.sql` (`npm.cmd run db:fechas`) corrige las filas ya guardadas y les da un seq nuevo para que los teléfonos las vuelvan a bajar.
+  - Arreglo en la app: al bajar, cualquier fecha (`*_at`) que llegue como número se convierte a texto.
+- **Ranking**: el buscador y el filtro de mazo son ahora dos campos con borde, del mismo alto y a mitades. Antes el filtro era un desplegable sin borde.
+- **Nombres de torneos**: formato de la comunidad **"Torneo #N · T4 2026"** (`tournament_names.dart`).
+  - Al crear un torneo, el nombre por defecto es el siguiente número de la temporada de la fecha elegida: el mayor número usado + 1 o, si ninguno tiene número, los torneos de la temporada + 1. Se recalcula al cambiar la fecha mientras no se escriba otro.
+  - Modo administrador → **Nombres de los torneos**: propone el nombre de cada torneo terminado, numerado por fecha dentro de su temporada. Se pueden desmarcar los de prueba, que no cuentan para el número.
+  - Lo guarda el servidor (`POST /v1/admin/tournaments/rename`, solo administrador) y llega a todos al sincronizar.

@@ -87,7 +87,10 @@ class _RankingViewState extends ConsumerState<RankingView> {
               _MyPlace(rows: list),
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                // Buscador y filtro de mazo con el mismo estilo y alto (los
+                // dos son campos con borde), uno al lado del otro.
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: TextField(
@@ -100,14 +103,15 @@ class _RankingViewState extends ConsumerState<RankingView> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    FilterDropdown(
-                      label: 'Mazo',
-                      value: _deck,
-                      options: {
-                        for (final set in decksByPlayer.values)
-                          for (final d in set) d: d,
-                      },
-                      onChanged: (v) => setState(() => _deck = v),
+                    Expanded(
+                      child: _DeckFilter(
+                        value: _deck,
+                        decks: ({
+                          for (final set in decksByPlayer.values) ...set,
+                        }.toList()
+                          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()))),
+                        onChanged: (v) => setState(() => _deck = v),
+                      ),
                     ),
                   ],
                 ),
@@ -252,6 +256,37 @@ class _MyPlace extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Filtro por mazo del ranking: un campo con borde igual que el buscador.
+class _DeckFilter extends StatelessWidget {
+  const _DeckFilter({required this.value, required this.decks, required this.onChanged});
+
+  final String? value;
+  final List<String> decks;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String?>(
+      // Se reconstruye si el mazo elegido deja de existir.
+      key: ValueKey(decks.contains(value) ? value : null),
+      initialValue: decks.contains(value) ? value : null,
+      isExpanded: true,
+      isDense: true,
+      borderRadius: BorderRadius.circular(12),
+      decoration: const InputDecoration(
+        isDense: true,
+        prefixIcon: Icon(Icons.style_outlined),
+      ),
+      items: [
+        const DropdownMenuItem<String?>(value: null, child: Text('Todos los mazos', overflow: TextOverflow.ellipsis)),
+        for (final d in decks)
+          DropdownMenuItem<String?>(value: d, child: Text(d, overflow: TextOverflow.ellipsis)),
+      ],
+      onChanged: onChanged,
     );
   }
 }

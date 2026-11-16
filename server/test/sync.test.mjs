@@ -281,6 +281,7 @@ test('ficha: el jugador edita la suya; organizador y admin cualquiera', async ()
   assert.equal(p1.nickname, 'Leo Z');
   assert.equal(p1.phone, '5355');
   assert.equal(p1.notes, 'privado', 'el jugador no toca las notas');
+  assert.equal(typeof p1.updated_at, 'string', 'fecha como texto, igual que en la app');
   const me = await call('GET', '/v1/me', null, player.token);
   assert.equal(me.data.account.nickname, 'Leo Z');
   r = await call('POST', '/v1/players/p2/profile', { nickname: 'Ana B', notes: 'ok' }, org.token);
@@ -317,5 +318,22 @@ test('listas del Top: cada jugador la suya; organizador y admin todas', async ()
   const mine = rows.find((x) => x.data.player_id === 'p1').data;
   assert.equal(mine.main_deck, '9,9,9');
   assert.equal(mine.featured_card, 2);
+  assert.match(mine.updated_at, /^\d{4}-\d\d-\d\dT/, 'fecha como texto, igual que en la app');
+  assert.equal(typeof mine.created_at, 'string');
   assert.equal(rows.find((x) => x.data.player_id === 'p2').data.main_deck, '4,5');
+});
+
+test('admin renombra torneos (formato "Torneo #1 · T4 2026")', async () => {
+  const { call, admin, org } = await setup();
+  await call('POST', '/v1/sync/push', {
+    rows: [row('tournaments', 'ta', 1, { id: 'ta', name: 'Torneo 15/11', status: 'finished' })],
+  }, org.token);
+  const items = [{ id: 'ta', name: 'Torneo #3 · T4 2026' }];
+  assert.equal((await call('POST', '/v1/admin/tournaments/rename', { items }, org.token)).status, 403);
+  const r = await call('POST', '/v1/admin/tournaments/rename', { items }, admin.token);
+  assert.equal(r.data.renamed, 1);
+  const rows = (await call('GET', '/v1/sync/pull?since=0', null, org.token)).data.rows;
+  const t = rows.find((x) => x.id === 'ta').data;
+  assert.equal(t.name, 'Torneo #3 · T4 2026');
+  assert.equal(t.status, 'finished', 'el resto no cambia');
 });
