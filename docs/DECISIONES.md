@@ -437,3 +437,37 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
 - **Datos** reúne Ranking, Tier list y Enfrentamientos en pestañas, con **un solo selector de temporada** arriba para las tres. El histórico vale para la tier list y los enfrentamientos; el ranking es siempre de una temporada y lo dice si se elige el histórico.
 - El botón de ajustes de Datos cambia según la pestaña: compartir el ranking o la tier list, gestionar mazos y cerrar la temporada (desde Ranking, solo organizadores y admin).
 - **Filtro por mazo del ranking**: incluye a todos los que jugaron con ese mazo en al menos un torneo terminado de la temporada, no solo a quienes lo usaron por última vez (`seasonPlayerDecksProvider`, con prueba). La columna "Mazo" sigue mostrando el último.
+
+## Incidente del primer evento oficial (15/11) — app y servidor 1.13.1
+- **Qué pasó**: durante el evento se cerraron las sesiones de todos y nadie podía volver a entrar ("error de servidor", también con VPN).
+- **Causa en la app (seguro)**: al abrir la app o al fallar una sincronización, `refreshAccount` cerraba la sesión del teléfono ante **cualquier** error que no fuera de red. Una página de error de Cloudflare (servidor saturado o límite del plan) o un 500 sacaba a todos a la vez.
+- **Por qué no podían volver a entrar (muy probable)**:
+  - El plan gratis de Workers da **10 ms de CPU por petición**.
+  - Medido: iniciar sesión (PBKDF2, 100.000 iteraciones) cuesta unos **15–19 ms**, y una página de bajada de 1.000 filas unos **15 ms**.
+  - Ese día mucha gente instaló la app o abrió la web por primera vez (bajadas completas). Tras el cierre masivo, todos intentaron iniciar sesión a la vez.
+  - Muchas peticiones pasaron del límite y Cloudflare las cortó (error 1102). Pendiente confirmarlo en Cloudflare: Metrics/Observability del Worker a la hora del evento.
+- **Arreglos**:
+  - **La sesión solo se cierra si el servidor dice 401/404** (sesión vencida o anulada, cuenta borrada). `AuthException.status` y `sessionInvalid`.
+  - Las páginas de error de Cloudflare y los 5xx cuentan como **fallo temporal**, igual que no tener conexión: el mensaje dice que la sesión sigue abierta.
+  - Con el servidor fallando, la sincronización automática **espera 2 min** entre intentos (no lo satura mientras se recupera).
+  - **Páginas de bajada de 250 filas** (unos 4 ms de CPU) en lugar de 1.000.
+  - Pruebas: `test/server_errors_test.dart` (página de Cloudflare, 500, 401 y 429).
+- **Si vuelve a pasar**: con la app nueva, nadie pierde la sesión, y al recuperarse el servidor todo sigue solo. La solución definitiva del límite de CPU es Workers Paid (5 USD/mes, 30 s de CPU por petición), si alguien puede pagarlo.
+- **Causa confirmada (15/11, `wrangler tail`)**: `D1_ERROR: Your account has exceeded D1's free tier daily row read limit`. El plan gratis de D1 permite **5 millones de filas leídas al día**, y el contador se reinicia a las 00:00 UTC (19:00–20:00 en Cuba). Lo que fallaba era la base de datos, no la CPU. Por eso `/v1/health` fallaba a ratos: su `COUNT(*)` de cuentas también lee filas.
+
+## Menos lecturas en D1 (15/11) — servidor 1.14.0, migración 0009
+- **De dónde salían las lecturas**: cada teléfono sincroniza cada 30 s, y cada sincronización releía datos que no habían cambiado:
+  - `play/mine` (los avisos de su mesa) recorría **todas las filas del torneo en juego** para encontrar sus partidas.
+  - La bajada leía **todos los torneos** cada vez que llegaba algún cambio.
+  - La bajada volvía a enviar el **torneo entero** a cada teléfono en cada ronda, y en cada cambio de su inscripción (puesto del suizo).
+  - `registrations/mine` leía todos los torneos para encontrar los que tenían la inscripción abierta.
+  - Varias consultas usaban un índice que no les servía: al contar plazas recorrían los inscritos de todos los torneos, y las solicitudes y avisos se buscaban fila por fila.
+  - Ejemplo: 40 teléfonos × 2 sincronizaciones/min × 5 h × ~1.000 filas ≈ 24 millones.
+- **Arreglos**:
+  - Índices nuevos (migración `0009_lecturas.sql`, `npm.cmd run db:lecturas`): (comunidad, torneo, seq), (comunidad, tabla, torneo), estado del torneo, solicitudes por torneo y estado, avisos por cuenta y por rival. Termina con `PRAGMA optimize`.
+  - `play_actions.target_player` en los reportes = el rival (la migración lo rellena en los antiguos). `play/mine` hace 2 búsquedas por índice.
+  - La bajada solo mira los torneos que aparecen en el tramo (por clave).
+  - Un torneo solo se completa cuando se vuelve visible: al terminar o abrir la inscripción, o con una inscripción nueva (creada hace menos de 10 min). Solo se leen las filas anteriores a `since`. Nunca en la primera descarga: `boot=1` (lo manda la app nueva) o `since=0`.
+  - Estimación: unas 10–30 filas por sincronización sin cambios (antes, cientos o miles).
+- **Cómo vigilarlo**: `npm.cmd run insights` (`wrangler d1 insights`) muestra las consultas que más filas leen. En el panel de Cloudflare: D1 → garage-tcg → Metrics → Rows read.
+- **Si aun así no alcanza**: con Workers Paid (5 USD/mes) D1 pasa a 25.000 millones de lecturas al mes.

@@ -18,7 +18,9 @@
     "backup": "node scripts/backup.mjs",
     "backup:info": "wrangler d1 time-travel info garage-tcg",
     "deploy": "wrangler deploy",
-    "logs": "wrangler tail"
+    "logs": "wrangler tail",
+    "db:lecturas": "wrangler d1 execute garage-tcg --remote --file=migrations/0009_lecturas.sql",
+    "insights": "wrangler d1 insights garage-tcg --sort-by reads --limit 15"
   },
   "devDependencies": {
     "wrangler": "^4.40.0"

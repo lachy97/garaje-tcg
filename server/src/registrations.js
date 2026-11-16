@@ -207,12 +207,13 @@ export class RegistrationService {
     // teléfono puede estar desfasado si se cerró o empezó).
     const oq = await this.db
       .prepare(
+        // Solo los torneos en inscripción (índice por estado), no todos.
         `SELECT t.id, t.data,
-                (SELECT COUNT(*) FROM sync_rows p WHERE p.community_id = t.community_id AND p.tbl = 'tournament_players'
-                   AND p.tournament_id = t.id AND p.deleted = 0 AND json_extract(p.data, '$.deleted_at') IS NULL) AS enrolled
+                (SELECT COUNT(*) FROM sync_rows p WHERE p.community_id = t.community_id AND p.tournament_id = t.id
+                   AND p.tbl = 'tournament_players' AND p.deleted = 0 AND json_extract(p.data, '$.deleted_at') IS NULL) AS enrolled
            FROM sync_rows t
-          WHERE t.community_id = ? AND t.tbl = 'tournaments' AND t.deleted = 0 AND json_extract(t.data, '$.deleted_at') IS NULL
-            AND json_extract(t.data, '$.status') = 'draft'
+          WHERE t.community_id = ? AND t.tbl = 'tournaments' AND json_extract(t.data, '$.status') = 'draft'
+            AND t.deleted = 0 AND json_extract(t.data, '$.deleted_at') IS NULL
             AND json_extract(t.data, '$.online_registration') = 1`,
       )
       .bind(me.community_id)

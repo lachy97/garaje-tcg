@@ -23,7 +23,17 @@ export const SYNC_TABLES = [
 
 export const MAX_PUSH_ROWS = 500;
 const MAX_ROW_BYTES = 64 * 1024;
-const MAX_PULL_ROWS = 1000;
+// Páginas pequeñas: cada página cuesta CPU (el plan gratis de Workers da
+// 10 ms por petición; 1000 filas eran unos 15 ms, 250 unos 4 ms).
+const MAX_PULL_ROWS = 250;
+
+/** Margen entre crear y cambiar una inscripción para tratarla como nueva. */
+const NEW_ENTRY_MS = 10 * 60 * 1000;
+
+/** Torneo que ve cualquiera: terminado, o en inscripción desde la app. */
+function publicTournament(t) {
+  return Boolean(t) && (t.status === 'finished' || (t.status === 'draft' && Number(t.online) === 1));
+}
 
 const bad = (m) => new ApiError(400, m);
 
@@ -283,12 +293,24 @@ export class SyncService {
     if (!delta.length) return { rows: [], more: false, seq };
 
     const pid = me.player_id ?? null;
+    // Solo los torneos que aparecen en este tramo (por clave): no se recorren
+    // todos los torneos en cada sincronización de cada teléfono.
+    const tids = [...new Set(delta.map((r) => r.tournament_id).filter(Boolean))];
+    const tinfo = new Map();
+    for (let i = 0; i < tids.length; i += 50) {
+      const chunk = tids.slice(i, i + 50);
+      const tq = await this.db
+        .prepare(
+          `SELECT id, owner_id, json_extract(data, '$.status') AS status, json_extract(data, '$.online_registration') AS online,
+                  json_extract(data, '$.list_visibility') AS lists
+             FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND id IN (${chunk.map(() => '?').join(',')}) AND deleted = 0`,
+        )
+        .bind(community, ...chunk)
+        .all();
+      for (const t of tq.results ?? []) tinfo.set(t.id, t);
+    }
     // Torneos visibles: terminados, con inscripción desde la app abierta y
     // en los que está inscrito.
-    const tq = await this.db
-      .prepare("SELECT id, owner_id, json_extract(data, '$.status') AS status, json_extract(data, '$.online_registration') AS online, json_extract(data, '$.list_visibility') AS lists FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND deleted = 0")
-      .bind(community)
-      .all();
     const visible = new Set();
     // Torneos que lleva este organizador: le llegan completos (cover, notas,
     // penalizaciones de todos).
@@ -296,21 +318,23 @@ export class SyncService {
     // Listas de mazo: 'archetype' = no se envían (el mazo ya va en la
     // inscripción); 'after' = solo con el torneo terminado.
     const hiddenLists = new Set();
-    for (const t of tq.results ?? []) {
+    for (const t of tinfo.values()) {
       if (t.lists === 'archetype' || (t.lists === 'after' && t.status !== 'finished')) hiddenLists.add(t.id);
     }
     // Torneos donde es juez: todas las partidas y penalizaciones (sin cover,
-    // notas ni teléfonos).
+    // notas ni teléfonos). Los jugadores y visitantes no arbitran.
     const judged = new Set();
-    const jq = await this.db
-      .prepare('SELECT tournament_id FROM tournament_staff WHERE account_id = ?')
-      .bind(me.id)
-      .all();
-    for (const j of jq.results ?? []) {
-      judged.add(j.tournament_id);
-      visible.add(j.tournament_id);
+    if (me.id && me.role !== 'player' && tids.length) {
+      const jq = await this.db
+        .prepare('SELECT tournament_id FROM tournament_staff WHERE account_id = ?')
+        .bind(me.id)
+        .all();
+      for (const j of jq.results ?? []) {
+        judged.add(j.tournament_id);
+        visible.add(j.tournament_id);
+      }
     }
-    for (const t of tq.results ?? []) {
+    for (const t of tinfo.values()) {
       if (isOrganizer && t.owner_id === me.id) {
         owned.add(t.id);
         visible.add(t.id);
@@ -318,16 +342,19 @@ export class SyncService {
       // Terminados, y en inscripción con la inscripción desde la app abierta
       // (a los organizadores solo les bajan los suyos: los demás no los
       // pueden cambiar).
-      if (!isOrganizer && (t.status === 'finished' || (t.status === 'draft' && Number(t.online) === 1))) {
-        visible.add(t.id);
-      }
+      if (!isOrganizer && publicTournament(t)) visible.add(t.id);
     }
-    if (pid && !isOrganizer) {
+    const enrolled = new Set();
+    if (pid && !isOrganizer && tids.length) {
       const eq = await this.db
         .prepare("SELECT tournament_id FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND player_id = ? AND deleted = 0")
         .bind(community, pid)
         .all();
-      for (const e of eq.results ?? []) if (e.tournament_id) visible.add(e.tournament_id);
+      for (const e of eq.results ?? []) {
+        if (!e.tournament_id) continue;
+        enrolled.add(e.tournament_id);
+        visible.add(e.tournament_id);
+      }
     }
 
     const ALWAYS = new Set(['decks', 'seasons', 'points_scale_entries', 'ranking_snapshots', 'deck_snapshots']);
@@ -361,24 +388,51 @@ export class SyncService {
     };
     for (const r of delta) add(r);
 
-    // Torneos que se volvieron visibles en este tramo: se envían completos.
+    // Torneos que se volvieron visibles en este tramo: se envían completos
+    // (solo lo anterior a [since]; lo posterior ya va en este tramo o en los
+    // siguientes). No en la primera descarga (boot=1 o since=0): ahí llega
+    // todo igualmente. No se repite en cada cambio de un torneo que ya veía.
     const expand = new Set();
-    for (const r of delta) {
-      if (r.deleted || !r.tournament_id || !visible.has(r.tournament_id)) continue;
-      if (r.tbl === 'tournaments' || (r.tbl === 'tournament_players' && pid && r.player_id === pid)) {
-        expand.add(r.tournament_id);
+    if (since > 0 && params.get('boot') !== '1') {
+      for (const r of delta) {
+        const tid = r.tournament_id;
+        if (r.deleted || !tid || !visible.has(tid) || owned.has(tid)) continue;
+        if (r.tbl === 'tournaments') {
+          // Terminó (lo ve todo el mundo y salen las listas de mazo "al
+          // terminar") o abrió la inscripción (lo ve quien no está inscrito).
+          const t = tinfo.get(tid);
+          if (publicTournament(t) && (t.status === 'finished' || (!enrolled.has(tid) && !judged.has(tid)))) expand.add(tid);
+        } else if (r.tbl === 'tournament_players' && pid && r.player_id === pid && SyncService.newEntry(r)) {
+          // Lo acaban de inscribir.
+          expand.add(tid);
+        }
       }
     }
     for (const tid of expand) {
       const all = await this.db
         .prepare(
-          'SELECT tbl, id, data, deleted, changed_at, seq, tournament_id, player_id FROM sync_rows WHERE community_id = ? AND tournament_id = ? AND deleted = 0 AND seq <= ?',
+          'SELECT tbl, id, data, deleted, changed_at, seq, tournament_id, player_id FROM sync_rows WHERE community_id = ? AND tournament_id = ? AND seq <= ? AND deleted = 0',
         )
-        .bind(community, tid, seq)
+        .bind(community, tid, since)
         .all();
       for (const r of all.results ?? []) add(r);
     }
     return { rows: [...rows.values()], more, seq };
+  }
+
+  /** Inscripción recién creada (no una actualización de puestos o check-in
+   * de una ronda posterior). Sin fechas legibles: se trata como nueva. */
+  static newEntry(r) {
+    try {
+      const d = JSON.parse(r.data);
+      const ms = (v) => (typeof v === 'number' ? (v < 1e11 ? v * 1000 : v) : Date.parse(v));
+      const c = ms(d.created_at);
+      const u = ms(d.updated_at);
+      if (!Number.isFinite(c) || !Number.isFinite(u)) return true;
+      return u - c <= NEW_ENTRY_MS;
+    } catch {
+      return true;
+    }
   }
 
   /** Cuántas filas hay en el servidor por tabla. */

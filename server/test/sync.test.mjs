@@ -198,3 +198,36 @@ test('listas de mazo: solo arquetipo o al terminar', async () => {
   assert.ok(rows.rows.some((x) => x.id === 'lb'));
   assert.ok(!rows.rows.some((x) => x.id === 'la'));
 });
+
+test('lecturas: no se completa otra vez un torneo que ya se veía', async () => {
+  const { call, admin, org, player } = await setup();
+  await call('POST', `/v1/admin/accounts/${player.account.id}/player`, { playerId: 'p1' }, admin.token);
+  const push = (rows) => call('POST', '/v1/sync/push', { rows }, org.token);
+  const pull = async (since, extra = '') => (await call('GET', `/v1/sync/pull?since=${since}${extra}`, null, player.token)).data;
+  await push([
+    row('tournaments', 'tv', 1, { id: 'tv', status: 'swiss' }),
+    row('tournament_players', 'ev', 1, { id: 'ev', tournament_id: 'tv', player_id: 'p1', created_at: 1000, updated_at: 1000 }),
+    row('matches', 'mv', 1, { id: 'mv', tournament_id: 'tv', player1_id: 'p1', player2_id: 'p2' }),
+  ]);
+  const first = await pull(0, '&boot=1');
+  assert.ok(first.rows.some((x) => x.id === 'mv'), 'inscrito: ve sus partidas');
+  // Cambia el torneo (otra ronda) y su puesto: no se reenvía la partida vieja.
+  await push([
+    row('tournaments', 'tv', 2, { id: 'tv', status: 'swiss', current_round: 2 }),
+    row('tournament_players', 'ev', 2, { id: 'ev', tournament_id: 'tv', player_id: 'p1', swiss_position: 3, created_at: 1000, updated_at: 1000 + 3600e3 }),
+  ]);
+  const next = await pull(first.seq);
+  assert.deepEqual(next.rows.map((x) => x.id).sort(), ['ev', 'tv']);
+
+  // Lo inscriben en otro torneo ya empezado: le llega entero.
+  await push([
+    row('tournaments', 'tw', 1, { id: 'tw', status: 'swiss' }),
+    row('matches', 'mw', 1, { id: 'mw', tournament_id: 'tw', player1_id: 'p3', player2_id: 'p4' }),
+  ]);
+  const mid = await pull(next.seq);
+  assert.ok(!mid.rows.some((x) => x.id === 'mw'), 'aún no inscrito');
+  await push([row('tournament_players', 'ew', 1, { id: 'ew', tournament_id: 'tw', player_id: 'p1', created_at: 5000, updated_at: 5000 })]);
+  const late = await pull(mid.seq);
+  assert.ok(late.rows.some((x) => x.id === 'mw'), 'inscripción nueva: torneo completo');
+  assert.ok(late.rows.some((x) => x.id === 'tw'));
+});

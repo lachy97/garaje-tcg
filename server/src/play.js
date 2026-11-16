@@ -124,7 +124,11 @@ export class PlayService {
       .bind(m.id)
       .first();
     if (!prev) {
-      const id = await this.insert(me, { tournamentId: t.id, matchId: m.id, kind: 'report', g1, gd, g2, status: 'proposed' });
+      // El rival (target_player) lo ve en su mesa sin buscar sus partidas.
+      const rival = m.player1_id === me.player_id ? m.player2_id : m.player1_id;
+      const id = await this.insert(me, {
+        tournamentId: t.id, matchId: m.id, kind: 'report', g1, gd, g2, targetPlayer: rival ?? null, status: 'proposed',
+      });
       return { action: PlayService.out(await this.byId(id)) };
     }
     if (prev.status === 'confirmed') throw bad('El resultado ya está confirmado: si hay un error, llama al juez.');
@@ -210,17 +214,24 @@ export class PlayService {
   async mine(token, tournamentId) {
     const me = await this.auth.authenticate(token);
     if (!me.player_id || !tournamentId) return { actions: [] };
-    const q = await this.db
-      .prepare(
-        `SELECT p.*, a.nickname FROM play_actions p JOIN accounts a ON a.id = p.account_id
-          WHERE p.community_id = ? AND p.tournament_id = ? AND p.status NOT IN ('cancelled')
-            AND (p.account_id = ? OR (p.kind = 'report' AND p.match_id IN (
-                  SELECT id FROM sync_rows WHERE community_id = ? AND tbl = 'matches' AND tournament_id = ?
-                    AND (json_extract(data, '$.player1_id') = ? OR json_extract(data, '$.player2_id') = ?))))
-          ORDER BY p.created_at DESC LIMIT 50`,
-      )
-      .bind(me.community_id, tournamentId, me.id, me.community_id, tournamentId, me.player_id, me.player_id)
-      .all();
+    // Dos búsquedas por índice (lo suyo y los reportes de su rival): no se
+    // recorre el torneo entero en cada sincronización.
+    const sql = (who, extra = '') =>
+      `SELECT p.*, a.nickname FROM play_actions p JOIN accounts a ON a.id = p.account_id
+        WHERE p.tournament_id = ? AND ${who} = ? AND p.community_id = ? AND p.status <> 'cancelled'${extra}
+        ORDER BY p.created_at DESC LIMIT 50`;
+    const [own, rival] = await Promise.all([
+      this.db.prepare(sql('p.account_id')).bind(tournamentId, me.id, me.community_id).all(),
+      this.db.prepare(sql('p.target_player', " AND p.kind = 'report'"))
+        .bind(tournamentId, me.player_id, me.community_id).all(),
+    ]);
+    const seen = new Set();
+    const q = {
+      results: [...(own.results ?? []), ...(rival.results ?? [])]
+        .filter((r) => !seen.has(r.id) && seen.add(r.id))
+        .sort((x, y) => y.created_at - x.created_at)
+        .slice(0, 50),
+    };
     return { actions: (q.results ?? []).map(PlayService.out) };
   }
 

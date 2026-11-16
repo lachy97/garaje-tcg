@@ -6,7 +6,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.13.0';
+export const VERSION = '1.14.0';
 
 /** La versión web (iPhone) llama desde otro dominio: se permite (las
  *  sesiones van en la cabecera Authorization, no en cookies). */
@@ -86,8 +86,15 @@ async function route(request, env, opts) {
   try {
     // Fase 0: prueba de conexión desde Cuba.
     if ((path === '/v1/health' || path === '/') && m === 'GET') {
-      const db = await env.DB.prepare('SELECT COUNT(*) AS n FROM accounts').first();
-      return json({ ok: true, service: 'garage-tcg', version: VERSION, time: new Date().toISOString(), db: db ? 'ok' : 'error' });
+      // Si la base falla, se dice por qué (para diagnosticar; no hay datos
+      // de nadie en el mensaje).
+      try {
+        const db = await env.DB.prepare('SELECT 1 AS n').first();
+        return json({ ok: true, service: 'garage-tcg', version: VERSION, time: new Date().toISOString(), db: db ? 'ok' : 'error' });
+      } catch (e) {
+        console.error('health', e);
+        return json({ ok: false, version: VERSION, db: 'error', detail: String(e?.message ?? e).slice(0, 300) }, 503);
+      }
     }
 
     // Versión mínima de la app (secreto o variable MIN_APP_BUILD = número de
@@ -184,8 +191,11 @@ async function route(request, env, opts) {
     return json({ error: 'Ruta no encontrada.' }, 404);
   } catch (e) {
     if (e instanceof ApiError) return json({ error: e.message, ...e.extra }, e.status);
-    console.error(e);
-    return json({ error: 'Error del servidor. Inténtalo de nuevo.' }, 500);
+    console.error(path, e);
+    // La base de datos (D1) saturada o sin cupo: se avisa como tal.
+    const msg = String(e?.message ?? e);
+    const db = /D1|SQLITE|database|storage|overloaded|limit/i.test(msg);
+    return json({ error: 'Error del servidor. Inténtalo de nuevo.', ...(db ? { code: 'db' } : {}) }, db ? 503 : 500);
   }
 }
 

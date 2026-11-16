@@ -444,3 +444,27 @@ npm.cmd run deploy
 
 `/v1/health` debe decir `1.13.0`. Si se despliega sin la migración, el
 servidor funciona igual, pero sin los límites por conexión.
+
+## 22 · Menos lecturas en D1 (versión 1.14.0)
+
+El 15/11 el servidor dejó de responder porque se agotaron las **5 millones
+de filas leídas al día** del plan gratis de D1. El límite se reinicia a las
+00:00 UTC. Esta versión lee muchas menos filas en cada sincronización.
+
+Una vez, en el PC (con VPN):
+
+```powershell
+npm.cmd run db:lecturas
+npm.cmd run deploy
+```
+
+`/v1/health` debe decir `1.14.0`. Sin la migración el servidor funciona,
+pero sigue leyendo de más.
+
+Para ver qué consultas leen más filas:
+
+```powershell
+npm.cmd run insights
+```
+
+También se ve en el panel de Cloudflare: D1 → garage-tcg → Metrics.

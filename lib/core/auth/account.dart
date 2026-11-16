@@ -140,8 +140,15 @@ class Session {
 
 /// Error de cuentas con un mensaje para mostrar tal cual.
 class AuthException implements Exception {
-  const AuthException(this.message);
+  const AuthException(this.message, {this.status});
   final String message;
+
+  /// Código HTTP del servidor (401 = sesión no válida). null = sin respuesta.
+  final int? status;
+
+  /// La sesión ya no vale en el servidor (vencida, anulada o cuenta borrada):
+  /// solo entonces se cierra la sesión del teléfono.
+  bool get sessionInvalid => status == 401 || status == 404;
 
   @override
   String toString() => message;

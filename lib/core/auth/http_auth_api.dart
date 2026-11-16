@@ -65,7 +65,16 @@ class HttpAuthApi implements AuthApi {
     try {
       data = text.isEmpty ? {} : (jsonDecode(text) as Map).cast<String, Object?>();
     } on FormatException {
-      throw AuthException('Respuesta inesperada del servidor ($status).');
+      // Página de error de Cloudflare (servidor saturado, límite del plan…):
+      // es temporal, como no tener conexión. La sesión NO se toca.
+      throw AuthNetworkException(
+          'El servidor no responde bien ahora mismo ($status). Tu sesión sigue abierta: '
+          'vuelve a intentarlo en unos minutos.');
+    }
+    // Fallo del propio servidor: también temporal (no cierra la sesión).
+    if (status >= 500) {
+      throw AuthNetworkException((data['error'] as String?) ??
+          'Error del servidor ($status). Tu sesión sigue abierta: inténtalo en unos minutos.');
     }
     if (status >= 400) {
       if (data['code'] == 'update_required') {
@@ -75,7 +84,7 @@ class HttpAuthApi implements AuthApi {
       if (data['code'] == 'unverified' && data['email'] is String) {
         throw UnverifiedAccountException(data['email']! as String);
       }
-      throw AuthException((data['error'] as String?) ?? 'Error del servidor ($status).');
+      throw AuthException((data['error'] as String?) ?? 'Error del servidor ($status).', status: status);
     }
     return data;
   }
@@ -95,7 +104,8 @@ class HttpAuthApi implements AuthApi {
       final hit = _cache[key];
       if (hit != null && DateTime.now().difference(hit.at) < cacheTtl) {
         if (hit.status >= 400) {
-          throw AuthException((hit.data['error'] as String?) ?? 'Error del servidor (${hit.status}).');
+          throw AuthException((hit.data['error'] as String?) ?? 'Error del servidor (${hit.status}).',
+              status: hit.status);
         }
         return hit.data;
       }

@@ -236,7 +236,13 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     if (!force && _lastRun != null) {
       try {
         // Margen de 3 s: el temporizador no cae justo a los 30 s.
-        if (DateTime.now().difference(_lastRun!) + const Duration(seconds: 3) < await _every()) return;
+        var every = await _every();
+        // Con el servidor fallando, se espera más entre intentos (no se le
+        // carga más mientras se recupera).
+        if (state.lastError != null && every < const Duration(minutes: 2)) {
+          every = const Duration(minutes: 2);
+        }
+        if (DateTime.now().difference(_lastRun!) + const Duration(seconds: 3) < every) return;
       } catch (_) {}
       if (!ref.mounted || _busy) return;
     }
@@ -326,7 +332,9 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
       if (ref.mounted) {
         state = state.copyWith(running: false, pending: pending, lastError: e.message);
         // Sesión vencida o rol cambiado: se actualiza la cuenta.
-        unawaited(ref.read(sessionProvider.notifier).refreshAccount());
+        if (e.sessionInvalid || e.status == 403) {
+          unawaited(ref.read(sessionProvider.notifier).refreshAccount());
+        }
       }
     } catch (e) {
       if (ref.mounted) state = state.copyWith(running: false, lastError: 'Error al sincronizar: $e');
@@ -371,9 +379,11 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     try {
       const seqKey = 'pull_seq:visitor';
       var since = int.tryParse(await _state(seqKey) ?? '') ?? 0;
+      // Primera descarga: el servidor no completa torneos (llega todo igual).
+      final boot = since == 0;
       var total = 0;
       while (ref.mounted) {
-        final res = await api.request('GET', 'v1/public/pull?since=$since');
+        final res = await api.request('GET', 'v1/public/pull?since=$since${boot ? '&boot=1' : ''}');
         final rows = [
           for (final r in (res['rows'] as List?) ?? const []) (r as Map).cast<String, Object?>(),
         ];
@@ -396,6 +406,11 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
   }
 
   // ───────────────────── Una petición por ciclo ─────────────────────
+
+  /// Ruta de bajada. [boot]: primera descarga (desde 0); el servidor no
+  /// completa torneos aparte porque llegan todas las filas igualmente.
+  static String pullPath(int since, {bool boot = false}) =>
+      'v1/sync/pull?since=$since${boot ? '&boot=1' : ''}';
 
   /// Pregunta al servidor, en UNA petición (/v1/poll), todo lo que las
   /// pantallas, los avisos y la sincronización van a consultar en este ciclo,
@@ -420,7 +435,7 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     ];
     String q(String id) => Uri.encodeQueryComponent(id);
     final gets = <String>[
-      'v1/sync/pull?since=$since',
+      pullPath(since, boot: since == 0),
       'v1/me/judging',
       'v1/registrations/mine',
       if (organizer) ...['v1/play/todo', 'v1/registrations/todo'],
@@ -540,9 +555,10 @@ class SyncController extends Notifier<SyncStatus> with WidgetsBindingObserver {
     final player = '${account.playerId ?? ''}|$judging';
     var since = int.tryParse(await _state(seqKey) ?? '') ?? 0;
     if ((await _state(playerKey) ?? '') != player) since = 0;
+    final boot = since == 0;
     var total = 0;
     while (ref.mounted) {
-      final res = await api.request('GET', 'v1/sync/pull?since=$since', token: session.token);
+      final res = await api.request('GET', pullPath(since, boot: boot), token: session.token);
       final rows = [
         for (final r in (res['rows'] as List?) ?? const []) (r as Map).cast<String, Object?>(),
       ];
