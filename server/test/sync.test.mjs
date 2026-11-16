@@ -287,3 +287,35 @@ test('ficha: el jugador edita la suya; organizador y admin cualquiera', async ()
   assert.equal(r.status, 200);
   assert.equal((await call('POST', '/v1/players/p2/profile', { nickname: 'Ana C' }, admin.token)).status, 200);
 });
+
+test('listas del Top: cada jugador la suya; organizador y admin todas', async () => {
+  const { call, admin, org, player } = await setup();
+  await call('POST', `/v1/admin/accounts/${player.account.id}/player`, { playerId: 'p1' }, admin.token);
+  const push = (rows) => call('POST', '/v1/sync/push', { rows }, org.token);
+  await push([
+    row('tournaments', 'tf', 1, { id: 'tf', status: 'swiss', top_cut_size: 4 }),
+    row('tournament_players', 'f1', 1, { id: 'f1', tournament_id: 'tf', player_id: 'p1', final_position: 2 }),
+    row('tournament_players', 'f2', 1, { id: 'f2', tournament_id: 'tf', player_id: 'p2', final_position: 1 }),
+    row('tournament_players', 'f9', 1, { id: 'f9', tournament_id: 'tf', player_id: 'p9', final_position: 9 }),
+  ]);
+  const list = (playerId, main = '1,2,3') => ({ tournamentId: 'tf', playerId, main, extra: '7', side: '', featuredCard: 2 });
+  let r = await call('POST', '/v1/decklists', list('p1'), player.token);
+  assert.equal(r.status, 400, 'aún no terminó');
+  await push([row('tournaments', 'tf', 2, { id: 'tf', status: 'finished', top_cut_size: 4 })]);
+  r = await call('POST', '/v1/decklists', list('p1'), player.token);
+  assert.equal(r.status, 200);
+  const first = r.data.id;
+  assert.equal((await call('POST', '/v1/decklists', list('p2'), player.token)).status, 403, 'la de otro no');
+  assert.equal((await call('POST', '/v1/decklists', list('p9'), org.token)).status, 400, 'fuera del Top');
+  assert.equal((await call('POST', '/v1/decklists', list('p2'), org.token)).status, 200);
+  assert.equal((await call('POST', '/v1/decklists', list('p2', '4,5'), admin.token)).status, 200);
+  // Corregirla mantiene la misma fila.
+  r = await call('POST', '/v1/decklists', list('p1', '9,9,9'), player.token);
+  assert.equal(r.data.id, first);
+  const rows = (await call('GET', '/v1/sync/pull?since=0', null, org.token)).data.rows.filter((x) => x.t === 'deck_lists');
+  assert.equal(rows.length, 2);
+  const mine = rows.find((x) => x.data.player_id === 'p1').data;
+  assert.equal(mine.main_deck, '9,9,9');
+  assert.equal(mine.featured_card, 2);
+  assert.equal(rows.find((x) => x.data.player_id === 'p2').data.main_deck, '4,5');
+});

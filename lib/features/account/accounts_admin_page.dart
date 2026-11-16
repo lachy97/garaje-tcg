@@ -20,58 +20,89 @@ final _accountsProvider = FutureProvider.autoDispose<List<Account>>((ref) async 
   return ref.read(authApiProvider).listAccounts(session);
 });
 
-class AccountsAdminPage extends ConsumerWidget {
+class AccountsAdminPage extends ConsumerStatefulWidget {
   const AccountsAdminPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccountsAdminPage> createState() => _AccountsAdminPageState();
+}
+
+class _AccountsAdminPageState extends ConsumerState<AccountsAdminPage> {
+  /// Buscar por apodo, usuario, Gmail o la ficha vinculada (apodo o nombre).
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
     final accounts = ref.watch(_accountsProvider);
     final players = ref.watch(playersProvider('')).value ?? const <Player>[];
+    final byId = {for (final p in players) p.id: p};
     final names = {for (final p in players) p.id: p.nickname};
     return Scaffold(
       appBar: AppBar(title: const Text('CUENTAS Y ROLES')),
       body: AsyncView(
         value: accounts,
-        builder: (list) => list.isEmpty
-            ? const EmptyState(icon: Icons.group_off, title: 'Todavía no hay cuentas')
-            : ListView(
-                padding: const EdgeInsets.only(bottom: 40),
-                children: [
-                  SectionLabel('${list.length} cuenta(s)'),
-                  for (final a in list)
-                    NeonCard(
-                      onTap: () => _edit(context, ref, a, players),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('${a.nickname} · @${a.username}',
-                                    style: const TextStyle(fontWeight: FontWeight.w800)),
-                                Text(a.email,
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary, fontSize: 12)),
-                                Text(
-                                  [
-                                    if (!a.verified) 'Sin confirmar',
-                                    a.playerId == null
-                                        ? 'Sin ficha'
-                                        : 'Ficha: ${names[a.playerId] ?? '(borrada)'}',
-                                  ].join(' · '),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: a.verified ? AppColors.textSecondary : AppColors.draw),
-                                ),
-                              ],
-                            ),
-                          ),
-                          RoleChip(a.role),
-                        ],
-                      ),
-                    ),
-                ],
+        builder: (all) {
+          if (all.isEmpty) return const EmptyState(icon: Icons.group_off, title: 'Todavía no hay cuentas');
+          final q = _query.trim().toLowerCase();
+          bool match(Account a) {
+            if (q.isEmpty) return true;
+            final p = a.playerId == null ? null : byId[a.playerId];
+            return [a.nickname, a.username, a.email, p?.nickname ?? '', p?.fullName ?? '']
+                .any((s) => s.toLowerCase().contains(q));
+          }
+
+          final list = [for (final a in all) if (match(a)) a];
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 40),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Buscar por nombre o apodo',
+                  ),
+                  onChanged: (v) => setState(() => _query = v),
+                ),
               ),
+              SectionLabel(q.isEmpty ? '${all.length} cuenta(s)' : '${list.length} de ${all.length} cuenta(s)'),
+              if (list.isEmpty)
+                const SizedBox(height: 200, child: EmptyState(icon: Icons.search_off, title: 'Ninguna cuenta coincide')),
+              for (final a in list)
+                NeonCard(
+                  onTap: () => _edit(context, ref, a, players),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${a.nickname} · @${a.username}',
+                                style: const TextStyle(fontWeight: FontWeight.w800)),
+                            Text(a.email, style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                            Text(
+                              [
+                                if (!a.verified) 'Sin confirmar',
+                                a.playerId == null
+                                    ? 'Sin ficha'
+                                    : 'Ficha: ${names[a.playerId] ?? '(borrada)'}',
+                              ].join(' · '),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: a.verified ? AppColors.textSecondary : AppColors.draw),
+                            ),
+                          ],
+                        ),
+                      ),
+                      RoleChip(a.role),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -118,6 +149,13 @@ class AccountsAdminPage extends ConsumerWidget {
               subtitle: const Text('Para mandárselo por WhatsApp si olvidó la contraseña'),
               onTap: () => Navigator.pop(ctx, 'resetcode'),
             ),
+            if (a.id != ref.read(sessionProvider).value?.account.id)
+              ListTile(
+                leading: Icon(Icons.delete_outline, color: AppColors.loss),
+                title: Text('Borrar cuenta', style: TextStyle(color: AppColors.loss)),
+                subtitle: const Text('La ficha de jugador se queda'),
+                onTap: () => Navigator.pop(ctx, 'delete'),
+              ),
             const SizedBox(height: 8),
           ],
         ),
@@ -137,6 +175,31 @@ class AccountsAdminPage extends ConsumerWidget {
         if (context.mounted) showMessage(context, 'No se pudo conectar: $e', error: true);
       }
       return null;
+    }
+
+    if (action == 'delete') {
+      final ficha = a.playerId == null ? null : players.where((p) => p.id == a.playerId).firstOrNull;
+      final ok = await confirmDialog(
+        context,
+        title: 'Borrar la cuenta @${a.username}',
+        message: 'Se borra la cuenta de ${a.nickname} (${a.email}): ya no podrá iniciar sesión y se '
+            'cierran sus sesiones. '
+            '${ficha == null ? 'No tiene ficha de jugador vinculada.' : 'Su ficha "${ficha.nickname}" NO se borra: se queda con sus torneos y resultados, sin cuenta vinculada.'}'
+            '\n\nNo se puede deshacer (con el mismo Gmail se puede crear una cuenta nueva).',
+        confirm: 'Borrar cuenta',
+        danger: true,
+      );
+      if (!ok || !context.mounted) return;
+      try {
+        await api.deleteAccount(session, accountId: a.id);
+        ref.invalidate(_accountsProvider);
+        if (context.mounted) showMessage(context, 'Cuenta @${a.username} borrada');
+      } on AuthException catch (e) {
+        if (context.mounted) showMessage(context, e.message, error: true);
+      } catch (e) {
+        if (context.mounted) showMessage(context, 'No se pudo conectar: $e', error: true);
+      }
+      return;
     }
 
     if (action == 'resetcode') {

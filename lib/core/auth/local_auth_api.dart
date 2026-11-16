@@ -413,6 +413,18 @@ class LocalAuthApi implements AuthApi {
     await _save(db);
     return u.account;
   }
+
+  @override
+  Future<void> deleteAccount(Session session, {required String accountId}) async {
+    final db = await _load();
+    final me = _admin(db, session);
+    if (me.account.id == accountId) throw const AuthException('No puedes borrar tu propia cuenta.');
+    final u = _target(db, accountId);
+    db.users.remove(u);
+    db.sessions.removeWhere((_, s) => s.accountId == accountId);
+    db.codes.removeWhere((c) => c.email == u.account.email);
+    await _save(db);
+  }
 }
 
 // ───────────────────────── Datos guardados ─────────────────────────

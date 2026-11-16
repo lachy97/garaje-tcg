@@ -229,3 +229,37 @@ test('versión mínima de la app', async () => {
   const h = await handle(new Request('https://api.test/v1/health'), env, { iterations: 1000 });
   assert.equal(h.status, 200, 'la prueba de conexión no se bloquea');
 });
+
+test('admin borra una cuenta: la ficha se queda', async () => {
+  const env = { DB: makeD1(), ADMIN_EMAIL: 'lachy@gmail.com', DEV_CODES: '1' };
+  const opts = { now: () => Date.UTC(2026, 10, 10, 12), iterations: 1000 };
+  const call = async (method, path, body, token) => {
+    const res = await handle(new Request(`https://api.test${path}`, {
+      method,
+      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    }), env, opts);
+    return { status: res.status, data: await res.json() };
+  };
+  const account = async (username, email) => {
+    const r = await call('POST', '/v1/auth/register', { username, email, password: 'clave1234', nickname: username });
+    return (await call('POST', '/v1/auth/verify', { email, code: r.data.devCode })).data.session;
+  };
+  const admin = await account('lachy', 'lachy@gmail.com');
+  const leo = await account('leo', 'leo@gmail.com');
+  await call('POST', '/v1/sync/push', { rows: [{ t: 'players', id: 'pl', changedAt: 1, data: { id: 'pl', nickname: 'Leo' } }] }, admin.token);
+  await call('POST', `/v1/admin/accounts/${leo.account.id}/player`, { playerId: 'pl' }, admin.token);
+  assert.equal((await call('POST', `/v1/admin/accounts/${leo.account.id}/delete`, null, leo.token)).status, 403);
+  assert.equal((await call('POST', `/v1/admin/accounts/${admin.account.id}/delete`, null, admin.token)).status, 400, 'la propia no');
+  const r = await call('POST', `/v1/admin/accounts/${leo.account.id}/delete`, null, admin.token);
+  assert.equal(r.status, 200);
+  assert.equal(r.data.playerId, 'pl');
+  assert.equal((await call('GET', '/v1/me', null, leo.token)).status, 401, 'sus sesiones se cierran');
+  const list = (await call('GET', '/v1/admin/accounts', null, admin.token)).data.accounts;
+  assert.ok(!list.some((a) => a.username === 'leo'));
+  const rows = (await call('GET', '/v1/sync/pull?since=0', null, admin.token)).data.rows;
+  assert.ok(rows.some((x) => x.id === 'pl' && !x.deleted), 'la ficha sigue');
+  // El Gmail queda libre para una cuenta nueva.
+  const again = await call('POST', '/v1/auth/register', { username: 'leo2', email: 'leo@gmail.com', password: 'clave1234', nickname: 'Leo' });
+  assert.notEqual(again.status, 409, 'el Gmail ya no está en uso');
+});

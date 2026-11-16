@@ -7,7 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/brand.dart';
 import '../../../app/widgets/common.dart';
+import '../../../core/auth/account.dart';
+import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/http_auth_api.dart';
 import '../../../core/db/database_provider.dart';
+import '../../../core/sync/sync_service.dart';
 import '../data/card_images.dart';
 import '../domain/card_db.dart';
 import '../domain/deck_list.dart';
@@ -372,6 +376,10 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
     final t = widget.target;
     int? inDeck(int? id) => id != null && _cards.total(id) > 0 ? id : null;
     final featured = inDeck(_featured);
+    if (!ref.read(permissionsProvider).savesDeckListsLocally) {
+      await _saveOnServer(featured, inDeck);
+      return;
+    }
     final ok = await runGuarded(
       context,
       () => ref.read(tournamentsDaoProvider).saveDeckList(
@@ -389,6 +397,40 @@ class _DeckListEditorPageState extends ConsumerState<DeckListEditorPage> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) Navigator.pop(context, true);
+  }
+
+  /// Jugador del Top (su lista) o la versión web: se guarda en el servidor y
+  /// llega a todos al sincronizar.
+  Future<void> _saveOnServer(int? featured, int? Function(int?) inDeck) async {
+    final t = widget.target;
+    final api = ref.read(authApiProvider);
+    final session = ref.read(sessionProvider).value;
+    try {
+      if (api is! HttpAuthApi || session == null) {
+        throw const AuthException('Necesitas conexión con el servidor para subir la lista.');
+      }
+      await api.request('POST', 'v1/decklists', token: session.token, body: {
+        'tournamentId': t.tournamentId,
+        'playerId': t.playerId,
+        'main': DeckCards.joinCodes(_cards.main),
+        'extra': DeckCards.joinCodes(_cards.extra),
+        'side': DeckCards.joinCodes(_cards.side),
+        'featuredCard': featured,
+        'backgroundCard': inDeck(_background),
+        'secondaryCard': inDeck(_secondary),
+      });
+      // Baja la lista guardada a este teléfono.
+      await ref.read(syncControllerProvider.notifier).sync();
+      if (!mounted) return;
+      showMessage(context, 'Lista subida');
+      Navigator.pop(context, true);
+    } on AuthException catch (e) {
+      if (mounted) showMessage(context, e.message, error: true);
+    } catch (e) {
+      if (mounted) showMessage(context, 'No se pudo subir: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 }
 

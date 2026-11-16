@@ -479,3 +479,8 @@ npm.cmd run deploy
 
 `/v1/health` debe decir `1.15.0`. Hay que desplegarlo **antes** de repartir
 la app nueva (editar la ficha y cambiar el mazo inscrito usan rutas nuevas).
+
+## 24 · Listas del Top y borrar cuentas (versión 1.16.0)
+
+Sin migración nueva. `npm.cmd run deploy` y `/v1/health` debe decir
+`1.16.0`. Desplegar antes de repartir la app 0.3.0.

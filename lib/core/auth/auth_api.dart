@@ -89,6 +89,10 @@ abstract interface class AuthApi {
   /// Verifica a mano una cuenta cuyo código no llegó.
   Future<Account> verifyManually(Session session, {required String accountId});
 
+  /// Borra una cuenta (no la propia). Su ficha de jugador no se borra: queda
+  /// sin cuenta vinculada.
+  Future<void> deleteAccount(Session session, {required String accountId});
+
   /// Últimos correos "enviados", el más reciente primero (solo simulación;
   /// vacío en el servidor real).
   Future<List<SentEmail>> outbox();

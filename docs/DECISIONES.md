@@ -494,3 +494,17 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - El organizador del torneo y sus jueces lo ven todo.
   - Al terminar, el torneo se envía entero otra vez.
   - Mi mesa y su aviso ya no muestran el mazo del rival.
+
+## Listas del Top, cuentas y Ajustes (16/11) — servidor 1.16.0, app 0.3.0 (2)
+- **Listas del Top**: con el torneo terminado, cada jugador del Top (Top Cut; sin Top Cut, los 4 primeros) sube o corrige su propia lista desde el resumen del torneo ("Subir mi lista").
+  - El organizador del torneo y el administrador pueden subir todas las del Top.
+  - El jugador y la versión web guardan en el servidor: `POST /v1/decklists`. El servidor comprueba que el torneo terminó y que el jugador está en el Top, y reutiliza la fila si ya había lista. El organizador en Android sigue guardando en su teléfono.
+  - Borrar una lista: solo desde el teléfono del organizador.
+- **Cuentas y roles**:
+  - Buscador por apodo, usuario, Gmail o la ficha vinculada (apodo o nombre).
+  - El administrador puede **borrar cuentas** (no la propia), con confirmación: `POST /v1/admin/accounts/:id/delete`.
+  - Se van sus sesiones, solicitudes, avisos de mesa, puestos de juez y control de torneos. **La ficha de jugador no se borra**: se queda con sus resultados, sin cuenta vinculada. El Gmail queda libre.
+- **Ajustes**:
+  - Ya no hay ninguna sección de licencia en el código (se quitó el 15/11). Si sale, ese teléfono tiene un APK anterior.
+  - "Servidor" y "Modo administrador" solo los ve la cuenta de administrador: ni otros roles, ni el administrador cuando ve la app como otro rol.
+  - La app pasa a 0.3.0 (2) para distinguir el APK nuevo en Ajustes → Acerca de.

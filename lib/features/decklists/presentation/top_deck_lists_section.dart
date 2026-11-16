@@ -36,7 +36,9 @@ class TopDeckListsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (targets.isEmpty) return const SizedBox.shrink();
     final saved = ref.watch(tournamentDeckListsProvider(tournamentId)).value ?? const {};
-    final canEdit = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
+    final perms = ref.watch(permissionsProvider);
+    // Quién ve las listas: el organizador desde su teléfono.
+    final canEdit = perms.canManageTournament(isOwner: true);
     final visibility = ref.watch(tournamentProvider(tournamentId)).value?.listVisibility ?? 'open';
     // Solo se comparten las que ya están subidas.
     final uploaded = [for (final t in targets) if (saved.containsKey(t.playerId)) t];
@@ -107,10 +109,11 @@ class TopDeckListsSection extends ConsumerWidget {
                     avatar: Icon(Icons.check, size: 16, color: AppColors.neon),
                     label: Text('Ver lista'),
                   )
-                else if (canEdit)
-                  const Chip(
-                    avatar: Icon(Icons.upload, size: 16),
-                    label: Text('Subir lista'),
+                // Cada jugador del Top sube la suya; organizador y admin, todas.
+                else if (perms.canEditDeckList(t.playerId))
+                  Chip(
+                    avatar: const Icon(Icons.upload, size: 16),
+                    label: Text(t.playerId == perms.playerId ? 'Subir mi lista' : 'Subir lista'),
                   )
                 else
                   const Chip(label: Text('Sin publicar')),

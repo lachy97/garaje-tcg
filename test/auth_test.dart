@@ -243,5 +243,16 @@ void main() {
       expect(web.canEditPlayerData('otro') && web.editsPlayersOnServer, isTrue);
       expect(const Permissions.visitor().canEditPlayerData('x'), isFalse);
     });
+
+    test('listas del Top: la suya el jugador; todas organizador y admin', () {
+      const p = Permissions(role: AppRole.player, playerId: 'me');
+      expect(p.canEditDeckList('me') && !p.canEditDeckList('otro'), isTrue);
+      expect(p.savesDeckListsLocally, isFalse, reason: 'el jugador la sube al servidor');
+      const org = Permissions(role: AppRole.organizer);
+      expect(org.canEditDeckList('otro') && org.savesDeckListsLocally, isTrue);
+      const web = Permissions(role: AppRole.admin, webReadOnly: true);
+      expect(web.canEditDeckList('otro') && !web.savesDeckListsLocally, isTrue);
+      expect(const Permissions.visitor().canEditDeckList('x'), isFalse);
+    });
   });
 }

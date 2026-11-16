@@ -271,4 +271,10 @@ class HttpAuthApi implements AuthApi {
   Future<Account> verifyManually(Session session, {required String accountId}) async =>
       _account(await _call('POST', 'v1/admin/accounts/${Uri.encodeComponent(accountId)}/verify',
           body: const {}, token: session.token));
+
+  @override
+  Future<void> deleteAccount(Session session, {required String accountId}) async {
+    await _call('POST', 'v1/admin/accounts/${Uri.encodeComponent(accountId)}/delete',
+        body: const {}, token: session.token);
+  }
 }

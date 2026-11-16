@@ -475,6 +475,27 @@ export class AuthService {
     return { account: publicAccount(await this.byId(id)) };
   }
 
+  /**
+   * Borra una cuenta (no la propia). La ficha de jugador NO se borra: se
+   * queda en la base, sin cuenta vinculada. Se van sus sesiones, solicitudes,
+   * avisos de mesa y puestos de juez.
+   */
+  async deleteAccount(token, id) {
+    const me = await this.requireAdmin(token);
+    if (id === me.id) throw bad('No puedes borrar tu propia cuenta.');
+    const a = await this.byId(id);
+    await this.db.batch([
+      this.db.prepare('DELETE FROM sessions WHERE account_id = ?').bind(id),
+      this.db.prepare('DELETE FROM registrations WHERE account_id = ?').bind(id),
+      this.db.prepare('DELETE FROM play_actions WHERE account_id = ?').bind(id),
+      this.db.prepare('DELETE FROM tournament_staff WHERE account_id = ?').bind(id),
+      this.db.prepare('DELETE FROM tournament_control WHERE account_id = ?').bind(id),
+      this.db.prepare('DELETE FROM codes WHERE email = ?').bind(a.email),
+      this.db.prepare('DELETE FROM accounts WHERE id = ?').bind(id),
+    ]);
+    return { ok: true, playerId: a.player_id ?? null };
+  }
+
   /** Diagnóstico: envía un correo de prueba al Gmail del administrador y
    *  devuelve el error exacto si falla. */
   async mailTest(token) {

@@ -31,8 +31,11 @@ class DeckListPage extends ConsumerWidget {
     final saved = lists.value?[target.playerId];
     final cards = saved == null ? null : cardsOf(saved);
     final cardDb = db.value;
-    // Subir, editar y borrar listas: quien lleva el torneo.
-    final canEdit = ref.watch(permissionsProvider).canManageTournament(isOwner: true);
+    // Subir y corregir: el propio jugador del Top, el organizador y el
+    // administrador. Borrar: solo desde el teléfono del organizador.
+    final perms = ref.watch(permissionsProvider);
+    final canEdit = perms.canEditDeckList(target.playerId);
+    final canDelete = perms.savesDeckListsLocally;
     return Scaffold(
       appBar: AppBar(
         title: NameTitle('Lista de ${target.playerName}'),
@@ -60,9 +63,9 @@ class DeckListPage extends ConsumerWidget {
                 'delete' => _delete(context, ref),
                 _ => null,
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Editar lista')),
-                PopupMenuItem(value: 'delete', child: Text('Borrar lista')),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('Editar lista')),
+                if (canDelete) const PopupMenuItem(value: 'delete', child: Text('Borrar lista')),
               ],
             ),
           ],
@@ -76,8 +79,10 @@ class DeckListPage extends ConsumerWidget {
               icon: Icons.style_outlined,
               title: 'Sin lista todavía',
               subtitle: canEdit
-                  ? 'Importa el .ydk del jugador o escribe la lista a mano.'
-                  : 'El organizador todavía no subió esta lista.',
+                  ? (perms.playerId == target.playerId
+                      ? 'Sube tu lista: importa tu .ydk o escríbela a mano.'
+                      : 'Importa el .ydk del jugador o escribe la lista a mano.')
+                  : 'Todavía no se subió esta lista.',
               action: canEdit
                   ? FilledButton.icon(
                       onPressed: () => _edit(context, null, null),

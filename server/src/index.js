@@ -6,7 +6,7 @@ import { PlayService } from './play.js';
 import { RegistrationService } from './registrations.js';
 import { SyncService } from './sync.js';
 
-export const VERSION = '1.15.0';
+export const VERSION = '1.16.0';
 
 /** La versión web (iPhone) llama desde otro dominio: se permite (las
  *  sesiones van en la cabecera Authorization, no en cookies). */
@@ -138,6 +138,7 @@ async function route(request, env, opts) {
         case '/v1/play/extension': return json(await play.extension(token, body));
         case '/v1/play/penalty': return json(await play.penalty(token, body));
       }
+      if (path === '/v1/decklists') return json(await sync.saveDeckList(token, body));
       const pp = path.match(/^\/v1\/players\/([^/]+)\/profile$/);
       if (pp) return json(await sync.editPlayer(token, decodeURIComponent(pp[1]), body));
       const st = path.match(/^\/v1\/tournaments\/([^/]+)\/judges(?:\/([^/]+)\/remove)?$/);
@@ -161,9 +162,10 @@ async function route(request, env, opts) {
         if (what === 'done') return json(await regs.done(token, id));
         return json(await regs.cancel(token, id));
       }
-      const admin = path.match(/^\/v1\/admin\/accounts\/([^/]+)\/(role|player|verify|reset-code)$/);
+      const admin = path.match(/^\/v1\/admin\/accounts\/([^/]+)\/(role|player|verify|reset-code|delete)$/);
       if (admin) {
         const [, id, what] = admin;
+        if (what === 'delete') return json(await auth.deleteAccount(token, id));
         if (what === 'role') return json(await auth.setRole(token, id, body));
         if (what === 'player') return json(await auth.linkPlayer(token, id, body));
         if (what === 'reset-code') return json(await auth.adminResetCode(token, id));

@@ -472,6 +472,77 @@ export class SyncService {
     return { ok: true };
   }
 
+  /**
+   * Lista de mazo de un jugador del Top de un torneo terminado. La suya: el
+   * jugador. Cualquiera del Top: el organizador del torneo y el
+   * administrador. body: { tournamentId, playerId, main, extra, side,
+   * featuredCard?, backgroundCard?, secondaryCard? } (códigos separados por
+   * comas, como en la app). Queda como un cambio más de deck_lists.
+   */
+  async saveDeckList(token, body) {
+    const me = await this.auth.authenticate(token);
+    const community = me.community_id;
+    const tid = String(body?.tournamentId ?? '');
+    const pid = String(body?.playerId ?? '');
+    const t = await this.db
+      .prepare("SELECT data, owner_id FROM sync_rows WHERE community_id = ? AND tbl = 'tournaments' AND id = ? AND deleted = 0")
+      .bind(community, tid)
+      .first();
+    if (!t?.data) throw new ApiError(404, 'Ese torneo no existe.');
+    const td = JSON.parse(t.data);
+    const boss = me.role === 'admin' || (me.role === 'organizer' && t.owner_id === me.id);
+    if (!boss && me.player_id !== pid) throw new ApiError(403, 'Solo puedes subir tu propia lista.');
+    if (!boss && td.status !== 'finished') throw bad('Las listas se suben cuando termina el torneo.');
+    // Del Top: Top Cut del torneo (sin Top Cut, los 4 primeros).
+    const e = await this.db
+      .prepare("SELECT data FROM sync_rows WHERE community_id = ? AND tbl = 'tournament_players' AND tournament_id = ? AND player_id = ? AND deleted = 0")
+      .bind(community, tid, pid)
+      .first();
+    const entry = e?.data ? JSON.parse(e.data) : null;
+    const cut = Number(td.top_cut_size ?? 0) > 0 ? Number(td.top_cut_size) : 4;
+    const pos = Number(entry?.final_position ?? 0);
+    if (!entry || !(pos > 0 && pos <= cut)) throw bad('Solo los jugadores del Top suben su lista.');
+    const codes = (v) => String(v ?? '').split(',').map((x) => x.trim()).filter((x) => /^\d{1,10}$/.test(x)).slice(0, 120).join(',');
+    const main = codes(body?.main);
+    if (!main) throw bad('La lista está vacía.');
+    const card = (v) => (v == null || !/^\d{1,10}$/.test(String(v)) ? null : Number(v));
+    const old = await this.db
+      .prepare("SELECT id, data, changed_at FROM sync_rows WHERE community_id = ? AND tbl = 'deck_lists' AND tournament_id = ? AND player_id = ?")
+      .bind(community, tid, pid)
+      .first();
+    const now = this.auth.now();
+    const secs = Math.floor(now / 1000);
+    const prev = old?.data ? JSON.parse(old.data) : null;
+    const id = old?.id ?? crypto.randomUUID();
+    const data = {
+      ...(prev ?? {}),
+      id,
+      created_at: prev?.created_at ?? secs,
+      updated_at: secs,
+      deleted_at: null,
+      tournament_id: tid,
+      player_id: pid,
+      main_deck: main,
+      extra_deck: codes(body?.extra),
+      side_deck: codes(body?.side),
+      featured_card: card(body?.featuredCard),
+      background_card: card(body?.backgroundCard),
+      secondary_card: card(body?.secondaryCard),
+    };
+    const changed = Math.max(now, Number(old?.changed_at ?? 0) + 1);
+    await this.db
+      .prepare(
+        `INSERT INTO sync_rows (community_id, tbl, id, data, deleted, changed_at, seq, owner_id, updated_by, received_at, tournament_id, player_id)
+         VALUES (?1, 'deck_lists', ?2, ?3, 0, ?4, (SELECT COALESCE(MAX(seq), 0) + 1 FROM sync_rows WHERE community_id = ?1), ?5, ?6, ?7, ?8, ?9)
+         ON CONFLICT (community_id, tbl, id) DO UPDATE SET
+           data = excluded.data, deleted = 0, changed_at = excluded.changed_at, seq = excluded.seq,
+           updated_by = excluded.updated_by, received_at = excluded.received_at`,
+      )
+      .bind(community, id, JSON.stringify(data), changed, t.owner_id, me.id, now, tid, pid)
+      .run();
+    return { ok: true, id };
+  }
+
   /** Quita los mazos de los rivales de una fila (deja el propio). */
   static hideDecks(tbl, data, pid) {
     if (tbl === 'tournament_players') {

@@ -79,6 +79,16 @@ class Permissions {
   /// jugador y la versión web. Llegan a todos al sincronizar.
   bool get editsPlayersOnServer => !canEditPlayers;
 
+  /// Subir o corregir la lista de mazo de un jugador del Top (torneo
+  /// terminado): la suya, el jugador; cualquiera, el organizador y el
+  /// administrador.
+  bool canEditDeckList(String playerId) =>
+      !visitor && (isAdmin || _organizer || (this.playerId != null && playerId == this.playerId));
+
+  /// Las listas se guardan en este teléfono (organizador en Android, que las
+  /// sube) o en el servidor (jugadores y la versión web).
+  bool get savesDeckListsLocally => canManageTournament(isOwner: true);
+
   /// Ficha de un jugador: todos ven la ficha pública de cualquiera (apodo,
   /// torneos, mazos, winrate). Ver [canSeePersonalData] para lo privado.
   bool canSeePlayerProfile(String id) => true;

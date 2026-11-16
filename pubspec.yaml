@@ -1,7 +1,7 @@
 name: garaje_tcg
 description: Gestión offline de torneos TCG para la comunidad Garage TCG.
 publish_to: 'none'
-version: 0.2.0+1
+version: 0.3.0+2
 
 environment:
   sdk: ^3.8.0

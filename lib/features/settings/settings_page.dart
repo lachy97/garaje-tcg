@@ -14,6 +14,7 @@ import '../../app/widgets/brand.dart';
 import '../../app/widgets/common.dart';
 import '../../core/backup/backup_codec.dart';
 import '../../core/backup/backup_service.dart';
+import '../../core/auth/account.dart';
 import '../../core/auth/auth_providers.dart';
 import '../account/account_section.dart';
 import '../account/server_section.dart';
@@ -23,7 +24,9 @@ import 'merge_preview_page.dart';
 
 final _packageInfoProvider = FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
 
-/// Ajustes: licencia, copia de seguridad y datos de la app.
+/// Ajustes: cuenta, sincronización, avisos, apariencia, copia de seguridad
+/// y, solo para el administrador, servidor y modo administrador. Ya no hay
+/// licencias (la app se paga aparte).
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -189,6 +192,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final info = ref.watch(_packageInfoProvider).value;
     final perms = ref.watch(permissionsProvider);
+    // Servidor y modo administrador: solo la cuenta de administrador (no
+    // otros roles, ni el administrador viendo la app como otro rol).
+    final admin = !perms.visitor && perms.role == AppRole.admin;
 
     return Scaffold(
       appBar: AppBar(title: const Text('AJUSTES')),
@@ -310,11 +316,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 const CardDataSection(),
               ],
               // Conexión con el servidor y diagnóstico: solo administración.
-              if (perms.isAdmin) ...[
+              if (admin) ...[
                 const SectionLabel('Servidor'),
                 const ServerSection(),
               ],
-              if (perms.isAdmin && !perms.visitor) ...[
+              if (admin) ...[
                 const SectionLabel('Administrador'),
                 NeonCard(
                   onTap: () => context.push('/ajustes/admin'),
