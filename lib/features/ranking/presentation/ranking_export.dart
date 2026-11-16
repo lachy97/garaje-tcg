@@ -11,21 +11,22 @@ import '../../../app/theme.dart';
 /// Exporta el ranking completo como una sola imagen en alta calidad.
 Future<void> exportRankingImage(
   BuildContext context, {
-  required Season season,
+  required Season? season,
   required List<RankingRow> rows,
 }) {
-  final label = seasonLabel(season.year, season.quarter);
+  // Sin temporada: ranking global.
+  final label = season == null ? 'GLOBAL' : seasonLabel(season.year, season.quarter);
   return AppColors.runDark(() => runExport<RankingRow>(
     context,
     ExportSpec(
-      heading: 'RANKING · TEMPORADA $label',
+      heading: season == null ? 'RANKING GLOBAL · TODAS LAS TEMPORADAS' : 'RANKING · TEMPORADA $label',
       items: rows,
       tableBuilder: (page, width) =>
           RankingTable(rows: page, fixedWidth: width, forExport: true),
       legend: '${rows.length} jugadores · PJ partidas jugadas · V/D/E victorias, derrotas, '
           'empates · WR% victorias/partidas · Torn torneos · Mejor posición alcanzada',
-      fileBase: 'ranking_garage_tcg_${season.year}_T${season.quarter}',
-      shareText: 'Ranking Garage TCG · Temporada $label',
+      fileBase: season == null ? 'ranking_garage_tcg_global' : 'ranking_garage_tcg_${season.year}_T${season.quarter}',
+      shareText: season == null ? 'Ranking global Garage TCG' : 'Ranking Garage TCG · Temporada $label',
       rowHeightEstimate: 46,
     ),
   ));

@@ -71,7 +71,7 @@ class _DeckDetailPageState extends ConsumerState<DeckDetailPage> {
             onChanged: (v) => setState(() => _scope = v?.id ?? kAllSeasons),
           );
     final label = season == null
-        ? (_scope == kAllSeasons ? 'Histórico' : '')
+        ? (_scope == kAllSeasons ? 'Global' : '')
         : 'Temporada ${seasonLabel(season.year, season.quarter)}';
 
     return AsyncView(

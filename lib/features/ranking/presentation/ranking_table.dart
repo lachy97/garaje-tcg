@@ -116,7 +116,7 @@ class RankingTable extends StatelessWidget {
               Text('${r.draws}', style: TextStyle(color: AppColors.draw)),
               Text(r.played == 0 ? '—' : '${(r.winrate * 100).toStringAsFixed(0)}%'),
               Text('${r.tournaments}'),
-              Text('${r.bestPosition}º'),
+              Text(r.bestText),
             ],
           ),
       ],

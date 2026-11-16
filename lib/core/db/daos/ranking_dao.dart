@@ -101,6 +101,52 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
     return liveSeasonRanking(seasonId);
   }
 
+  /// Ranking global: todas las temporadas juntas (las importadas de antes
+  /// de la app, las cerradas y la que esté en juego). Por jugador: suma de
+  /// puntos, partidas y torneos; la mejor posición de todas; el último mazo
+  /// conocido. Se ordena con los mismos criterios que el de temporada.
+  Stream<List<RankingRow>> watchGlobalRanking({String game = kDefaultGame}) {
+    final db = attachedDatabase;
+    return customSelect(
+      'SELECT (SELECT COUNT(*) FROM season_results) + (SELECT COUNT(*) FROM ranking_snapshots) AS c',
+      readsFrom: {seasonResults, db.seasons, db.rankingSnapshots, db.players, db.tournaments},
+    ).watch().asyncMap((_) => globalRanking(game: game));
+  }
+
+  Future<List<RankingRow>> globalRanking({String game = kDefaultGame}) async {
+    final db = attachedDatabase;
+    final seasons = await (select(db.seasons)
+          ..where((s) => s.game.equals(game) & s.deletedAt.isNull())
+          ..orderBy([(s) => OrderingTerm.asc(s.year), (s) => OrderingTerm.asc(s.quarter)]))
+        .get();
+    final names = {
+      for (final p in await (select(db.players)..where((p) => p.deletedAt.isNull())).get()) p.id: p.nickname,
+    };
+    final acc = <String, _GlobalAcc>{};
+    for (final s in seasons) {
+      for (final r in await seasonRanking(s.id)) {
+        final a = acc.putIfAbsent(r.playerId, () => _GlobalAcc(r.nickname));
+        a.add(r);
+      }
+    }
+    return RankingRow.sortAndRank([
+      for (final MapEntry(key: id, value: a) in acc.entries)
+        RankingRow(
+          playerId: id,
+          nickname: names[id] ?? a.nickname,
+          points: a.points,
+          tournaments: a.tournaments,
+          bestPosition: a.best,
+          bestLabel: a.bestLabel,
+          wins: a.wins,
+          losses: a.losses,
+          draws: a.draws,
+          games: a.games,
+          lastDeck: a.lastDeck,
+        ),
+    ]);
+  }
+
   /// Ranking calculado con los torneos actuales (sin mirar la foto).
   Future<List<RankingRow>> liveSeasonRanking(String seasonId) async {
     final sid = Variable.withString(seasonId);
@@ -532,6 +578,8 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
             draws: j['d'] as int? ?? 0,
             lastDeck: j['deck'] as String?,
             rank: r.rank,
+            games: j['games'] as int?,
+            bestLabel: j['bestLabel'] as String?,
           );
         }(),
     ];
@@ -576,5 +624,32 @@ class RankingDao extends DatabaseAccessor<AppDatabase> with _$RankingDaoMixin {
           return s;
         }(),
     ];
+  }
+}
+
+/// Acumulado de un jugador para el ranking global.
+class _GlobalAcc {
+  _GlobalAcc(this.nickname);
+
+  final String nickname;
+  int points = 0, tournaments = 0, wins = 0, losses = 0, draws = 0, games = 0;
+  int best = 0;
+  String? bestLabel;
+  String? lastDeck;
+
+  void add(RankingRow r) {
+    points += r.points;
+    tournaments += r.tournaments;
+    wins += r.wins;
+    losses += r.losses;
+    draws += r.draws;
+    games += r.played;
+    // Mejor posición: la más baja (0 = sin dato).
+    if (r.bestPosition > 0 && (best == 0 || r.bestPosition < best)) {
+      best = r.bestPosition;
+      bestLabel = r.bestLabel;
+    }
+    // Las temporadas llegan en orden: se queda el último mazo conocido.
+    if (r.lastDeck != null) lastDeck = r.lastDeck;
   }
 }

@@ -539,3 +539,23 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Al crear un torneo, el nombre por defecto es el siguiente número de la temporada de la fecha elegida: el mayor número usado + 1 o, si ninguno tiene número, los torneos de la temporada + 1. Se recalcula al cambiar la fecha mientras no se escriba otro.
   - Modo administrador → **Nombres de los torneos**: propone el nombre de cada torneo terminado, numerado por fecha dentro de su temporada. Se pueden desmarcar los de prueba, que no cuentan para el número.
   - Lo guarda el servidor (`POST /v1/admin/tournaments/rename`, solo administrador) y llega a todos al sincronizar.
+
+## Temporadas anteriores (T1–T3 2026) y ranking global (16/11)
+- **Ranking final de T1, T2 y T3 2026** (tablas de Excel de la comunidad), en `lib/features/ranking/data/historic_seasons.dart`.
+  - Solo el ranking final, sin partidas ni mazos. Por jugador: puesto, puntos, PJ, PG, PP, PE (en T1 y T2 se deduce: PJ − PG − PP), torneos y mejor posición.
+  - Mejor posición: "1er…4to lugar" → 1–4; "TOP 8" y "TOP 16" se guardan como texto ("Top 8") porque no se sabe el puesto exacto; "MATAU" → "Sin Top".
+  - El mazo de las tablas **no** se importa.
+  - Se guardan como **temporadas cerradas** con su foto (`ranking_snapshots`, `statsJson` con `games`, `bestLabel` e `imported`), igual que una temporada cerrada desde la app. Se ven al elegir la temporada en Datos → Ranking.
+  - El PJ y el %WR son los del Excel (`RankingRow.games`), aunque PG+PP no siempre cuadra.
+  - Se respeta el orden del Excel: en la T1, CORONA sale como "38" entre el 32 y el 33 y queda en el puesto 33; en la T3, ERNESTO CACHARRO (700) queda en el 22.
+- **Importación** (Modo administrador → Temporadas anteriores, desde Android):
+  - Propone la ficha de cada nombre: mismo apodo, o alias conocidos (LACHY(FRANKLIN) → Lachy Lawton, THE SAMURAI → El Samurai, ANDY AHIJADO → Andy, ALEXIS → Alexy, ANDRES C. → Andres, YEISON → Jeison). Si no hay, crea una ficha nueva.
+  - Se tratan como la misma persona: LACHY PROWA = LACHY, y MIGUEL VITILIGO = MIGUEL V.
+  - Se puede cambiar la ficha de cada nombre antes de importar. Repetir la importación reemplaza la foto.
+  - Esas temporadas no se pueden reabrir (no tienen torneos y se perdería el ranking).
+- **Ranking global** (Datos → selector → "Global · todas las temporadas"), en `RankingDao.globalRanking`:
+  - Suma por ficha los puntos, V/D/E, PJ y torneos de todas las temporadas: importadas, cerradas y la actual en vivo.
+  - Mejor posición = la mejor de todas. Mazo = el último conocido.
+  - Mismos desempates que el de temporada. Se puede compartir como imagen ("RANKING GLOBAL").
+  - El filtro por mazo mira los torneos terminados de cualquier temporada.
+  - "Histórico" pasa a llamarse "Global" en el selector (también en la tier list).

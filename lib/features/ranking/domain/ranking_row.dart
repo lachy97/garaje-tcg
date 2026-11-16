@@ -12,6 +12,8 @@ class RankingRow {
     this.draws = 0,
     this.lastDeck,
     this.rank = 0,
+    this.games,
+    this.bestLabel,
   });
 
   final String playerId;
@@ -25,13 +27,27 @@ class RankingRow {
   final String? lastDeck;
   final int rank;
 
-  int get played => wins + losses + draws;
+  /// Partidas jugadas tal como vienen en un ranking importado (temporadas
+  /// anteriores a la app, sin partidas: el Excel no siempre cuadra con
+  /// V+D+E). null = V+D+E.
+  final int? games;
+
+  /// Mejor posición como texto ("Top 8", "Sin Top") cuando no se sabe el
+  /// puesto exacto (rankings importados). null = "Nº".
+  final String? bestLabel;
+
+  int get played => games ?? wins + losses + draws;
+
+  /// "1º", "Top 8"…
+  String get bestText => bestLabel ?? (bestPosition > 0 ? '$bestPositionº' : '—');
 
   /// Victorias / partidas jugadas (los BYE no cuentan como partida).
   double get winrate => played == 0 ? 0 : wins / played;
 
   RankingRow copyWith({int? rank, int? wins, int? losses, int? draws, String? lastDeck}) =>
       RankingRow(
+        games: games,
+        bestLabel: bestLabel,
         playerId: playerId,
         nickname: nickname,
         points: points,

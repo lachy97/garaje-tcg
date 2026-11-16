@@ -72,8 +72,8 @@ class _DecksPageState extends ConsumerState<DecksPage> with SingleTickerProvider
 
   Future<void> _shareTier(Season season, List<DeckSeasonStats> decks) => _run(() => exportDeckTierImages(
         context,
-        label: _all ? 'Histórico' : 'Temporada ${seasonLabel(season.year, season.quarter)}',
-        fileTag: _all ? 'historico' : '${season.year}_T${season.quarter}',
+        label: _all ? 'Global' : 'Temporada ${seasonLabel(season.year, season.quarter)}',
+        fileTag: _all ? 'global' : '${season.year}_T${season.quarter}',
         decks: decks,
         styles: ref.read(tierStylesProvider),
       ));
@@ -85,7 +85,11 @@ class _DecksPageState extends ConsumerState<DecksPage> with SingleTickerProvider
     final current = list == null || list.isEmpty ? null : pickSeason(list, _seasonId);
     final scopeId = _all ? kAllSeasons : current?.id;
     final decks = scopeId == null ? null : ref.watch(seasonDecksProvider(scopeId)).value;
-    final rows = current == null || _all ? null : ref.watch(seasonRankingProvider(current.id)).value;
+    final rows = current == null
+        ? null
+        : _all
+            ? ref.watch(globalRankingProvider).value
+            : ref.watch(seasonRankingProvider(current.id)).value;
     final perms = ref.watch(permissionsProvider);
     final tab = _tabs.index;
 
@@ -130,7 +134,7 @@ class _DecksPageState extends ConsumerState<DecksPage> with SingleTickerProvider
               tooltip: 'Opciones',
               icon: const Icon(Icons.settings_outlined),
               onSelected: (v) => switch (v) {
-                'share' when tab == 0 => _run(() => exportRankingImage(context, season: current!, rows: rows!)),
+                'share' when tab == 0 => _run(() => exportRankingImage(context, season: _all ? null : current!, rows: rows!)),
                 'share' => _shareTier(current!, decks!),
                 'close' => closeSeason(context, ref, current!),
                 _ => context.push('/mazos/gestionar'),
@@ -177,13 +181,9 @@ class _DecksPageState extends ConsumerState<DecksPage> with SingleTickerProvider
                 child: TabBarView(
                   controller: _tabs,
                   children: [
-                    // 1) Ranking (siempre de una temporada).
+                    // 1) Ranking de la temporada o global (histórico).
                     _all
-                        ? const EmptyState(
-                            icon: Icons.leaderboard_outlined,
-                            title: 'El ranking es por temporada',
-                            subtitle: 'Elige una temporada arriba para ver su ranking.',
-                          )
+                        ? const RankingView(key: ValueKey('global'), season: null)
                         : RankingView(key: ValueKey(season.id), season: season),
                     // 2) Tier list y tabla de mazos.
                     _TierTab(

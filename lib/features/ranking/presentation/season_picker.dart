@@ -52,7 +52,7 @@ class SeasonPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = allSelected
-        ? 'Histórico · todas las temporadas'
+        ? 'Global · todas las temporadas'
         : 'Temporada ${seasonLabel(selected.year, selected.quarter)}';
     return Center(
       child: PopupMenuButton<String>(
@@ -71,7 +71,7 @@ class SeasonPicker extends StatelessWidget {
             const PopupMenuDivider(),
             const PopupMenuItem(
               value: kAllSeasons,
-              child: Text('Histórico · todas las temporadas'),
+              child: Text('Global · todas las temporadas'),
             ),
           ],
           if (seasons.length < 2 && !allowAll)

@@ -10,6 +10,7 @@ import '../../../core/auth/auth_providers.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/database_provider.dart';
 import '../../../core/utils/season_utils.dart';
+import '../data/historic_seasons.dart';
 import '../domain/ranking_row.dart';
 import 'ranking_export.dart';
 import 'ranking_table.dart';
@@ -17,6 +18,11 @@ import 'ranking_table.dart';
 final seasonRankingProvider =
     StreamProvider.autoDispose.family<List<RankingRow>, String>((ref, seasonId) {
   return ref.watch(rankingDaoProvider).watchSeasonRanking(seasonId);
+});
+
+/// Ranking global: todas las temporadas juntas.
+final globalRankingProvider = StreamProvider.autoDispose<List<RankingRow>>((ref) {
+  return ref.watch(rankingDaoProvider).watchGlobalRanking();
 });
 
 /// Mazos con los que jugó cada jugador en los torneos terminados de una
@@ -30,9 +36,10 @@ final seasonPlayerDecksProvider =
         'SELECT DISTINCT tp.player_id AS p, d.name AS deck FROM tournament_players tp '
         'JOIN tournaments t ON t.id = tp.tournament_id '
         'JOIN decks d ON d.id = tp.deck_id '
-        "WHERE t.season_id = ? AND t.status = 'finished' AND t.deleted_at IS NULL "
+        // kAllSeasons ('*'): todas las temporadas (ranking global).
+        "WHERE (? = '*' OR t.season_id = ?) AND t.status = 'finished' AND t.deleted_at IS NULL "
         'AND tp.deleted_at IS NULL',
-        variables: [Variable.withString(seasonId)],
+        variables: [Variable.withString(seasonId), Variable.withString(seasonId)],
         readsFrom: {db.tournamentPlayers, db.tournaments, db.decks},
       )
       .watch()
@@ -46,11 +53,12 @@ final seasonPlayerDecksProvider =
 });
 
 /// Ranking de una temporada (pestaña Ranking de Datos): mi puesto, filtros por
-/// jugador y por mazo jugado, y la tabla.
+/// jugador y por mazo jugado, y la tabla. Sin temporada: ranking global.
 class RankingView extends ConsumerStatefulWidget {
   const RankingView({super.key, required this.season});
 
-  final Season season;
+  /// null = global (todas las temporadas).
+  final Season? season;
 
   @override
   ConsumerState<RankingView> createState() => _RankingViewState();
@@ -64,8 +72,8 @@ class _RankingViewState extends ConsumerState<RankingView> {
   @override
   Widget build(BuildContext context) {
     final season = widget.season;
-    final ranking = ref.watch(seasonRankingProvider(season.id));
-    final decksByPlayer = ref.watch(seasonPlayerDecksProvider(season.id)).value ?? const {};
+    final ranking = season == null ? ref.watch(globalRankingProvider) : ref.watch(seasonRankingProvider(season.id));
+    final decksByPlayer = ref.watch(seasonPlayerDecksProvider(season?.id ?? '*')).value ?? const {};
     return AsyncView(
       value: ranking,
       builder: (list) => SyncRefresh(
@@ -73,7 +81,10 @@ class _RankingViewState extends ConsumerState<RankingView> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 32),
           children: [
-            _SeasonStatusBar(season: season, hasRanking: list.isNotEmpty),
+            if (season == null)
+              const _GlobalInfo()
+            else
+              _SeasonStatusBar(season: season, hasRanking: list.isNotEmpty),
             if (list.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(top: 48),
@@ -159,6 +170,24 @@ Future<void> shareRanking(BuildContext context, Season season, List<RankingRow> 
   }
 }
 
+/// Qué suma el ranking global.
+class _GlobalInfo extends StatelessWidget {
+  const _GlobalInfo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Text(
+        'Ranking global: suma los puntos, partidas y torneos de todas las temporadas. '
+        'Mejor posición = la mejor de todas.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+      ),
+    );
+  }
+}
+
 /// Estado de la temporada: cerrada (ranking definitivo) o botón para cerrarla.
 class _SeasonStatusBar extends ConsumerWidget {
   const _SeasonStatusBar({required this.season, required this.hasRanking});
@@ -181,7 +210,10 @@ class _SeasonStatusBar extends ConsumerWidget {
             Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary),
             const SizedBox(width: 6),
             Flexible(
-              child: Text('Temporada cerrada$when · ranking definitivo',
+              child: Text(
+                  isHistoricSeason(season)
+                      ? 'Ranking final importado (antes de la app): sin partidas ni mazos'
+                      : 'Temporada cerrada$when · ranking definitivo',
                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ),
           ],

@@ -11,6 +11,8 @@ import '../../core/auth/account.dart';
 import '../../core/auth/http_auth_api.dart';
 import '../../core/sync/sync_service.dart';
 import '../../core/utils/season_utils.dart';
+import '../ranking/data/historic_seasons.dart';
+import '../ranking/presentation/historic_import_page.dart';
 import '../tournaments/domain/tournament_names.dart';
 import '../ranking/presentation/season_picker.dart';
 
@@ -35,11 +37,24 @@ class AdminPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('MODO ADMINISTRADOR')),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 40),
-        children: const [
-          SectionLabel('Nombres de los torneos'),
-          NeonCard(child: _TournamentNames()),
-          SectionLabel('Temporadas cerradas'),
-          NeonCard(child: _ClosedSeasons()),
+        children: [
+          const SectionLabel('Temporadas anteriores a la app'),
+          NeonCard(
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute<void>(builder: (_) => const HistoricImportPage())),
+            child: Row(
+              children: [
+                Icon(Icons.history, color: AppColors.neon),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('Importar el ranking final de T1, T2 y T3 2026')),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+          ),
+          const SectionLabel('Nombres de los torneos'),
+          const NeonCard(child: _TournamentNames()),
+          const SectionLabel('Temporadas cerradas'),
+          const NeonCard(child: _ClosedSeasons()),
         ],
       ),
     );
@@ -54,7 +69,9 @@ class _ClosedSeasons extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final seasons = ref.watch(seasonListProvider).value ?? const <Season>[];
-    final closed = seasons.where((s) => s.status == SeasonStatus.closed).toList();
+    // Las importadas (antes de la app) no se reabren: no tienen torneos y se
+    // perdería su ranking (se vuelven a importar arriba si hace falta).
+    final closed = seasons.where((s) => s.status == SeasonStatus.closed && !isHistoricSeason(s)).toList();
     if (closed.isEmpty) {
       return Text('No hay temporadas cerradas. Se cierran desde Datos → Ranking (botón de ajustes).',
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary));
