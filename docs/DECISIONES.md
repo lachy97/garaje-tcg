@@ -559,3 +559,14 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Mismos desempates que el de temporada. Se puede compartir como imagen ("RANKING GLOBAL").
   - El filtro por mazo mira los torneos terminados de cualquier temporada.
   - "Histórico" pasa a llamarse "Global" en el selector (también en la tier list).
+
+## Calculadora de vida (16/11)
+- Estudio y diseño en `docs/CALCULADORA_VIDA.md`. Fase 1 hecha:
+  - Un solo teléfono en el centro de la mesa (mitad de arriba girada).
+  - Teclado que autocompleta con "00" hasta 4 cifras, botones rápidos y ½.
+  - Aviso del último cambio, deshacer y rehacer, y registro con moneda y dado.
+  - Partida al mejor de 3, con confirmación al llegar a 0.
+  - **Reloj de ajedrez** por jugador: solo corre el del turno, con botón "Turno" y pausa, y tiempos por duelo y en total.
+  - Pantalla siempre encendida, y el estado se guarda en el teléfono en cada cambio.
+- Desde Mi mesa muestra la mesa y el tiempo de la ronda, y al terminar **"Reportar 2-1"** usa el reporte de siempre.
+- No toca el servidor: solo viaja el resultado final.

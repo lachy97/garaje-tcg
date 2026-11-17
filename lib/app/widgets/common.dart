@@ -286,6 +286,7 @@ Future<bool> confirmDialog(
   required String title,
   required String message,
   String confirm = 'Aceptar',
+  String cancel = 'Cancelar',
   bool danger = false,
 }) async {
   final ok = await showDialog<bool>(
@@ -295,7 +296,7 @@ Future<bool> confirmDialog(
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(cancel)),
         FilledButton(
           style: danger
               ? FilledButton.styleFrom(backgroundColor: AppColors.loss)

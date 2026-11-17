@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../duel/presentation/duel_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -95,6 +97,13 @@ class TournamentsPage extends ConsumerWidget {
                       child: Row(
                         children: [
                           const SyncStatusIcon(),
+                          // Calculadora de vida para un duelo libre.
+                          IconButton(
+                            tooltip: 'Calculadora de vida',
+                            onPressed: () => Navigator.of(context, rootNavigator: true)
+                                .push(MaterialPageRoute<void>(builder: (_) => const DuelPage())),
+                            icon: const Icon(Icons.calculate_outlined),
+                          ),
                           IconButton(
                             tooltip: 'Ajustes',
                             onPressed: () => context.push('/ajustes'),

@@ -7,6 +7,8 @@ import '../../../app/widgets/common.dart';
 import '../../../core/auth/account.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/play/play.dart';
+import '../../duel/application/duel_controller.dart';
+import '../../duel/presentation/duel_page.dart';
 import '../domain/game_score.dart';
 import 'my_table.dart';
 
@@ -200,6 +202,26 @@ class _TableActionsState extends ConsumerState<TableActions> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // Calculadora de vida de esta mesa (con el tiempo de la ronda y
+              // el reporte al terminar la partida).
+              if (!i.bye)
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => DuelPage(
+                      setup: DuelSetup(
+                        tournamentId: i.tournamentId,
+                        matchId: i.matchId,
+                        iAmP1: i.iAmP1,
+                        topCut: i.topCut,
+                        opponent: i.opponent ?? 'Rival',
+                        playerId: i.playerId,
+                      ),
+                    ),
+                  )),
+                  icon: const Icon(Icons.calculate_outlined, size: 18),
+                  label: const Text('Calculadora'),
+                ),
+              const Spacer(),
               if (judge == null)
                 TextButton.icon(
                   onPressed: _busy ? null : _judge,
