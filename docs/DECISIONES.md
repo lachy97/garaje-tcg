@@ -567,6 +567,11 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Aviso del último cambio, deshacer y rehacer, y registro con moneda y dado.
   - Partida al mejor de 3, con confirmación al llegar a 0.
   - **Reloj de ajedrez** por jugador: solo corre el del turno, con botón "Turno" y pausa, y tiempos por duelo y en total.
-  - Pantalla siempre encendida, y el estado se guarda en el teléfono en cada cambio.
+  - Pantalla siempre encendida.
 - Desde Mi mesa muestra la mesa y el tiempo de la ronda, y al terminar **"Reportar 2-1"** usa el reporte de siempre.
 - No toca el servidor: solo viaja el resultado final.
+- **Cambios del 17/11**:
+  - La calculadora **no guarda las partidas**: solo vive en memoria mientras la app está abierta.
+  - Más → **Reiniciar la calculadora** vuelve todo a 0.
+  - Botones de **±50** (con −/+ para pasar a sumar).
+  - **Vista en espejo (vertical) u horizontal**, a elegir en Más; la elección se recuerda.

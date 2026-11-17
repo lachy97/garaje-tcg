@@ -34,7 +34,7 @@ Estudio de noviembre de 2026. Se revisaron las apps de LP de Yu-Gi-Oh! más usad
 **Historial y correcciones**
 10. **Registro del duelo**: cada cambio con hora, jugador, de cuánto a cuánto y nota opcional ("ataque directo", "Solemn"). Las monedas y dados también salen en el registro (Duel Adviser).
 11. **Deshacer y rehacer** ilimitados (DeckTin). Deshacer está siempre a la vista; tocar una línea del registro permite volver a ese punto.
-12. **Nada se pierde**: el estado se guarda en el teléfono en cada cambio. Si la app se cierra, se queda sin batería o el sistema la mata, se vuelve exactamente al mismo punto (Lifetap, Duel Adviser).
+12. ~~Nada se pierde (guardar el estado en el teléfono)~~: descartado por Lachy el 17/11. La partida solo vive mientras la app está abierta.
 
 **Partida (Bo3) y torneo: lo que no tiene ninguna app**
 13. **Contador de duelos de la partida** (1, 2, 3) con quién ganó cada uno, y botón "Siguiente duelo" que vuelve a 8000.
@@ -76,14 +76,18 @@ Estudio de noviembre de 2026. Se revisaron las apps de LP de Yu-Gi-Oh! más usad
 
 ## 4. Decisiones de Lachy (16/11) e implementación de la fase 1
 - **Teclado**: lo escrito se autocompleta con "00" mientras no pase de 4 cifras: "5" → 500, "18" → 1800. Con 3 cifras o más va tal cual: "150" → 150, "1800" → 1800, "050" → 50. El "00" se ve en gris mientras se escribe (`typedAmount`, `typedPreview`).
-- **Un solo teléfono en el centro de la mesa** (vista espejada). No hay vista de un solo lado.
+- **Vista** (Más → "Ver en horizontal / en espejo"; se recuerda en el teléfono):
+  - **Espejo**: vertical, con el teléfono en el centro de la mesa y la mitad de arriba girada para el rival.
+  - **Horizontal**: los dos lados de pie, uno junto al otro.
+- **No se guardan las partidas** (17/11): la partida solo vive en memoria mientras la app está abierta. Más → **Reiniciar la calculadora** vuelve todo a 0.
+- **±50**: botones rápidos −50 / −100 / −500 / −1000 y ½. El botón **−/+** de la izquierda los cambia a sumar (vuelven a restar después de cada suma). Mantener pulsado hace lo contrario.
 - **Tiempo de partida (reloj de ajedrez)**: cada jugador tiene su reloj y solo corre el del que está jugando su turno.
   - El botón **Turno** (o tocar el propio reloj) para uno y arranca el otro. Pausa en la barra central.
   - Al empezar cada duelo se toca el reloj del que empieza.
   - Se guarda el tiempo de cada uno **por duelo y en total**; se ve en "Resumen de la partida".
-- Archivos: `lib/features/duel/domain/duel.dart` (lógica pura, con tests en `test/duel_test.dart`), `application/duel_controller.dart` (estado guardado en el teléfono en cada cambio: `duel.current`) y `presentation/duel_page.dart`.
+- Archivos: `lib/features/duel/domain/duel.dart` (lógica pura, con tests en `test/duel_test.dart`), `application/duel_controller.dart` (estado en memoria; solo la vista elegida se guarda: `duel.layout`) y `presentation/duel_page.dart`.
 - Se abre desde **Mi mesa → Calculadora** (con el rival, la mesa, el tiempo de la ronda y "Reportar" al terminar) y desde el icono de **calculadora en Torneos** (duelo libre, con nombres editables).
-- Botones rápidos −100 / −500 / −1000 (mantener pulsado = sumar) y ½. Al llegar a 0 se confirma el ganador del duelo (o se deshace).
+- Al llegar a 0 se confirma el ganador del duelo (o se deshace).
 
 ## 5. Fases
 1. **MVP (lo del torneo)**: pantalla espejada, teclado + botones rápidos + ½, aviso del cambio, deshacer y rehacer, registro, estado que no se pierde, moneda y dado, pantalla encendida, partida Bo3 y "Reportar" desde Mi mesa con el tiempo de la ronda.

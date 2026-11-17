@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,31 +24,23 @@ class DuelSetup {
   final String? playerId;
 }
 
-/// La partida en curso de la calculadora. Se guarda en el teléfono en cada
-/// cambio: si la app se cierra o se queda sin batería, se sigue igual.
-class DuelController extends Notifier<DuelMatch?> {
-  static const _key = 'duel.current';
+/// Cómo se ve la calculadora: en espejo (vertical, la mitad de arriba
+/// girada para el rival) u horizontal (los dos lados de pie, uno junto al
+/// otro).
+enum DuelLayout { mirror, horizontal }
 
+/// La partida en curso de la calculadora. Solo vive mientras la app está
+/// abierta: no se guarda nada de las partidas.
+class DuelController extends Notifier<DuelMatch?> {
   @override
   DuelMatch? build() => null;
 
-  /// Abre la partida: la guardada si es la misma (la misma mesa del torneo,
-  /// o un duelo libre), o una nueva.
-  Future<void> open(DuelSetup? setup) async {
-    DuelMatch? saved;
-    try {
-      final p = await SharedPreferences.getInstance();
-      final raw = p.getString(_key);
-      if (raw != null) saved = DuelMatch.fromJson((jsonDecode(raw) as Map).cast<String, Object?>());
-    } catch (_) {
-      saved = null;
-    }
-    if (saved != null && saved.matchId == setup?.matchId) {
-      state = saved;
-      return;
-    }
+  /// Abre la calculadora: sigue con la partida en memoria si es la misma
+  /// (la misma mesa del torneo, o un duelo libre); si no, empieza de cero.
+  void open(DuelSetup? setup) {
+    final current = state;
+    if (current != null && current.matchId == setup?.matchId) return;
     state = fresh(setup);
-    await _save();
   }
 
   static DuelMatch fresh(DuelSetup? setup, {List<String>? names}) => DuelMatch(
@@ -68,24 +58,44 @@ class DuelController extends Notifier<DuelMatch?> {
     final m = current.copy();
     change(m);
     state = m;
-    _save();
   }
 
   /// Nueva partida (misma mesa o duelo libre), con los mismos nombres.
+  /// Reinicia la calculadora desde 0: LP, duelos, tiempos y registro (los
+  /// nombres se quedan).
   void restart(DuelSetup? setup) {
     final names = state?.names;
     state = fresh(setup, names: names);
-    _save();
+  }
+}
+
+/// Vista elegida (espejo u horizontal). Es un ajuste del teléfono, no un dato
+/// de la partida: se recuerda para la próxima vez.
+class DuelLayoutController extends Notifier<DuelLayout> {
+  static const _key = 'duel.layout';
+
+  @override
+  DuelLayout build() {
+    SharedPreferences.getInstance()
+        .then((p) {
+          final v = p.getString(_key);
+          if (v == DuelLayout.horizontal.name && ref.mounted && state != DuelLayout.horizontal) {
+            state = DuelLayout.horizontal;
+          }
+        })
+        .catchError((_) {});
+    return DuelLayout.mirror;
   }
 
-  Future<void> _save() async {
-    final m = state;
-    if (m == null) return;
+  Future<void> set(DuelLayout v) async {
+    state = v;
     try {
       final p = await SharedPreferences.getInstance();
-      await p.setString(_key, jsonEncode(m.toJson()));
+      await p.setString(_key, v.name);
     } catch (_) {}
   }
 }
+
+final duelLayoutProvider = NotifierProvider<DuelLayoutController, DuelLayout>(DuelLayoutController.new);
 
 final duelProvider = NotifierProvider<DuelController, DuelMatch?>(DuelController.new);

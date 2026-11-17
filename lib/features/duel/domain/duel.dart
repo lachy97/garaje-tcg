@@ -1,6 +1,6 @@
 /// Calculadora de vida (LP) de una partida de Yu-Gi-Oh! (al mejor de 3),
 /// con un solo teléfono en el centro de la mesa. Dart puro (sin Flutter):
-/// así se prueba y se guarda en el teléfono como JSON.
+/// así se prueba y se copia (JSON) para deshacer. No se guarda en el teléfono.
 ///
 /// Jugador 0 = la mitad de abajo (en un torneo, yo); 1 = la de arriba
 /// (girada, el rival).

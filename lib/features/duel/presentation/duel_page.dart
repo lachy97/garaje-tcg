@@ -38,9 +38,16 @@ class _DuelPageState extends ConsumerState<DuelPage> {
   @override
   void initState() {
     super.initState();
-    ref.read(duelProvider.notifier).open(widget.setup);
+    // Después del primer dibujo (no se puede cambiar un provider durante
+    // initState).
+    Future.microtask(() {
+      if (mounted) ref.read(duelProvider.notifier).open(widget.setup);
+    });
     // La pantalla no se apaga mientras se juega.
     WakelockPlus.enable().catchError((_) {});
+    // Vertical en espejo u horizontal, según lo elegido.
+    _applyOrientation(ref.read(duelLayoutProvider));
+    ref.listenManual(duelLayoutProvider, (_, v) => _applyOrientation(v));
     // Relojes y tiempo de ronda.
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -51,7 +58,17 @@ class _DuelPageState extends ConsumerState<DuelPage> {
   void dispose() {
     _tick?.cancel();
     WakelockPlus.disable().catchError((_) {});
+    // El resto de la app gira con el teléfono, como siempre.
+    SystemChrome.setPreferredOrientations(const []).catchError((_) {});
     super.dispose();
+  }
+
+  void _applyOrientation(DuelLayout layout) {
+    SystemChrome.setPreferredOrientations(
+      layout == DuelLayout.horizontal
+          ? const [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]
+          : const [DeviceOrientation.portraitUp],
+    ).catchError((_) {});
   }
 
   DuelController get _c => ref.read(duelProvider.notifier);
@@ -198,17 +215,32 @@ class _DuelPageState extends ConsumerState<DuelPage> {
                   title: const Text('Nombres de los jugadores'),
                   onTap: () => Navigator.pop(ctx, 'names'),
                 ),
+              // Cómo se ve: en espejo (vertical) u horizontal.
+              ListTile(
+                leading: Icon(
+                  ref.read(duelLayoutProvider) == DuelLayout.mirror ? Icons.stay_current_landscape : Icons.flip,
+                ),
+                title: Text(
+                  ref.read(duelLayoutProvider) == DuelLayout.mirror ? 'Ver en horizontal' : 'Ver en espejo (vertical)',
+                ),
+                subtitle: Text(
+                  ref.read(duelLayoutProvider) == DuelLayout.mirror
+                      ? 'Los dos lados de pie, uno junto al otro'
+                      : 'Teléfono en el centro: la mitad de arriba girada para el rival',
+                ),
+                onTap: () => Navigator.pop(ctx, 'layout'),
+              ),
+              ListTile(
+                leading: Icon(Icons.restart_alt, color: AppColors.loss),
+                title: Text('Reiniciar la calculadora', style: TextStyle(color: AppColors.loss)),
+                subtitle: const Text('Desde 0: LP a 8000, duelos, tiempos y registro'),
+                onTap: () => Navigator.pop(ctx, 'new'),
+              ),
               ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text('Salir'),
-                subtitle: const Text('La partida queda guardada: al volver sigue igual'),
+                subtitle: const Text('No se guarda nada de la partida'),
                 onTap: () => Navigator.pop(ctx, 'exit'),
-              ),
-              ListTile(
-                leading: Icon(Icons.fiber_new_outlined, color: AppColors.loss),
-                title: Text('Nueva partida', style: TextStyle(color: AppColors.loss)),
-                subtitle: const Text('Borra esta partida: LP, duelos, tiempos y registro'),
-                onTap: () => Navigator.pop(ctx, 'new'),
               ),
             ],
           ),
@@ -231,12 +263,16 @@ class _DuelPageState extends ConsumerState<DuelPage> {
         await _editNames(m);
       case 'exit':
         Navigator.of(context).maybePop();
+      case 'layout':
+        final next = ref.read(duelLayoutProvider) == DuelLayout.mirror ? DuelLayout.horizontal : DuelLayout.mirror;
+        await ref.read(duelLayoutProvider.notifier).set(next);
+        _applyOrientation(next);
       case 'new':
         final ok = await confirmDialog(
           context,
-          title: 'Nueva partida',
-          message: 'Se borra la partida actual.',
-          confirm: 'Nueva partida',
+          title: 'Reiniciar la calculadora',
+          message: 'Vuelve todo a 0: LP a $kStartLp, duelos, tiempos y registro.',
+          confirm: 'Reiniciar',
           danger: true,
         );
         if (ok) _c.restart(widget.setup);
@@ -266,8 +302,48 @@ class _DuelPageState extends ConsumerState<DuelPage> {
   @override
   Widget build(BuildContext context) {
     final m = ref.watch(duelProvider);
-    if (m == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    // (Otra partida en memoria: se ve la carga hasta abrir la de esta mesa.)
+    if (m == null || m.matchId != widget.setup?.matchId) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final now = DateTime.now();
+    final bar = _CenterBar(
+      match: m,
+      now: now,
+      setup: widget.setup,
+      onAct: _act,
+      onCoin: _coin,
+      onDice: _dice,
+      onLog: _showLog,
+      onMenu: _menu,
+      onClose: () => Navigator.of(context).maybePop(),
+    );
+    // Horizontal: los dos lados de pie, uno junto al otro (el rival a la
+    // izquierda) y la barra abajo.
+    if (ref.watch(duelLayoutProvider) == DuelLayout.horizontal) {
+      return Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _Half(match: m, player: 1, now: now, onAct: _act),
+                    ),
+                    VerticalDivider(width: 1, color: AppColors.neon.withValues(alpha: 0.5)),
+                    Expanded(
+                      child: _Half(match: m, player: 0, now: now, onAct: _act),
+                    ),
+                  ],
+                ),
+              ),
+              bar,
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -279,17 +355,7 @@ class _DuelPageState extends ConsumerState<DuelPage> {
                 child: _Half(match: m, player: 1, now: now, onAct: _act),
               ),
             ),
-            _CenterBar(
-              match: m,
-              now: now,
-              setup: widget.setup,
-              onAct: _act,
-              onCoin: _coin,
-              onDice: _dice,
-              onLog: _showLog,
-              onMenu: _menu,
-              onClose: () => Navigator.of(context).maybePop(),
-            ),
+            bar,
             Expanded(
               child: _Half(match: m, player: 0, now: now, onAct: _act),
             ),
@@ -459,14 +525,19 @@ class _HalfState extends State<_Half> {
     );
   }
 
+  /// Botones rápidos en modo sumar (por defecto restan). Vuelve a restar
+  /// después de cada suma.
+  bool _add = false;
+
   Widget _quickButtons() {
-    Widget quick(String label, VoidCallback onTap, {VoidCallback? onLong, Color? color}) => Expanded(
+    final sign = _add ? 1 : -1;
+    Widget quick(String label, VoidCallback onTap, {VoidCallback? onLong}) => Expanded(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 2),
         child: OutlinedButton(
           style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            foregroundColor: color,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
+            foregroundColor: _add ? AppColors.win : null,
             minimumSize: const Size(0, 44),
           ),
           onPressed: onTap,
@@ -477,30 +548,41 @@ class _HalfState extends State<_Half> {
         ),
       ),
     );
+    // Restar (o sumar, con el modo +) una cantidad. Mantener pulsado hace
+    // lo contrario.
+    Widget amount(int n) => quick('${_add ? '+' : '−'}$n', () {
+      widget.onAct((m) => m.damage(p, -sign * n));
+      if (_add) setState(() => _add = false);
+    }, onLong: () => widget.onAct((m) => m.damage(p, sign * n)));
     return Row(
       children: [
-        // Mantener pulsado: suma en vez de restar.
-        quick(
-          '−100',
-          () => widget.onAct((m) => m.damage(p, 100)),
-          onLong: () => widget.onAct((m) => m.damage(p, -100)),
-        ),
-        quick(
-          '−500',
-          () => widget.onAct((m) => m.damage(p, 500)),
-          onLong: () => widget.onAct((m) => m.damage(p, -500)),
-        ),
-        quick(
-          '−1000',
-          () => widget.onAct((m) => m.damage(p, 1000)),
-          onLong: () => widget.onAct((m) => m.damage(p, -1000)),
-        ),
-        quick('½', () => widget.onAct((m) => m.halve(p))),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
+        // − / +: cambia los botones entre restar y sumar.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: SizedBox(
+            width: 44,
             child: FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 44), padding: EdgeInsets.zero),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(44, 44),
+                padding: EdgeInsets.zero,
+                backgroundColor: _add ? AppColors.win : AppColors.loss,
+              ),
+              onPressed: () => setState(() => _add = !_add),
+              child: Text(_add ? '+' : '−', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ),
+        amount(50),
+        amount(100),
+        amount(500),
+        amount(1000),
+        quick('½', () => widget.onAct((m) => m.halve(p))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: SizedBox(
+            width: 44,
+            child: FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(44, 44), padding: EdgeInsets.zero),
               onPressed: () => setState(() => _keypad = true),
               child: const Icon(Icons.dialpad),
             ),
@@ -711,7 +793,11 @@ class _CenterBar extends ConsumerWidget {
                       ? 'Partida terminada · $w-${d > 0 ? '$d-' : ''}$l'
                       : 'Duelo ${m.game} · $w-${d > 0 ? '$d-' : ''}$l${m.turn > 0 ? ' · Turno ${m.turn}' : ''}'
                             // Qué hacer con el reloj parado.
-                            '${m.clockRunning ? '' : m.turn == 0 ? ' · Toca el reloj del que empieza' : ' · En pausa: toca el reloj del que juega'}',
+                            '${m.clockRunning
+                                ? ''
+                                : m.turn == 0
+                                ? ' · Toca el reloj del que empieza'
+                                : ' · En pausa: toca el reloj del que juega'}',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 if (table != null) ...[
@@ -949,7 +1035,7 @@ class _SummarySheetState extends ConsumerState<_SummarySheet> {
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.fiber_new_outlined),
-                  label: const Text('Nueva partida'),
+                  label: const Text('Reiniciar la calculadora'),
                 ),
               ],
             ],
