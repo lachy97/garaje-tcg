@@ -107,6 +107,24 @@ Estudio de noviembre de 2026. Se revisaron las apps de LP de Yu-Gi-Oh! más usad
   - Tocar el reloj pasa el turno; mantenerlo pulsado lo pausa. Antes de cada duelo sale "Empiezo yo".
 - **Borrar con los "00"**: con 1 o 2 cifras se añaden dos ceros ("30" → 3000). El primer borrar quita esos ceros ("30" → 30), no la cifra escrita. Al vaciarlo, la siguiente cantidad vuelve a llevar los ceros (`typedBackspace`).
 
+## 4c. Correcciones del 20/11 (segunda tanda)
+- **Moneda y dado animados (2 s)**:
+  - La **moneda** sube, gira sobre sí misma cada vez más despacio, cae con un pequeño rebote y su sombra crece al bajar. Es una moneda dorada con CARA (estrella) y CRUZ (aspa).
+  - El **dado** es un cubo 3D (perspectiva, caras con luz según hacia dónde miran, el 1 en rojo) que rueda y rebota frenando hasta dejar el resultado de frente.
+  - El resultado se decide al azar al empezar y la animación termina exactamente en él (`diceRestAngles`, probado en `test/duel_visuals_test.dart`). Al parar, queda en el registro.
+  - El diálogo sale orientado hacia el jugador que lo pidió.
+- **Girar**: cada toque gira ese lado **90°** (vuelta completa en 4 toques). La pantalla queda en vertical; se quita la vista horizontal aparte.
+- **Opciones (⋮)**: solo **Reiniciar**, **Registro de la partida** y **Salir**, más el selector de tema arriba. Se quitan "gana el duelo", empate, resumen y reporte (no se guarda nada); al llegar a 0 se paran los relojes.
+- **Barra de vida** (igual en todos los temas, `lifeBarColor`):
+  - Verde a 8000; al bajar pasa a naranja y a rojo, y cerca de 0 a un rojo intenso.
+  - Por encima de 8000 se vuelve azul, más intenso cuanto más se aleja (máximo a 16000).
+- **5 temas** (se recuerdan en el teléfono: `duel.theme`):
+  - **Neón**: el verde de la app.
+  - **Hielo**: azul.
+  - **Faraón**: oro.
+  - **Abismo**: morado.
+  - **Papel**: claro.
+
 ## 5. Fases
 1. **MVP (lo del torneo)**: pantalla espejada, teclado + botones rápidos + ½, aviso del cambio, deshacer y rehacer, registro, estado que no se pierde, moneda y dado, pantalla encendida, partida Bo3 y "Reportar" desde Mi mesa con el tiempo de la ronda.
 2. **Mejoras**: VS de batalla, notas en el registro, deslizar para ±100, sonidos, animación configurable, turnos extra al acabar el tiempo y compartir el registro (texto).

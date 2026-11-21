@@ -581,3 +581,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Deshacer, girar cada lado y opciones en la esquina de cada lado; Reiniciar (LP y relojes) en opciones.
   - Reloj del turno (vuelve a 0 en cada turno) además del total.
   - El primer borrar quita los "00" añadidos (ver `docs/CALCULADORA_VIDA.md` §4b).
+- **Correcciones del 20/11 (2)**:
+  - Moneda y dado con animación realista de 2 s (moneda que vuela y gira, dado 3D que rueda y rebota).
+  - Girar cada lado de 90 en 90°.
+  - Opciones reducidas a Reiniciar, Registro y Salir (más el tema).
+  - Barra de vida verde→rojo intenso al bajar y azul intenso por encima de 8000.
+  - 5 temas (Neón, Hielo, Faraón, Abismo, Papel).
