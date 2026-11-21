@@ -89,6 +89,24 @@ Estudio de noviembre de 2026. Se revisaron las apps de LP de Yu-Gi-Oh! más usad
 - Se abre desde **Mi mesa → Calculadora** (con el rival, la mesa, el tiempo de la ronda y "Reportar" al terminar) y desde el icono de **calculadora en Torneos** (duelo libre, con nombres editables).
 - Al llegar a 0 se confirma el ganador del duelo (o se deshace).
 
+## 4b. Rediseño del 20/11 (marcas de Lachy sobre la captura)
+- **Sin barra central ni nombres**: se quitan el nombre, las estrellas y la barra de botones del centro. Los dos lados quedan separados por una línea.
+- **LP más grandes** (se ajustan al ancho). Con el teclado abierto, los LP se encogen para dejar sitio.
+- **Teclado** en 3 columnas: 1–9 en 3 filas, una cuarta fila con **moneda · 0 · dado**, y debajo Restar / Sumar.
+- **Esquina de cada lado**: deshacer, **girar ese lado 180°** (cada lado por separado, en espejo y en horizontal) y opciones (⋮).
+- **Opciones**:
+  - **Reiniciar** (LP a 8000 y relojes a 0).
+  - Pausar los relojes.
+  - Gana el duelo / empate.
+  - Registro y Resumen de tiempos.
+  - Vista espejo u horizontal, nombres (duelo libre) y salir.
+  - Arriba, el marcador y la ronda del torneo.
+- **Dos relojes por jugador**:
+  - El del **turno** vuelve a 0 en cada turno; fuera de su turno se ve 0:00; tras una pausa en su turno, sigue.
+  - El **total** de la partida.
+  - Tocar el reloj pasa el turno; mantenerlo pulsado lo pausa. Antes de cada duelo sale "Empiezo yo".
+- **Borrar con los "00"**: con 1 o 2 cifras se añaden dos ceros ("30" → 3000). El primer borrar quita esos ceros ("30" → 30), no la cifra escrita. Al vaciarlo, la siguiente cantidad vuelve a llevar los ceros (`typedBackspace`).
+
 ## 5. Fases
 1. **MVP (lo del torneo)**: pantalla espejada, teclado + botones rápidos + ½, aviso del cambio, deshacer y rehacer, registro, estado que no se pierde, moneda y dado, pantalla encendida, partida Bo3 y "Reportar" desde Mi mesa con el tiempo de la ronda.
 2. **Mejoras**: VS de batalla, notas en el registro, deslizar para ±100, sonidos, animación configurable, turnos extra al acabar el tiempo y compartir el registro (texto).

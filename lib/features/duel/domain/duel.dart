@@ -9,19 +9,30 @@ library;
 /// LP iniciales de cada duelo.
 const kStartLp = 8000;
 
-/// Cantidad escrita en el teclado. Se autocompleta con "00" mientras el
-/// resultado no pase de 4 cifras: "5" → 500, "18" → 1800. Con 3 cifras o
-/// más se toma tal cual: "150" → 150, "1800" → 1800, "050" → 50.
-int? typedAmount(String digits) {
+/// Cantidad escrita en el teclado. Con 1 o 2 cifras se añaden dos ceros
+/// detrás ([zeros]): "5" → 500, "30" → 3000. Con 3 cifras o más va tal
+/// cual: "150" → 150, "1800" → 1800. Al borrar con los ceros puestos se
+/// quitan primero esos dos ceros ([zeros] = false): "30" → 30.
+int? typedAmount(String digits, {bool zeros = true}) {
   if (digits.isEmpty) return null;
   final n = int.tryParse(digits);
   if (n == null) return null;
-  return digits.length <= 2 ? n * 100 : n;
+  return zeros && digits.length <= 2 ? n * 100 : n;
 }
 
 /// Lo que se ve al escribir: lo tecleado y el "00" que se añade (en gris).
-(String typed, String suffix) typedPreview(String digits) =>
-    (digits, digits.isNotEmpty && digits.length <= 2 ? '00' : '');
+(String typed, String suffix) typedPreview(String digits, {bool zeros = true}) =>
+    (digits, zeros && digits.isNotEmpty && digits.length <= 2 ? '00' : '');
+
+/// Borrar en el teclado: si se ven los "00" añadidos, se quitan ellos (no la
+/// última cifra escrita). Devuelve (cifras, ceros).
+(String, bool) typedBackspace(String digits, {bool zeros = true}) {
+  if (digits.isEmpty) return ('', true);
+  if (zeros && digits.length <= 2) return (digits, false);
+  final rest = digits.substring(0, digits.length - 1);
+  // Al vaciarlo, la próxima cantidad vuelve a llevar los ceros.
+  return (rest, rest.isEmpty ? true : zeros);
+}
 
 /// Una línea del registro del duelo.
 class DuelLogEntry {
@@ -88,6 +99,8 @@ class DuelMatch {
     this.active,
     this.runningSince,
     this.turn = 0,
+    this.lastActive,
+    List<int>? turnMs,
     List<DuelSnap>? undo,
     List<DuelSnap>? redo,
   }) : lp = lp ?? [kStartLp, kStartLp],
@@ -96,6 +109,7 @@ class DuelMatch {
        clockMs = clockMs ?? [0, 0],
        gameClockMs = gameClockMs ?? [],
        gameStartMs = gameStartMs ?? [0, 0],
+       turnMs = turnMs ?? [0, 0],
        _undo = undo ?? [],
        _redo = redo ?? [];
 
@@ -133,6 +147,14 @@ class DuelMatch {
 
   /// Turno del duelo actual (sube al pasar el turno).
   int turn;
+
+  /// De quién es el turno en curso (aunque el reloj esté en pausa): al
+  /// reanudar el mismo jugador, su tiempo del turno sigue.
+  int? lastActive;
+
+  /// Tiempo de cada jugador en su turno actual (se pone a 0 al empezar cada
+  /// turno), sin el tramo que está corriendo.
+  final List<int> turnMs;
 
   final List<DuelSnap> _undo;
   final List<DuelSnap> _redo;
@@ -220,37 +242,59 @@ class DuelMatch {
   /// Tiempo de [p] en el duelo actual.
   Duration gameElapsed(int p, DateTime now) => elapsed(p, now) - Duration(milliseconds: gameStartMs[p]);
 
+  /// Tiempo de [p] en su turno actual (vuelve a 0 en cada turno).
+  Duration turnElapsed(int p, DateTime now) => Duration(
+    milliseconds: turnMs[p] + (active == p && runningSince != null ? now.difference(runningSince!).inMilliseconds : 0),
+  );
+
   void _stopClock(DateTime now) {
     final a = active;
     if (a != null && runningSince != null) {
-      clockMs[a] += now.difference(runningSince!).inMilliseconds;
+      final ms = now.difference(runningSince!).inMilliseconds;
+      clockMs[a] += ms;
+      turnMs[a] += ms;
     }
     active = null;
     runningSince = null;
   }
 
-  /// Empieza a correr el tiempo de [p] (y para el del otro).
+  /// Empieza un turno nuevo de [p]: su reloj del turno vuelve a 0.
+  void _beginTurn(int p, DateTime t) {
+    turnMs[p] = 0;
+    active = p;
+    lastActive = p;
+    runningSince = t;
+  }
+
+  /// Empieza a correr el tiempo de [p] (y para el del otro). Si era su
+  /// turno (reanudar tras una pausa), su tiempo del turno sigue.
   void startClock(int p, {DateTime? now}) {
     final t = now ?? DateTime.now();
     if (active == p) return;
     final first = turn == 0;
+    final resume = lastActive == p && !first;
     _stopClock(t);
-    active = p;
-    runningSince = t;
+    if (resume) {
+      active = p;
+      runningSince = t;
+    } else {
+      _beginTurn(p, t);
+      if (!first) turn++;
+    }
     if (first) {
       turn = 1;
       note('Duelo $game: empieza ${names[p]}', kind: 'turn', player: p, now: t);
     }
   }
 
-  /// Pasa el turno: para el reloj del que jugaba y arranca el del rival.
+  /// Pasa el turno: para el reloj del que jugaba y arranca el del rival
+  /// (con su tiempo del turno desde 0).
   void passTurn({DateTime? now}) {
     final a = active;
     if (a == null) return;
     final t = now ?? DateTime.now();
     _stopClock(t);
-    active = 1 - a;
-    runningSince = t;
+    _beginTurn(1 - a, t);
     turn++;
   }
 
@@ -293,6 +337,10 @@ class DuelMatch {
       ..[0] = clockMs[0]
       ..[1] = clockMs[1];
     turn = 0;
+    lastActive = null;
+    turnMs
+      ..[0] = 0
+      ..[1] = 0;
     _undo.clear();
     _redo.clear();
   }
@@ -339,6 +387,8 @@ class DuelMatch {
     'active': active,
     'since': runningSince?.millisecondsSinceEpoch,
     'turn': turn,
+    'last': lastActive,
+    'tms': turnMs,
     'undo': [for (final s in _undo) s.toJson()],
     'redo': [for (final s in _redo) s.toJson()],
   };
@@ -364,6 +414,8 @@ class DuelMatch {
       active: (j['active'] as num?)?.toInt(),
       runningSince: j['since'] == null ? null : DateTime.fromMillisecondsSinceEpoch((j['since']! as num).toInt()),
       turn: (j['turn'] as num?)?.toInt() ?? 0,
+      lastActive: (j['last'] as num?)?.toInt(),
+      turnMs: ints(j['tms'], [0, 0]),
       undo: [for (final s in (j['undo'] as List?) ?? const []) DuelSnap.fromJson((s as Map).cast<String, Object?>())],
       redo: [for (final s in (j['redo'] as List?) ?? const []) DuelSnap.fromJson((s as Map).cast<String, Object?>())],
     );

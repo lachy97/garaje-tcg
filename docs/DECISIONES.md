@@ -575,3 +575,9 @@ Primer paso del plan online: la app ya tiene cuentas, roles y permisos, con un *
   - Más → **Reiniciar la calculadora** vuelve todo a 0.
   - Botones de **±50** (con −/+ para pasar a sumar).
   - **Vista en espejo (vertical) u horizontal**, a elegir en Más; la elección se recuerda.
+- **Rediseño del 20/11**:
+  - Sin barra central ni nombres; LP más grandes, que se encogen con el teclado abierto.
+  - Teclado 3×3 con moneda · 0 · dado.
+  - Deshacer, girar cada lado y opciones en la esquina de cada lado; Reiniciar (LP y relojes) en opciones.
+  - Reloj del turno (vuelve a 0 en cada turno) además del total.
+  - El primer borrar quita los "00" añadidos (ver `docs/CALCULADORA_VIDA.md` §4b).

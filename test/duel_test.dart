@@ -106,4 +106,45 @@ void main() {
     c.undo();
     expect(c.lp[1], 8000);
   });
+
+  test('teclado: borrar con los 00 puestos quita los ceros, no la cifra', () {
+    // "30" → 3000; borrar → 30.
+    var (d, z) = typedBackspace('30');
+    expect((d, z), ('30', false));
+    expect(typedAmount(d, zeros: z), 30);
+    expect(typedPreview(d, zeros: z), ('30', ''));
+    // Otra vez: ya quita la cifra.
+    (d, z) = typedBackspace(d, zeros: z);
+    expect((d, z), ('3', false));
+    expect(typedAmount(d, zeros: z), 3);
+    // Vacío: la siguiente cantidad vuelve a llevar los ceros.
+    (d, z) = typedBackspace(d, zeros: z);
+    expect((d, z), ('', true));
+    expect(typedAmount('7', zeros: z), 700);
+    // Con 3 cifras no hay ceros: borra la cifra.
+    expect(typedBackspace('150'), ('15', true));
+  });
+
+  test('reloj del turno: vuelve a 0 en cada turno y sigue tras una pausa', () {
+    final t0 = DateTime(2026, 11, 20, 15);
+    final m = DuelMatch(names: ['Yo', 'Rival']);
+    m.startClock(0, now: t0);
+    final t1 = t0.add(const Duration(minutes: 2));
+    expect(m.turnElapsed(0, t1), const Duration(minutes: 2));
+    m.pauseClock(now: t1);
+    // Reanuda el mismo jugador: su turno sigue (2 + 1 min).
+    m.startClock(0, now: t1.add(const Duration(minutes: 5)));
+    final t2 = t1.add(const Duration(minutes: 6));
+    expect(m.turnElapsed(0, t2), const Duration(minutes: 3));
+    expect(m.turn, 1);
+    m.passTurn(now: t2);
+    expect(m.turnElapsed(1, t2.add(const Duration(seconds: 40))), const Duration(seconds: 40));
+    m.passTurn(now: t2.add(const Duration(seconds: 40)));
+    // Nuevo turno del jugador 0: desde 0; su total sigue sumando.
+    final t3 = t2.add(const Duration(seconds: 50));
+    expect(m.turnElapsed(0, t3), const Duration(seconds: 10));
+    expect(m.elapsed(0, t3), const Duration(minutes: 3, seconds: 10));
+    expect(m.turn, 3);
+  });
 }
+
